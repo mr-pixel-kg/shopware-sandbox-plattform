@@ -3,6 +3,8 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from "primevue/button";
 import Tag from "primevue/tag"
+import Dialog from 'primevue/dialog';
+import InputText from 'primevue/inputtext';
 import SandboxService from "../../services/sandboxService.js";
 import ImagesService from "../../services/imagesService.js";
 
@@ -12,7 +14,9 @@ export default {
     DataTable,
     Column,
     Button,
-    Tag
+    Tag,
+    Dialog,
+    InputText
   },
 
   // Properties returned from data() become reactive state
@@ -25,7 +29,10 @@ export default {
         "image_tag": "6.6.8.2",
         "created_at": "2024-11-12T17:10:49+01:00",
         "size": 4860039980
-      }]
+      }],
+      addImageDialogVisible: false,
+      imageName: "",
+      imageTag: ""
     }
   },
 
@@ -41,6 +48,10 @@ export default {
       const i = Math.floor(Math.log(bytes) / Math.log(1024));
       const size = bytes / Math.pow(1024, i);
       return `${size.toFixed(2)} ${sizes[i]}`;
+    },
+    async addSandboxImage() {
+      await ImagesService.registerImage(this.imageName, this.imageTag);
+      this.addImageDialogVisible = false;
     }
   },
 
@@ -60,7 +71,10 @@ export default {
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xl font-bold">Sandbox Images</span>
-          <Button icon="pi pi-refresh" rounded raised @click="loadData"/>
+          <div class="flex gap-2">
+            <Button icon="pi pi-plus" rounded raised @click="addImageDialogVisible = true"/>
+            <Button icon="pi pi-refresh" rounded raised @click="loadData"/>
+          </div>
         </div>
       </template>
       <Column field="id" header="ID">
@@ -91,6 +105,22 @@ export default {
       </template>
     </DataTable>
   </div>
+
+  <Dialog v-model:visible="addImageDialogVisible" modal header="Add Sandbox Image" :style="{ width: '25rem' }">
+    <span class="text-surface-500 dark:text-surface-400 block mb-8">Enter docker image:</span>
+    <div class="flex items-center gap-4 mb-4">
+      <label for="image-name" class="font-semibold w-24">Image Name</label>
+      <InputText id="image-name" v-model="imageName" class="flex-auto" autocomplete="off" />
+    </div>
+    <div class="flex items-center gap-4 mb-8">
+      <label for="image-tag" class="font-semibold w-24">Image Tag</label>
+      <InputText id="image-tag" v-model="imageTag" class="flex-auto" autocomplete="off" />
+    </div>
+    <div class="flex justify-end gap-2">
+      <Button type="button" label="Cancel" severity="secondary" @click="addImageDialogVisible = false"></Button>
+      <Button type="button" label="Save" @click="addSandboxImage"></Button>
+    </div>
+  </Dialog>
 </template>
 
 <style scoped>

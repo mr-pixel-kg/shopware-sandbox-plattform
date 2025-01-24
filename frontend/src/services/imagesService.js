@@ -23,10 +23,10 @@ class ImagesService {
         return response.data;
     }
 
-    async registerImage() {
+    async registerImage(imageName, imageTag) {
         var data = {
-            "image_name": "dockware/dev",
-            "image_tag": "6.6.8.2"
+            "image_name": imageName,
+            "image_tag": imageTag
         };
         const response = await this.apiClient.post("/api/images", data);
         return response.data;
