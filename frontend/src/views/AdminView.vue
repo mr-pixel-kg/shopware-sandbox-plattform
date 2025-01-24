@@ -9,7 +9,7 @@ import Panel from 'primevue/panel';
       <Sidebar></Sidebar>
     </div>
     <div class="w-3/4 p-3">
-      <Panel header="Header">
+      <Panel>
         <router-view></router-view>
       </Panel>
     </div>

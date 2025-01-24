@@ -5,7 +5,9 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Select from 'primevue/select';
 import Dialog from 'primevue/dialog';
+import ProgressSpinner from 'primevue/progressspinner';
 import SandboxService from "../../services/sandboxService.js";
+import ImagesService from "../../services/imagesService.js";
 
 export default {
 
@@ -15,7 +17,8 @@ export default {
     Button,
     Select,
     Dialog,
-    Tag
+    Tag,
+    ProgressSpinner
   },
 
   // Properties returned from data() become reactive state
@@ -33,6 +36,7 @@ export default {
         status: "Up 1 second"
       }],
       createSandboxDialogVisible: false,
+      deployingSandboxLoading: false,
       sandboxImage: "",
       availableSandboxImages: ["dockware/dev:6.6.8.2"],
       sandboxLifetime: -1,
@@ -59,14 +63,22 @@ export default {
       }
     },
     openSandboxWindow(data) {
-      window.open(data.url, '_blank').focus();
+      window.open("https://" + data.url, '_blank').focus();
     },
     async deleteSandbox(data) {
       await SandboxService.deleteSandbox(data.id);
       await this.loadData();
     },
+    async openCreateSandboxDialog() {
+      let result = await ImagesService.getAllImages();
+      this.availableSandboxImages = result.map(item => `${item.image_name}:${item.image_tag}`);
+      this.createSandboxDialogVisible = true;
+    },
     async createSandboxEnvironment() {
+      this.deployingSandboxLoading = true;
       await SandboxService.createSandbox(this.sandboxImage, this.sandboxLifetime)
+      await this.loadData();
+      this.deployingSandboxLoading = false;
       this.createSandboxDialogVisible = false;
     }
   },
@@ -88,7 +100,7 @@ export default {
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xl font-bold">Sandbox Environments</span>
           <div class="flex gap-2">
-            <Button icon="pi pi-plus" rounded raised @click="createSandboxDialogVisible = true"/>
+            <Button icon="pi pi-plus" rounded raised @click="openCreateSandboxDialog"/>
             <Button icon="pi pi-refresh" rounded raised @click="loadData"/>
           </div>
         </div>
@@ -125,11 +137,17 @@ export default {
     </div>
     <div class="flex items-center gap-4 mb-8">
       <label for="sandbox-lifetime" class="font-semibold w-24">Lifetime</label>
-      <Select id="sandbox-lifetime" v-model="sandboxLifetime" :options="availableSandboxLifetimes" optionLabel="display" class="flex-auto" autocomplete="off" />
+      <Select id="sandbox-lifetime" v-model="sandboxLifetime" :options="availableSandboxLifetimes" optionLabel="display" optionValue="value" class="flex-auto" autocomplete="off" />
     </div>
-    <div class="flex justify-end gap-2">
-      <Button type="button" label="Cancel" severity="secondary" @click="createSandboxDialogVisible = false"></Button>
-      <Button type="button" label="Save" @click="createSandboxEnvironment"></Button>
+    <div :class="['flex gap-2', deployingSandboxLoading ? 'justify-between' : 'justify-end']">
+      <span v-if="deployingSandboxLoading" class="flex items-center gap-2 text-primary">
+        Deploying Sandbox...
+        <ProgressSpinner style="width: 50px; height: 30px" strokeWidth="8" fill="transparent" animationDuration=".5s" />
+      </span>
+      <div class="flex gap-2">
+        <Button type="button" label="Cancel" severity="secondary" @click="createSandboxDialogVisible = false"></Button>
+        <Button type="button" label="Deploy" :disabled="deployingSandboxLoading" @click="createSandboxEnvironment"></Button>
+      </div>
     </div>
   </Dialog>
 </template>

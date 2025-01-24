@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag"
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
+import ProgressSpinner from 'primevue/progressspinner';
 import SandboxService from "../../services/sandboxService.js";
 import ImagesService from "../../services/imagesService.js";
 
@@ -16,7 +17,8 @@ export default {
     Button,
     Tag,
     Dialog,
-    InputText
+    InputText,
+    ProgressSpinner
   },
 
   // Properties returned from data() become reactive state
@@ -31,6 +33,7 @@ export default {
         "size": 4860039980
       }],
       addImageDialogVisible: false,
+      pullingImageLoading: false,
       imageName: "",
       imageTag: ""
     }
@@ -49,8 +52,15 @@ export default {
       const size = bytes / Math.pow(1024, i);
       return `${size.toFixed(2)} ${sizes[i]}`;
     },
+    async deleteImage(data) {
+      await ImagesService.deleteImage(data.id);
+      await this.loadData();
+    },
     async addSandboxImage() {
+      this.pullingImageLoading = true;
       await ImagesService.registerImage(this.imageName, this.imageTag);
+      await this.loadData();
+      this.pullingImageLoading = false;
       this.addImageDialogVisible = false;
     }
   },
@@ -93,7 +103,7 @@ export default {
       <Column class="w-24 !text-end">
         <template #body="{ data }">
           <div class="flex /*flex-wrap*/ gap-1 justify-center">
-            <Button icon="pi pi-trash" severity="secondary" rounded></Button>
+            <Button icon="pi pi-trash" @click="deleteImage(data)" severity="secondary" rounded></Button>
           </div>
         </template>
       </Column>
@@ -116,9 +126,15 @@ export default {
       <label for="image-tag" class="font-semibold w-24">Image Tag</label>
       <InputText id="image-tag" v-model="imageTag" class="flex-auto" autocomplete="off" />
     </div>
-    <div class="flex justify-end gap-2">
-      <Button type="button" label="Cancel" severity="secondary" @click="addImageDialogVisible = false"></Button>
-      <Button type="button" label="Save" @click="addSandboxImage"></Button>
+    <div :class="['flex gap-2', pullingImageLoading ? 'justify-between' : 'justify-end']">
+      <span v-if="pullingImageLoading" class="flex items-center gap-2 text-primary">
+        Pulling image...
+        <ProgressSpinner style="width: 50px; height: 30px" strokeWidth="8" fill="transparent" animationDuration=".5s" />
+      </span>
+      <div class="flex gap-2">
+        <Button type="button" label="Cancel" severity="secondary" @click="addImageDialogVisible = false"></Button>
+        <Button type="button" label="Save" :disabled="pullingImageLoading" @click="addSandboxImage"></Button>
+      </div>
     </div>
   </Dialog>
 </template>
