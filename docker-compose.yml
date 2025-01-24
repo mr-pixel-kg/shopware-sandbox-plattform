@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - GOPROXY=proxy.golang.org
+    networks:
+      - sandbox-network
+    depends_on:
+      - frontend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - VITE_BACKEND_URL=http://backend:8080
+    networks:
+      - sandbox-network
+
+networks:
+  sandbox-network:
+    driver: bridge

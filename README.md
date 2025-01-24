@@ -2,6 +2,12 @@
 
 This application allows you to create demo shops in a docker environment.
 
+
+Start application with docker compose:
+```
+docker-compose up --build
+```
+
 ## Backend
 
 Requires a environment variable for docker and it has to be started as root:
