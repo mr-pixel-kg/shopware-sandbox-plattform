@@ -58,7 +58,7 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 
 	imageName := input.ImageName
 
-	sandbox, err := h.SandboxService.CreateSandbox(ctx, imageName)
+	sandbox, err := h.SandboxService.CreateSandbox(ctx, imageName, input.Lifetime)
 	if err != nil {
 		log.Printf("Failed to create sandbox %s: %v", imageName, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create sandbox environment")
@@ -68,9 +68,9 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 		Message:       "Sandbox created successfully",
 		Status:        "success",
 		ContainerName: sandbox.ContainerName,
-		ContainerId:   sandbox.ContainerId,
+		ContainerId:   sandbox.ContainerID,
 		Image:         imageName,
-		Url:           sandbox.Url,
+		Url:           sandbox.URL,
 		SandboxId:     sandbox.ID,
 	}
 

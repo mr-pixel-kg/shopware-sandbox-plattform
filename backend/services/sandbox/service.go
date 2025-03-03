@@ -8,29 +8,37 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database/models"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database/repository"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services/images"
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 type SandboxService struct {
-	database     *SandboxDatabase
-	client       *client.Client
-	imageService *images.ImageService
+	client            *client.Client
+	imageService      *images.ImageService
+	sandboxRepository *repository.SandboxRepository
 }
 
-func NewSandboxService(imageService *images.ImageService) (*SandboxService, error) {
+func NewSandboxService(imageService *images.ImageService, sandboxRepository *repository.SandboxRepository) (*SandboxService, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
-	return &SandboxService{
-		database:     NewSandboxDatabase(),
-		client:       cli,
-		imageService: imageService,
-	}, nil
+	var sandboxService = &SandboxService{
+		client:            cli,
+		imageService:      imageService,
+		sandboxRepository: sandboxRepository,
+	}
+
+	// start garbage collector scheduler
+	go sandboxService.startGarbageCollectorScheduler()
+
+	return sandboxService, nil
 }
 
 func (s *SandboxService) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
@@ -38,6 +46,8 @@ func (s *SandboxService) ListSandboxes(ctx context.Context) ([]SandboxInfo, erro
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Docker Containers %+v\n", containers)
 
 	sandboxInfos := make([]SandboxInfo, 0)
 	for _, cont := range containers {
@@ -65,11 +75,12 @@ func (s *SandboxService) ListSandboxes(ctx context.Context) ([]SandboxInfo, erro
 
 func (s *SandboxService) GetSandbox(ctx context.Context, sandboxId string) (SandboxInfo, error) {
 
-	sandbox, err := s.database.GetByID(sandboxId)
+	sandbox, err := s.sandboxRepository.GetByID(sandboxId)
 	if err != nil {
 		log.Printf("Failed to fetch info for sandbox %s, because sandbox not found: %v", sandboxId, err)
+		// todo error handling
 	}
-	containerId := sandbox.ContainerId
+	containerId := sandbox.ContainerID
 
 	cont, err := s.client.ContainerInspect(ctx, containerId)
 	if err != nil {
@@ -92,22 +103,25 @@ func (s *SandboxService) GetSandbox(ctx context.Context, sandboxId string) (Sand
 	return sandboxInfo, nil
 }
 
-func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string) (Sandbox, error) {
+func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string, lifetime int) (models.Sandbox, error) {
 
 	sandboxId := uuid.New().String()
 	containerName := "sandbox-" + sandboxId
 	hostname := containerName + ".shopshredder.zion.mr-pixel.de"
 
 	// Check if image is on whitelist
-	if !s.imageService.Whitelist.IsAllowed(imageName) {
-		return Sandbox{}, errors.New("Image " + imageName + " is not on whitelist")
+	name := strings.Split(imageName, ":")[0]
+	tag := strings.Split(imageName, ":")[1]
+	sandboxImage, err := s.imageService.ImageRepository.GetByNameAndTag(name, tag)
+	if err != nil {
+		return models.Sandbox{}, errors.New("Image " + imageName + " is not on whitelist")
 	}
 
 	// Pull docker container
 	out, err := s.client.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		log.Print("Failed to pull sandbox docker container", err)
-		return Sandbox{}, err
+		return models.Sandbox{}, err
 	}
 	defer out.Close()
 	io.Copy(os.Stdout, out)
@@ -126,56 +140,76 @@ func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string) (S
 	}, nil, nil, nil, containerName)
 	if err != nil {
 		log.Fatal("Failed to create sandbox docker container", err)
-		return Sandbox{}, err
+		return models.Sandbox{}, err
 	}
 
 	// Start docker container
 	if err := s.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		log.Print("Failed to start sandbox docker container", err)
-		return Sandbox{}, err
+		return models.Sandbox{}, err
 	}
 	log.Printf("Started sandbox %s with image %s", containerName, imageName)
 
 	// Register sandbox in database
-	sandbox := Sandbox{
-		ID:            sandboxId,
-		ImageName:     imageName,
-		ImageId:       "",
-		ContainerName: containerName,
-		ContainerId:   resp.ID,
-		Url:           "https://" + hostname,
-		CreatedAt:     time.Now(),
-		LifeTime:      1440,
+	var destroyAt *time.Time = nil
+	if lifetime > 0 {
+		tempTime := time.Now().Add(time.Minute * time.Duration(lifetime))
+		destroyAt = &tempTime
 	}
-	s.database.Add(sandbox)
 
-	return sandbox, nil
+	sandbox := &models.Sandbox{
+		ID:            sandboxId,
+		ContainerID:   resp.ID,
+		ContainerName: containerName,
+		ImageID:       sandboxImage.ID,
+		URL:           "https://" + hostname,
+		CreatedAt:     time.Now(),
+		DestroyAt:     destroyAt,
+	}
+	s.sandboxRepository.Create(sandbox)
+
+	return *sandbox, nil
 }
 
 func (s *SandboxService) DeleteSandbox(ctx context.Context, sandboxId string) {
 
 	// Find containerId for sandboxId
-	sandbox, err := s.database.GetByID(sandboxId)
+	sandbox, err := s.sandboxRepository.GetByID(sandboxId)
 	if err != nil {
 		log.Printf("Failed to delete sandbox %s, because sandbox not found: %v", sandboxId, err)
+	}
+	if sandbox == nil {
+		log.Printf("Sandbox %s not found", sandboxId)
+		return
 	}
 
 	// Stop sandbox container
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
-	err = s.client.ContainerStop(ctx, sandbox.ContainerId, container.StopOptions{Timeout: &noWaitTimeout})
+	err = s.client.ContainerStop(ctx, sandbox.ContainerID, container.StopOptions{Timeout: &noWaitTimeout})
 	if err != nil {
 		log.Printf("Failed to stop sandbox container %s: %v", sandbox.ContainerName, err)
 	}
 
 	// Remove sandbox from database
-	err = s.database.Remove(sandboxId)
+	err = s.sandboxRepository.Delete(sandboxId)
 	if err != nil {
 		log.Printf("Failed to delete sandbox %s in database: %v", sandboxId, err)
 	}
 }
 
 func (s *SandboxService) ShutdownSandboxes() {
-	// TODO
+	ctx := context.Background()
+
+	containers, err := s.sandboxRepository.GetExpiredContainers()
+	if err != nil {
+		fmt.Printf("Error getting expired containers: %v", err)
+		return
+	}
+
+	for _, container := range containers {
+		log.Println(container.ContainerName + " is expired. Shutting down...")
+		s.DeleteSandbox(ctx, container.ID)
+	}
 }
 
 type SandboxInfo struct {
@@ -187,4 +221,24 @@ type SandboxInfo struct {
 	CreatedAt     string `json:"created_at"`
 	State         string `json:"state"`
 	Status        string `json:"status"`
+}
+
+const gcInterval = 10 * time.Minute
+
+func (s *SandboxService) startGarbageCollectorScheduler() {
+	ticker := time.NewTicker(gcInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.ShutdownSandboxes()
+			s.garbageCollect()
+		}
+	}
+}
+
+func (s *SandboxService) garbageCollect() {
+	log.Println("Check for expired sandbox containers...")
+	s.ShutdownSandboxes()
 }

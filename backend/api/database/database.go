@@ -39,7 +39,7 @@ func parseDSN(config config.DatabaseConfig) (string, string) {
 	if config.Host == "" && config.Port == 0 && config.User == "" && config.Password == "" && config.Name == "" {
 		// SQLite
 		log.Println("Database configuration is empty, so we use a SQLite database")
-		dsn = "database.db"
+		dsn = "file:database.db"
 		driver = "sqlite3"
 	} else {
 		// PostgreSQL
@@ -70,12 +70,13 @@ func createTables() {
 	
 	CREATE TABLE IF NOT EXISTS sandboxes (
 		id VARCHAR(255) PRIMARY KEY,
-		docker_container_id VARCHAR(255) NOT NULL,
+		container_id VARCHAR(255) NOT NULL,
+	    container_name VARCHAR(64) NOT NULL,
+	    image_id VARCHAR(255) NOT NULL,
 		url VARCHAR(255) NOT NULL,
-		container_name VARCHAR(64) NOT NULL,
-		image_id VARCHAR(255) NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+	    destroy_at TIMESTAMP DEFAULT NULL,
+		FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE SET NULL
 	);
 	`
 

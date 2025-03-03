@@ -25,6 +25,7 @@ func RegisterRoutes(e *echo.Echo) {
 
 	// Init repositories
 	imageRepository := repository.NewImageRepository(database.DB)
+	sandboxRepository := repository.NewSandboxRepository(database.DB)
 
 	// Init services
 	dockerService, err := services.NewDockerService()
@@ -37,7 +38,7 @@ func RegisterRoutes(e *echo.Echo) {
 		e.Logger.Fatalf("Failed to create Image service: %v", err)
 	}
 
-	sandboxService, err := sandbox.NewSandboxService(imageService)
+	sandboxService, err := sandbox.NewSandboxService(imageService, sandboxRepository)
 	if err != nil {
 		e.Logger.Fatalf("Failed to create Sandbox service: %v", err)
 	}

@@ -17,10 +17,11 @@ type Image struct {
 }
 
 type Sandbox struct {
-	ID                string    `db:"id" json:"id"`
-	DockerContainerID string    `db:"docker_container_id" json:"docker_container_id"`
-	URL               string    `db:"url" json:"url"`
-	ContainerName     string    `db:"container_name" json:"container_name"`
-	ImageID           string    `db:"image_id" json:"image_id"`
-	CreatedAt         time.Time `db:"created_at" json:"created_at"`
+	ID            string     `db:"id" json:"id"`
+	ContainerID   string     `db:"container_id" json:"container_id"`
+	ContainerName string     `db:"container_name" json:"container_name"`
+	ImageID       string     `db:"image_id" json:"image_id"`
+	URL           string     `db:"url" json:"url"`
+	CreatedAt     time.Time  `db:"created_at" json:"created_at"`
+	DestroyAt     *time.Time `db:"destroy_at" json:"destroy_at"`
 }
