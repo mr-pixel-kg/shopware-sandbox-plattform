@@ -2,7 +2,10 @@ package config
 
 import (
 	"github.com/spf13/viper"
+	"log"
 )
+
+const CONFIG_FILE = "./config.yml"
 
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
@@ -24,7 +27,7 @@ type DatabaseConfig struct {
 
 // LoadConfig loads configuration from a file or from environment variables
 func LoadConfig() (*Config, error) {
-	viper.SetConfigFile("./config.yaml")
+	viper.SetConfigFile(CONFIG_FILE)
 
 	// Init defaults and environment variables
 	initConfig()
@@ -34,8 +37,15 @@ func LoadConfig() (*Config, error) {
 
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
-		// no problem, if no config file found
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
+	}
+	err := viper.ReadInConfig()
+	if err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Println(CONFIG_FILE + " not found!")
+		} else {
 			return nil, err
 		}
 	}

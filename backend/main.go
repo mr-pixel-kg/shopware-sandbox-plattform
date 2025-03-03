@@ -33,7 +33,7 @@ func main() {
 
 	// Start server
 	port := cfg.Server.Port
-	log.Printf("Starting server on http://localhost:%s", port)
+	log.Printf("Starting server on http://localhost:%d", port)
 	if err := e.Start(":" + strconv.Itoa(port)); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("Could not start server: %v", err)
 	}
