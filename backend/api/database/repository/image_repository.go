@@ -97,7 +97,9 @@ func (r *ImageRepository) DeleteByTagAndName(image_name, image_tag string) error
 }
 
 func (r *ImageRepository) IsAllowed(imageName, imageTag string) bool {
-	image, err := r.GetByNameAndTag(imageName, imageTag)
+	var image models.Image
+	query := `SELECT * FROM images WHERE image_name = $1 AND image_tag = $2`
+	err := r.db.Get(&image, query, imageName, imageTag)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -106,10 +108,5 @@ func (r *ImageRepository) IsAllowed(imageName, imageTag string) bool {
 		log.Fatalln("Failed to check if image is on whitelist", err)
 		return false
 	}
-
-	if image == nil {
-		return false
-	} else {
-		return true
-	}
+	return true
 }
