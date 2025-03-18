@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database/models"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
 	"log"
 )
 

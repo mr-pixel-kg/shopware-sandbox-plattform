@@ -5,8 +5,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api"
-	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,7 +17,7 @@ import (
 // @description Management API for Docker Sandbox Enviroment
 // @license.name MIT
 // @host localhost:8080
-// @BasePath /api
+// @BasePath /
 // @securityDefinitions.basic BasicAuth
 // @schemes http https
 func main() {

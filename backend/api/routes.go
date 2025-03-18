@@ -2,12 +2,12 @@ package api
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database"
-	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/database/repository"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/images"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/sandboxes"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/repository"
 	_ "github.com/mr-pixel-kg/shopware-sandbox-plattform/docs"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/middleware"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services"
