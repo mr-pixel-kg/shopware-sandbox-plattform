@@ -13,7 +13,6 @@ services:
     volumes:
       - /var/run/docker.sock:/Users/manuel.kienlein/.docker/run/docker.sock #/var/run/docker.sock
       - ./config.yml:/root/config.yml
-      - ./database.db:/root/database.db
     networks:
       - sandbox-network
     depends_on:

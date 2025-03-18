@@ -3,6 +3,8 @@ server:
   allowed_origins:
     - "http://localhost:5173"
     - "https://www.shopshredder.de"
+    - "http://localhost:8000"
+    - "http://localhost:80"
   app_url: "http://localhost"
 
 #database:
