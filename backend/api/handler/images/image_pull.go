@@ -24,6 +24,7 @@ type PullImageResponse struct {
 // @Param image body PullImageRequest true "Image Input"
 // @Success 200 {object} PullImageResponse
 // @Failure 400 {object} map[string]string
+// @Security BasicAuth
 // @Router /api/images [post]
 func (h *ImageHandler) PullImageHandler(c echo.Context) error {
 	ctx := c.Request().Context()

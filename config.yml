@@ -7,6 +7,10 @@ server:
     - "http://localhost:80"
   app_url: "http://localhost"
 
+auth:
+  username: "admin"
+  password: "password"
+
 #database:
 #  host: "localhost"
 #  port: 5432

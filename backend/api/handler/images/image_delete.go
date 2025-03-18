@@ -20,6 +20,7 @@ type ImageDeleteResponse struct {
 // @Param id path string true "Image ID"
 // @Success 200 {object} ImageDeleteResponse
 // @Failure 400 {object} map[string]string
+// @Security BasicAuth
 // @Router /api/images/{id} [delete]
 func (h *ImageHandler) ImageDeleteHandler(c echo.Context) error {
 

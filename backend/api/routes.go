@@ -7,21 +7,16 @@ import (
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/images"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/sandboxes"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
 	_ "github.com/mr-pixel-kg/shopware-sandbox-plattform/docs"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/middleware"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services"
 	images2 "github.com/mr-pixel-kg/shopware-sandbox-plattform/services/images"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services/sandbox"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
-// @title mpXsandbox API
-// @version 1.0.0
-// @description Management API for Docker Sandbox Enviroment
-// @license.name MIT
-// @host localhost:8080
-// @BasePath /api
-// @schemes http https
-func RegisterRoutes(e *echo.Echo) {
+func RegisterRoutes(e *echo.Echo, config *config.Config) {
 
 	// Init repositories
 	imageRepository := repository.NewImageRepository(database.DB)
@@ -47,6 +42,9 @@ func RegisterRoutes(e *echo.Echo) {
 	imageHandler := images.NewImageHandler(dockerService, imageService)
 	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService)
 
+	// Init middlewares
+	authMiddleware := middleware.AuthMiddleware(config.Auth)
+
 	// Add api handlers
 	api := e.Group("/api")
 
@@ -56,10 +54,10 @@ func RegisterRoutes(e *echo.Echo) {
 	api.GET("/sandboxes", sandboxHandler.SandboxListHandler)
 	api.GET("/sandboxes/:id", sandboxHandler.SandboxDetailsHandler)
 	api.POST("/sandboxes", sandboxHandler.SandboxCreateHandler)
-	api.DELETE("/sandboxes/:id", sandboxHandler.SandboxDeleteHandler)
+	api.DELETE("/sandboxes/:id", sandboxHandler.SandboxDeleteHandler, authMiddleware)
 
 	api.GET("/images", imageHandler.ImageListHandler)
 	api.GET("/images/:id", imageHandler.ImageDetailsHandler)
-	api.POST("/images", imageHandler.PullImageHandler)
-	api.DELETE("/images/:id", imageHandler.ImageDeleteHandler)
+	api.POST("/images", imageHandler.PullImageHandler, authMiddleware)
+	api.DELETE("/images/:id", imageHandler.ImageDeleteHandler, authMiddleware)
 }

@@ -19,6 +19,7 @@ type SandboxDeleteResponse struct {
 // @Param id path string true "Sandbox ID"
 // @Success 200 {object} SandboxDeleteResponse
 // @Failure 400 {object} map[string]string
+// @Security BasicAuth
 // @Router /api/sandboxes/{id} [delete]
 func (h *SandboxHandler) SandboxDeleteHandler(c echo.Context) error {
 

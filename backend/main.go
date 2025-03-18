@@ -12,6 +12,14 @@ import (
 	"strconv"
 )
 
+// @title mpXsandbox API
+// @version 1.0.0
+// @description Management API for Docker Sandbox Enviroment
+// @license.name MIT
+// @host localhost:8080
+// @BasePath /api
+// @securityDefinitions.basic BasicAuth
+// @schemes http https
 func main() {
 	e := echo.New()
 
@@ -33,7 +41,7 @@ func main() {
 	}))
 
 	// Register routes
-	api.RegisterRoutes(e)
+	api.RegisterRoutes(e, cfg)
 
 	// Start server
 	port := cfg.Server.Port

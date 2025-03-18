@@ -9,12 +9,18 @@ const CONFIG_FILE = "./config.yml"
 
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
+	Auth     AuthConfig     `mapstructure:"auth"`
 	Database DatabaseConfig `mapstructure:"database"`
 }
 
 type ServerConfig struct {
 	Port           int      `mapstructure:"port"`
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
+}
+
+type AuthConfig struct {
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
 type DatabaseConfig struct {
@@ -60,5 +66,7 @@ func LoadConfig() (*Config, error) {
 
 func initConfig() {
 	viper.BindEnv("server.port", "SERVER_PORT")
+	viper.BindEnv("auth.username", "AUTH_USERNAME")
+	viper.BindEnv("auth.password", "AUTH_PASSWORD")
 	viper.SetDefault("server.port", 8080)
 }
