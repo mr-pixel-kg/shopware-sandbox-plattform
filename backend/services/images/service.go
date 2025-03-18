@@ -40,6 +40,12 @@ func (s *ImageService) ListImages(ctx context.Context) ([]Image, error) {
 
 	for _, image := range images {
 
+		// This is a hacky fix to avoid errors by images like "nginx" without tag
+		// TODO: Rewrite this filter
+		if strings.Contains(image.ID, ":") == false || len(image.RepoTags) < 1 || strings.Contains(image.RepoTags[0], ":") == false {
+			continue
+		}
+
 		// Extract id
 		imageHash := strings.Split(image.ID, ":")[1]
 
