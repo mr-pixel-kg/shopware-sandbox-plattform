@@ -78,6 +78,16 @@ func createTables() {
 	    destroy_at TIMESTAMP DEFAULT NULL,
 		FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE SET NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS audit_log (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		ip_address VARCHAR(16) NOT NULL,
+		user_agent VARCHAR(255) NOT NULL,
+		username VARCHAR(64) DEFAULT NULL,
+		action VARCHAR(16) NOT NULL,
+		details JSON DEFAULT NULL
+	);
 	`
 
 	_, err := DB.Exec(schema)
