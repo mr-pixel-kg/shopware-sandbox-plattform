@@ -38,6 +38,8 @@ type DockerServiceInterface interface {
 	ListContainers(ctx context.Context) ([]DockerContainer, error)
 	GetContainer(ctx context.Context, containerId string) (DockerContainer, error)
 	CreateContainer(ctx context.Context, imageName, containerName string, labels map[string]string) (string, error)
+	StartContainer(ctx context.Context, containerId string) error
+	StopContainer(ctx context.Context, containerId string) error
 	RemoveContainer(ctx context.Context, containerId string) error
 }
 
@@ -63,32 +65,6 @@ func (ds *DockerService) ListImages(ctx context.Context) ([]DockerImage, error) 
 	var outputImages = make([]DockerImage, 0)
 	for _, img := range images {
 
-		// Extract docker image id from format "sha256:hash"
-		/*id := strings.Split(img.ID, ":")[1]
-
-		// Validate
-		if len(img.RepoTags) != 1 {
-			slog.Debug("Skip Docker Image since it has not exactly one RepoTag assigned", "imageId", img.ID)
-			continue
-		}
-		repoTag := img.RepoTags[0] // Format: "name:tag"
-		if !strings.Contains(repoTag, ":") {
-			slog.Debug("Skip Docker Image since RepoTag is in wrong format", "imageId", img.ID, "repoTag", repoTag)
-			continue
-		}
-
-		// Extract image name and tag
-		imageName := strings.Split(repoTag, ":")[0]
-		imageTag := strings.Split(repoTag, ":")[1]
-
-		outputImages = append(outputImages, DockerImage{
-			ID:      id,
-			Name:    imageName,
-			Tag:     imageTag,
-			Created: time.Unix(img.Created, 0),
-			Size:    img.Size,
-		})*/
-
 		parsedImage, err := parseDockerImage(img.ID, img.RepoTags, time.Unix(img.Created, 0), img.Size)
 		if err != nil {
 			slog.Debug("Skipping Docker Image", "imageId", img.ID, "reason", err)
@@ -106,39 +82,6 @@ func (ds *DockerService) GetImage(ctx context.Context, imageId string) (DockerIm
 	if err != nil {
 		return DockerImage{}, err
 	}
-
-	// Extract docker image id from format "sha256:hash"
-	/*id := strings.Split(image.ID, ":")[1]
-
-	// Validate
-	if len(image.RepoTags) != 1 {
-		slog.Debug("Skip Docker Image since it has not exactly one RepoTag assigned", "imageId", image.ID)
-		return DockerImage{}, nil
-	}
-	repoTag := image.RepoTags[0] // Format: "name:tag"
-	if !strings.Contains(repoTag, ":") {
-		slog.Debug("Skip Docker Image since RepoTag is in wrong format", "imageId", image.ID, "repoTag", repoTag)
-		return DockerImage{}, nil
-	}
-
-	// Extract image name and tag
-	imageName := strings.Split(repoTag, ":")[0]
-	imageTag := strings.Split(repoTag, ":")[1]
-
-	// Parse image creation time
-	createdTime, err := time.Parse(time.RFC3339Nano, image.Created)
-	if err != nil {
-		slog.Error("Error parsing the creation time of docker image", "image", repoTag, "error", err)
-		return DockerImage{}, nil
-	}
-
-	return DockerImage{
-		ID:      id,
-		Name:    imageName,
-		Tag:     imageTag,
-		Created: createdTime,
-		Size:    image.Size,
-	}, nil*/
 
 	// Parse image creation time
 	createdTime, err := time.Parse(time.RFC3339Nano, img.Created)
@@ -264,30 +207,34 @@ func (ds *DockerService) CreateContainer(ctx context.Context, imageName, contain
 	// Create container
 	cont, err := ds.dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, nil, containerName)
 	if err != nil {
-		return "", err
-	}
-
-	// Start container
-	err = ds.dockerClient.ContainerStart(ctx, cont.ID, container.StartOptions{})
-	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Failed to create container %s: %w", containerName, err)
 	}
 
 	return cont.ID, nil
 }
 
-func (ds *DockerService) RemoveContainer(ctx context.Context, containerId string) error {
+func (ds *DockerService) StartContainer(ctx context.Context, containerId string) error {
+	err := ds.dockerClient.ContainerStart(ctx, containerId, container.StartOptions{})
+	if err != nil {
+		return fmt.Errorf("Failed to start container %s: %w", containerId, err)
+	}
+	return nil
+}
+
+func (ds *DockerService) StopContainer(ctx context.Context, containerId string) error {
 	// TODO consider using a proper timeout
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
 	err := ds.dockerClient.ContainerStop(ctx, containerId, container.StopOptions{Timeout: &noWaitTimeout})
 	if err != nil {
 		return fmt.Errorf("Failed to stop container %s: %w", containerId, err)
 	}
+	return nil
+}
 
-	err = ds.dockerClient.ContainerRemove(ctx, containerId, container.RemoveOptions{Force: true, RemoveVolumes: true})
+func (ds *DockerService) RemoveContainer(ctx context.Context, containerId string) error {
+	err := ds.dockerClient.ContainerRemove(ctx, containerId, container.RemoveOptions{Force: true, RemoveVolumes: true})
 	if err != nil {
-		return fmt.Errorf("Failed to delete container %s: %w", containerId, err)
+		return fmt.Errorf("Failed to remove container %s: %w", containerId, err)
 	}
-
 	return nil
 }

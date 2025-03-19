@@ -175,10 +175,42 @@ func TestCreateContainer(t *testing.T) {
 
 }
 
+func TestStartContainer(t *testing.T) {
+	dockerService := setupDockerService(t)
+
+	t.Run("StartContainer should throw an error if container does not exists", func(t *testing.T) {
+		err := dockerService.StartContainer(context.Background(), "nonExistingContainer")
+
+		assert.Error(t, err, "StartContainer should return an error")
+	})
+
+	t.Run("StartContainer should start the container", func(t *testing.T) {
+		err := dockerService.StartContainer(context.Background(), "test")
+
+		assert.NoError(t, err, "StartContainer should not return an error")
+	})
+}
+
+func TestStopContainer(t *testing.T) {
+	dockerService := setupDockerService(t)
+
+	t.Run("StopContainer should throw an error if container does not exists", func(t *testing.T) {
+		err := dockerService.StartContainer(context.Background(), "nonExistingContainer")
+
+		assert.Error(t, err, "StopContainer should return an error")
+	})
+
+	t.Run("StopContainer should stop the container", func(t *testing.T) {
+		err := dockerService.StartContainer(context.Background(), "test")
+
+		assert.NoError(t, err, "StopContainer should not return an error")
+	})
+}
+
 func TestRemoveContainer(t *testing.T) {
 	dockerService := setupDockerService(t)
 
-	t.Run("RemoveContainer should remove contaner", func(t *testing.T) {
+	t.Run("RemoveContainer should remove container", func(t *testing.T) {
 		err := dockerService.RemoveContainer(context.Background(), "test")
 		assert.NoError(t, err, "Removing docker container should not return an error")
 	})
