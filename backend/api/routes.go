@@ -43,10 +43,11 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService)
 
 	// Init middlewares
-	authMiddleware := middleware.AuthMiddleware(config.Auth)
+	authMiddleware := middleware.OptionalAuthMiddleware(config.Auth)
+	authRequiredMiddleware := middleware.AuthRequiredMiddleware(config.Auth)
 
 	// Add api handlers
-	api := e.Group("/api")
+	api := e.Group("/api", authMiddleware)
 
 	api.GET("/health", handler.HealthCheckHandler)
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
@@ -54,10 +55,10 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 	api.GET("/sandboxes", sandboxHandler.SandboxListHandler)
 	api.GET("/sandboxes/:id", sandboxHandler.SandboxDetailsHandler)
 	api.POST("/sandboxes", sandboxHandler.SandboxCreateHandler)
-	api.DELETE("/sandboxes/:id", sandboxHandler.SandboxDeleteHandler, authMiddleware)
+	api.DELETE("/sandboxes/:id", sandboxHandler.SandboxDeleteHandler, authRequiredMiddleware)
 
 	api.GET("/images", imageHandler.ImageListHandler)
 	api.GET("/images/:id", imageHandler.ImageDetailsHandler)
-	api.POST("/images", imageHandler.PullImageHandler, authMiddleware)
-	api.DELETE("/images/:id", imageHandler.ImageDeleteHandler, authMiddleware)
+	api.POST("/images", imageHandler.PullImageHandler, authRequiredMiddleware)
+	api.DELETE("/images/:id", imageHandler.ImageDeleteHandler, authRequiredMiddleware)
 }
