@@ -11,6 +11,7 @@ import (
 	_ "github.com/mr-pixel-kg/shopware-sandbox-plattform/docs"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/middleware"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services/audit"
 	images2 "github.com/mr-pixel-kg/shopware-sandbox-plattform/services/images"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/services/sandbox"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -21,6 +22,7 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 	// Init repositories
 	imageRepository := repository.NewImageRepository(database.DB)
 	sandboxRepository := repository.NewSandboxRepository(database.DB)
+	auditLogRepository := repository.NewAuditLogRepository(database.DB)
 
 	// Init services
 	dockerService, err := services.NewDockerService()
@@ -38,9 +40,11 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 		e.Logger.Fatalf("Failed to create Sandbox service: %v", err)
 	}
 
+	auditLogService := audit.NewAuditLogService(auditLogRepository)
+
 	// Init handlers
-	imageHandler := images.NewImageHandler(dockerService, imageService)
-	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService)
+	imageHandler := images.NewImageHandler(dockerService, imageService, auditLogService)
+	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService, auditLogService)
 
 	// Init middlewares
 	authMiddleware := middleware.OptionalAuthMiddleware(config.Auth)

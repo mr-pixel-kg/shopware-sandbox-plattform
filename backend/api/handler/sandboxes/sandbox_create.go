@@ -2,6 +2,7 @@ package sandboxes
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
 	"log"
 	"net/http"
 )
@@ -63,6 +64,17 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 		log.Printf("Failed to create sandbox %s: %v", imageName, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create sandbox environment")
 	}
+
+	// Write audit log
+	h.AuditLogService.LogRequest(c, models.SANDBOX_CREATE, map[string]interface{}{
+		"sandbox_id":     sandbox.ID,
+		"image_name":     sandbox.ImageID,
+		"created_at":     sandbox.CreatedAt,
+		"destroy_at":     sandbox.DestroyAt,
+		"container_id":   sandbox.ContainerID,
+		"container_name": sandbox.ContainerName,
+		"url":            sandbox.URL,
+	})
 
 	output := SandboxCreateResponse{
 		Message:       "Sandbox created successfully",

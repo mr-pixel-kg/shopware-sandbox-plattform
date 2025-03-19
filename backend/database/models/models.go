@@ -46,7 +46,7 @@ type AuditLogEntry struct {
 	Timestamp time.Time       `db:"timestamp" json:"timestamp"`
 	IpAddress string          `db:"ip_address" json:"ip_address"`
 	UserAgent string          `db:"user_agent" json:"user_agent"`
-	Username  string          `db:"username" json:"username"`
+	Username  *string         `db:"username" json:"username"`
 	Action    AuditAction     `db:"action" json:"action"`
 	Details   json.RawMessage `db:"details" json:"details"`
 }

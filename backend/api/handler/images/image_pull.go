@@ -2,6 +2,7 @@ package images
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
 	"net/http"
 )
 
@@ -44,6 +45,12 @@ func (h *ImageHandler) PullImageHandler(c echo.Context) error {
 
 	imageName := input.ImageName + ":" + input.ImageTag
 	h.ImageService.PullImage(ctx, imageName)
+
+	// Write audit log
+	h.AuditLogService.LogRequest(c, models.IMAGE_CREATE, map[string]interface{}{
+		"image_name": input.ImageName,
+		"image_tag":  input.ImageTag,
+	})
 
 	output := PullImageResponse{
 		Message: "Image " + input.ImageName + ":" + input.ImageTag + " created successfully",

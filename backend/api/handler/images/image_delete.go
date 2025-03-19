@@ -2,6 +2,7 @@ package images
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
 	"log"
 	"net/http"
 )
@@ -32,6 +33,11 @@ func (h *ImageHandler) ImageDeleteHandler(c echo.Context) error {
 		log.Printf("Failed to delete image: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	// Write audit log
+	h.AuditLogService.LogRequest(c, models.IMAGE_DELETE, map[string]interface{}{
+		"image_id": imageId,
+	})
 
 	output := ImageDeleteResponse{
 		Message: "Image " + imageId + " removed successfully",
