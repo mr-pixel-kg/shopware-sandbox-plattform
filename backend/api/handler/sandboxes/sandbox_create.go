@@ -3,6 +3,7 @@ package sandboxes
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/middleware"
 	"log"
 	"net/http"
 )
@@ -59,10 +60,21 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 
 	imageName := input.ImageName
 
+	// Check quota
+	if h.GuardService.IsNewSessionAllowed(c.RealIP()) == false {
+		return echo.NewHTTPError(http.StatusTooManyRequests, "You have reached the maximum number of concurrent sandboxes")
+	}
+
 	sandbox, err := h.SandboxService.CreateSandbox(ctx, imageName, input.Lifetime)
 	if err != nil {
 		log.Printf("Failed to create sandbox %s: %v", imageName, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create sandbox environment")
+	}
+
+	// Increase quota and register session
+	err = h.GuardService.RegisterSession(c.RealIP(), c.Request().UserAgent(), middleware.GetCurrentUserName(c), sandbox.ID)
+	if err != nil {
+		log.Printf("Failed to register new sandbox session: %v", err)
 	}
 
 	// Write audit log

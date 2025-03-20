@@ -20,8 +20,12 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 	imageRepository := repository.NewImageRepository(database.DB)
 	sandboxRepository := repository.NewSandboxRepository(database.DB)
 	auditLogRepository := repository.NewAuditLogRepository(database.DB)
+	sessionRepository := repository.NewSessionRepository(database.DB)
 
 	// Init services
+	guardService := services.NewGuardService(sessionRepository)
+	auditLogService := services.NewAuditLogService(auditLogRepository)
+
 	dockerService, err := services.NewDockerService()
 	if err != nil {
 		e.Logger.Fatalf("Failed to create Docker service: %v", err)
@@ -32,16 +36,14 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 		e.Logger.Fatalf("Failed to create Image service: %v", err)
 	}
 
-	sandboxService, err := services.NewSandboxService(imageService, sandboxRepository)
+	sandboxService, err := services.NewSandboxService(imageService, guardService, sandboxRepository)
 	if err != nil {
 		e.Logger.Fatalf("Failed to create Sandbox service: %v", err)
 	}
 
-	auditLogService := services.NewAuditLogService(auditLogRepository)
-
 	// Init handlers
 	imageHandler := images.NewImageHandler(dockerService, imageService, auditLogService)
-	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService, auditLogService)
+	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService, auditLogService, guardService)
 
 	// Init middlewares
 	authMiddleware := middleware.OptionalAuthMiddleware(config.Auth)

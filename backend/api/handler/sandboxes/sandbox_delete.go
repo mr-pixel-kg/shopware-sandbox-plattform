@@ -3,6 +3,7 @@ package sandboxes
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
+	"log"
 	"net/http"
 )
 
@@ -33,6 +34,12 @@ func (h *SandboxHandler) SandboxDeleteHandler(c echo.Context) error {
 	h.AuditLogService.LogRequest(c, models.SANDBOX_DELETE, map[string]interface{}{
 		"sandbox_id": sandboxId,
 	})
+
+	// Remove sandbox session
+	err := h.GuardService.UnregisterSession(sandboxId)
+	if err != nil {
+		log.Printf("Failed to remove sandbox session: %v", err)
+	}
 
 	output := SandboxDeleteResponse{
 		Message: "Sandbox " + sandboxId + " removed successfully",

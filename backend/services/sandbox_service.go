@@ -20,10 +20,11 @@ import (
 type SandboxService struct {
 	client            *client.Client
 	imageService      *ImageService
+	guardService      *GuardService
 	sandboxRepository *repository.SandboxRepository
 }
 
-func NewSandboxService(imageService *ImageService, sandboxRepository *repository.SandboxRepository) (*SandboxService, error) {
+func NewSandboxService(imageService *ImageService, guardService *GuardService, sandboxRepository *repository.SandboxRepository) (*SandboxService, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
@@ -31,6 +32,7 @@ func NewSandboxService(imageService *ImageService, sandboxRepository *repository
 	var sandboxService = &SandboxService{
 		client:            cli,
 		imageService:      imageService,
+		guardService:      guardService,
 		sandboxRepository: sandboxRepository,
 	}
 
@@ -237,6 +239,12 @@ func (s *SandboxService) ShutdownSandboxes() {
 	for _, container := range containers {
 		log.Println(container.ContainerName + " is expired. Shutting down...")
 		s.DeleteSandbox(ctx, container.ID)
+
+		err := s.guardService.UnregisterSession(container.ID)
+		if err != nil {
+			fmt.Printf("Failed to unregister session on container autoremove: %v", err)
+			return
+		}
 	}
 }
 
