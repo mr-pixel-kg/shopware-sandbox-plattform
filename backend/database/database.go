@@ -88,6 +88,15 @@ func createTables() {
 		action VARCHAR(16) NOT NULL,
 		details JSON DEFAULT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS sessions (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	    ip_address VARCHAR(16) NOT NULL,
+	    user_agent VARCHAR(255) NOT NULL,
+	    username VARCHAR(64) DEFAULT NULL,
+		sandbox_id VARCHAR(255) NOT NULL,
+		FOREIGN KEY(sandbox_id) REFERENCES sandboxes(id) ON DELETE CASCADE
+	);
 	`
 
 	_, err := DB.Exec(schema)

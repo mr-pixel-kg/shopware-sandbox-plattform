@@ -50,3 +50,11 @@ type AuditLogEntry struct {
 	Action    AuditAction     `db:"action" json:"action"`
 	Details   json.RawMessage `db:"details" json:"details"`
 }
+
+type Session struct {
+	ID        int     `db:"id" json:"id"`
+	IpAddress string  `db:"ip_address" json:"ip_address"`
+	UserAgent string  `db:"user_agent" json:"user_agent"`
+	Username  *string `db:"username" json:"username"`
+	SandboxID string  `db:"sandbox_id" json:"sandbox_id"`
+}
