@@ -20,16 +20,16 @@ RUN go build -o main .
 # Step 3: Production stage
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /app/
 
 # Install SQLite runtime dependencies
 RUN apk add --no-cache sqlite-libs
 
 # Copy go application build
-COPY --from=builder /app/main .
+COPY --from=builder /app/main ./sandbox-server
 
 # Export application port
 EXPOSE 8080
 
 # Run application
-CMD ["./main"]
+CMD ["./sandbox-server"]

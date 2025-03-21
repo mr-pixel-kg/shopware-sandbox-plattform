@@ -21,9 +21,9 @@ guard:
   max_sandboxes_per_ip: 5
   max_sandbox_lifetime: 60
 
-#database:
-#  host: "localhost"
-#  port: 5432
-#  user: "postgres"
-#  password: "password"
-#  name: "appdb"
+database:
+  host: "database"
+  port: 5432
+  user: "mrpix_sandbox"
+  password: "sandXbox_mrpix2025"
+  name: "mrpix_sandbox"

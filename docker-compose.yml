@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   backend:
+    restart: always
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -12,13 +13,15 @@ services:
       - DOCKER_HOST=unix:///Users/manuel.kienlein/.docker/run/docker.sock #unix:///var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/Users/manuel.kienlein/.docker/run/docker.sock #/var/run/docker.sock
-      - ./config.yml:/root/config.yml
+      - ./config.yml:/app/config.yml
     networks:
       - sandbox-network
     depends_on:
       - frontend
+      - database
 
   frontend:
+    restart: always
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -29,6 +32,23 @@ services:
     networks:
       - sandbox-network
 
+  database:
+    image: postgres:17.4
+    restart: always
+    shm_size: 128mb
+    volumes:
+        - database_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: mrpix_sandbox
+      POSTGRES_PASSWORD: sandXbox_mrpix2025
+      POSTGRES_DB: mrpix_sandbox
+    networks:
+      - sandbox-network
+
 networks:
   sandbox-network:
     driver: bridge
+
+volumes:
+  database_data:
+    driver: local
