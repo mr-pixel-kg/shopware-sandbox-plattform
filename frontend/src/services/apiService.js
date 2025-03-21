@@ -38,6 +38,24 @@ class ApiService {
         return this.authCredentials !== null;
     }
 
+    async request(method, url, data = null) {
+        const config = {
+            method: method,
+            url: url,
+            data: data,
+            auth: this.authCredentials ? this.authCredentials : undefined,
+        };
+
+        try {
+            const response = await this.apiClient.request(config);
+            console.log("API Response received: ", response)
+            return response.data;
+        } catch (error) {
+            console.error("API Request Error:", error);
+            throw error;
+        }
+    }
+
 }
 
 export default new ApiService();

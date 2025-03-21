@@ -1,35 +1,20 @@
-import axios from "axios";
+import ApiService from "@/services/apiService.js";
 
 class SandboxService {
 
-    constructor() {
-        this.apiClient = axios.create({
-            baseURL: "http://localhost:8080",
-            headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-        });
-    }
-
     async getAllSandboxes() {
-        const response = await this.apiClient.get("/api/sandboxes");
-        console.log(response)
-        return response.data;
+        return await ApiService.request("get", "/api/sandboxes");
     }
 
     async deleteSandbox(id) {
-        const response = await this.apiClient.delete(`/api/sandboxes/${id}`);
-        return response.data;
+        return await ApiService.request("delete", `/api/sandboxes/${id}`);
     }
 
     async createSandbox(image_name, lifetime) {
-        var data = {
-            "image_name": image_name,
-            "lifetime": lifetime
-        };
-        const response = await this.apiClient.post("/api/sandboxes", data);
-        return response.data;
+        return await ApiService.request("post", "/api/sandboxes", {
+            image_name: image_name,
+            lifetime: lifetime
+        });
     }
 
 }

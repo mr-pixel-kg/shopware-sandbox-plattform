@@ -83,7 +83,7 @@ guard:
 |           | allowed_origins       | 	array   | 	[]                 | 	List of allowed CORS origins.                          |
 |           | app_url               | 	string  | 	"http://localhost" | 	The base URL of the application.                       |
 | sandbox   | 	url_prefix           | 	string  | 	"sandbox-"         | 	Prefix for sandbox URLs.                               |
-|           | url_suffix            | 	string  | 	".sandbox.com"     | 	Suffix for sandbox URLs.                               |
+|           | url_suffix            | 	string  | 	".shopshredder.de" | 	Suffix for sandbox URLs.                               |
 |           | default_lifetime      | 	int	    | 60                  | 	Default sandbox lifetime in minutes.                   |
 | auth      | 	username             | 	string  | 	"admin"            | 	Username for basic authentication.                     |
 |           | password              | 	string	 | "password"          | 	Password for basic authentication.                     |
