@@ -55,6 +55,8 @@ export default {
         if (response.status === "success") {
           console.log("Sandbox erfolgreich erstellt", response);
 
+          this.$toast.add({ severity: 'success', summary: this.sandboxImage.title, detail: 'Sandbox erfolgreich erstellt!', life: 3000 });
+
           const sandboxEnvironment = new SandboxEnvironment(response.sandbox_id, response.image, response.url);
           this.generalStore.addSandbox(sandboxEnvironment);
 
@@ -62,9 +64,12 @@ export default {
         } else {
           const errorMessage = response.message || "Unbekannter Fehler";
           console.log("Fehler beim Erstellen der Sandbox:", errorMessage);
+          this.$toast.add({ severity: 'error', summary: "Sandbox konnte nicht erstellt werden!", detail: errorMessage, life: 6000 });
         }
       } catch(error) {
-        console.error("Fehler beim Erstellen der Sandbox:", error.response?.data.message || error.message || error);
+        const errorMessage = error.response?.data.message || error.message || error;
+        console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
+        this.$toast.add({ severity: 'error', summary: "Sandbox konnte nicht erstellt werden!", detail: errorMessage, life: 6000 });
       } finally {
         const elapsedTime = Date.now() - startTime;
 

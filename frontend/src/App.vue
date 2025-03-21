@@ -1,5 +1,6 @@
 <script setup>
 import logo from './assets/logo.png'
+import Toast from 'primevue/toast';
 </script>
 
 <template>
@@ -12,6 +13,7 @@ import logo from './assets/logo.png'
       <RouterLink to="/login">Go to Login</RouterLink>
       <RouterLink to="/admin">Go to Admin</RouterLink>
     </nav>
+    <Toast />
   </header>
 
   <main>
