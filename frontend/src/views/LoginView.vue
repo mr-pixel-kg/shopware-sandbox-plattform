@@ -1,9 +1,9 @@
 <script>
-import Button from 'primevue/button';
-import Card from 'primevue/card';
-import InputText from 'primevue/inputtext';
+import Button from "primevue/button";
+import Card from "primevue/card";
+import InputText from "primevue/inputtext";
 import ProgressSpinner from "primevue/progressspinner";
-import apiService from '@/services/apiService';
+import apiService from "@/services/apiService";
 
 export default {
   components: {
@@ -24,16 +24,14 @@ export default {
     async loginClick() {
       const response = await apiService.login(this.username, this.password);
 
-      if(response) {
+      if (response) {
         this.$router.push("/admin");
       } else {
         this.password = "";
       }
-    }
+    },
   },
-
 };
-
 </script>
 
 <template>
@@ -43,10 +41,20 @@ export default {
       <template #content>
         <div class="flex justify-center flex-col gap-4">
           <div class="flex flex-col gap-1">
-            <InputText name="username" type="text" placeholder="Username" v-model="username"/>
+            <InputText
+              name="username"
+              type="text"
+              placeholder="Username"
+              v-model="username"
+            />
           </div>
           <div class="flex flex-col gap-1">
-            <InputText name="password" type="password" placeholder="Password" v-model="password" />
+            <InputText
+              name="password"
+              type="password"
+              placeholder="Password"
+              v-model="password"
+            />
           </div>
           <Button label="Login" @click="loginClick" />
         </div>

@@ -1,10 +1,18 @@
 <script setup>
-import Menu from 'primevue/menu';
-import { ref } from 'vue';
+import Menu from "primevue/menu";
+import { ref } from "vue";
 
 const items = ref([
-  { label: 'Sandbox Environments', icon: 'pi pi-box', route: '/admin/sandbox-environments' },
-  { label: 'Sandbox Images', icon: 'pi pi-image', route: '/admin/sandbox-images' },
+  {
+    label: "Sandbox Environments",
+    icon: "pi pi-box",
+    route: "/admin/sandbox-environments",
+  },
+  {
+    label: "Sandbox Images",
+    icon: "pi pi-image",
+    route: "/admin/sandbox-images",
+  },
 ]);
 </script>
 
@@ -18,7 +26,13 @@ const items = ref([
         </a>
       </router-link>
 
-      <a v-else v-ripple :href="item.url" :target="item.target" v-bind="props.action">
+      <a
+        v-else
+        v-ripple
+        :href="item.url"
+        :target="item.target"
+        v-bind="props.action"
+      >
         <span :class="item.icon" />
         <span class="ml-2">{{ item.label }}</span>
       </a>

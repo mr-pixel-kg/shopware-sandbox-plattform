@@ -61,7 +61,10 @@ export default {
       this.pullingImageLoading = true;
 
       try {
-        await ImagesService.registerImage(this.imageForm.name, this.imageForm.tag);
+        await ImagesService.registerImage(
+          this.imageForm.name,
+          this.imageForm.tag,
+        );
         await this.loadData();
         this.resetImageForm();
         this.addImageDialogVisible = false;
@@ -95,10 +98,10 @@ export default {
           <span class="text-xl font-bold">Sandbox Images</span>
           <div class="flex gap-2">
             <Button
-                icon="pi pi-plus"
-                rounded
-                raised
-                @click="addImageDialogVisible = true"
+              icon="pi pi-plus"
+              rounded
+              raised
+              @click="addImageDialogVisible = true"
             />
             <Button icon="pi pi-refresh" rounded raised @click="loadData" />
           </div>
@@ -107,9 +110,7 @@ export default {
 
       <!-- Columns -->
       <Column field="id" header="ID">
-        <template #body="{ data }">
-          {{ data.id.slice(0, 10) }}...
-        </template>
+        <template #body="{ data }"> {{ data.id.slice(0, 10) }}... </template>
       </Column>
       <Column field="image_name" header="Image Name"></Column>
       <Column field="image_tag" header="Image Tag"></Column>
@@ -123,10 +124,10 @@ export default {
         <template #body="{ data }">
           <div class="flex gap-1 justify-center">
             <Button
-                icon="pi pi-trash"
-                severity="secondary"
-                rounded
-                @click="deleteImage(data)"
+              icon="pi pi-trash"
+              severity="secondary"
+              rounded
+              @click="deleteImage(data)"
             />
           </div>
         </template>
@@ -144,10 +145,10 @@ export default {
 
   <!-- Dialog -->
   <Dialog
-      v-model:visible="addImageDialogVisible"
-      modal
-      header="Add Sandbox Image"
-      :style="{ width: '25rem' }"
+    v-model:visible="addImageDialogVisible"
+    modal
+    header="Add Sandbox Image"
+    :style="{ width: '25rem' }"
   >
     <span class="text-surface-500 dark:text-surface-400 block mb-8">
       Enter docker image:
@@ -155,49 +156,55 @@ export default {
     <div class="flex items-center gap-4 mb-4">
       <label for="image-name" class="font-semibold w-24">Image Name</label>
       <InputText
-          id="image-name"
-          v-model="imageForm.name"
-          class="flex-auto"
-          autocomplete="off"
+        id="image-name"
+        v-model="imageForm.name"
+        class="flex-auto"
+        autocomplete="off"
       />
     </div>
     <div class="flex items-center gap-4 mb-8">
       <label for="image-tag" class="font-semibold w-24">Image Tag</label>
       <InputText
-          id="image-tag"
-          v-model="imageForm.tag"
-          class="flex-auto"
-          autocomplete="off"
+        id="image-tag"
+        v-model="imageForm.tag"
+        class="flex-auto"
+        autocomplete="off"
       />
     </div>
-    <div :class="['flex gap-2', pullingImageLoading ? 'justify-between' : 'justify-end']">
-      <span v-if="pullingImageLoading" class="flex items-center gap-2 text-primary">
+    <div
+      :class="[
+        'flex gap-2',
+        pullingImageLoading ? 'justify-between' : 'justify-end',
+      ]"
+    >
+      <span
+        v-if="pullingImageLoading"
+        class="flex items-center gap-2 text-primary"
+      >
         Pulling image...
         <ProgressSpinner
-            style="width: 50px; height: 30px"
-            strokeWidth="8"
-            fill="transparent"
-            animationDuration=".5s"
+          style="width: 50px; height: 30px"
+          strokeWidth="8"
+          fill="transparent"
+          animationDuration=".5s"
         />
       </span>
       <div class="flex gap-2">
         <Button
-            type="button"
-            label="Cancel"
-            severity="secondary"
-            @click="addImageDialogVisible = false"
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          @click="addImageDialogVisible = false"
         />
         <Button
-            type="button"
-            label="Save"
-            :disabled="pullingImageLoading"
-            @click="addSandboxImage"
+          type="button"
+          label="Save"
+          :disabled="pullingImageLoading"
+          @click="addSandboxImage"
         />
       </div>
     </div>
   </Dialog>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

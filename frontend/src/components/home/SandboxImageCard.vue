@@ -9,8 +9,8 @@ import InputText from "primevue/inputtext";
 import ProgressSpinner from "primevue/progressspinner";
 import sandboxService from "@/services/sandboxService.js";
 import { GeneralStore } from "@/stores/generalStore";
-import {SandboxEnvironment} from "@/models/SandboxEnvironment.js";
-import {SandboxImage} from "@/models/SandboxImage.js";
+import { SandboxEnvironment } from "@/models/SandboxEnvironment.js";
+import { SandboxImage } from "@/models/SandboxImage.js";
 
 export default {
   components: {
@@ -25,51 +25,71 @@ export default {
   },
 
   props: {
-    sandboxImage: SandboxImage
+    sandboxImage: SandboxImage,
   },
 
   computed: {
     image() {
       return this.sandboxImage;
-    }
+    },
   },
 
   setup() {
     const store = GeneralStore();
     return {
-      generalStore: store
-    }
+      generalStore: store,
+    };
   },
 
   methods: {
     async createSandbox() {
-
       this.generalStore.setLoading(true);
-      console.log("Start loading")
+      console.log("Start loading");
 
-      const startTime = Date.now()
+      const startTime = Date.now();
 
       try {
-        const response = await sandboxService.createSandbox(this.sandboxImage.imageName, 60)
+        const response = await sandboxService.createSandbox(
+          this.sandboxImage.imageName,
+          60,
+        );
 
         if (response.status === "success") {
           console.log("Sandbox erfolgreich erstellt", response);
 
-          this.$toast.add({ severity: 'success', summary: this.sandboxImage.title, detail: 'Sandbox erfolgreich erstellt!', life: 3000 });
+          this.$toast.add({
+            severity: "success",
+            summary: this.sandboxImage.title,
+            detail: "Sandbox erfolgreich erstellt!",
+            life: 3000,
+          });
 
-          const sandboxEnvironment = new SandboxEnvironment(response.sandbox_id, response.image, response.url);
+          const sandboxEnvironment = new SandboxEnvironment(
+            response.sandbox_id,
+            response.image,
+            response.url,
+          );
           this.generalStore.addSandbox(sandboxEnvironment);
-
-
         } else {
           const errorMessage = response.message || "Unbekannter Fehler";
           console.log("Fehler beim Erstellen der Sandbox:", errorMessage);
-          this.$toast.add({ severity: 'error', summary: "Sandbox konnte nicht erstellt werden!", detail: errorMessage, life: 6000 });
+          this.$toast.add({
+            severity: "error",
+            summary: "Sandbox konnte nicht erstellt werden!",
+            detail: errorMessage,
+            life: 6000,
+          });
         }
-      } catch(error) {
-        const errorMessage = error.response?.data.message || error.message || error;
+      } catch (error) {
+        const errorMessage =
+          error.response?.data.message || error.message || error;
         console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
-        this.$toast.add({ severity: 'error', summary: "Sandbox konnte nicht erstellt werden!", detail: errorMessage, life: 6000 });
+        this.$toast.add({
+          severity: "error",
+          summary: "Sandbox konnte nicht erstellt werden!",
+          detail: errorMessage,
+          life: 6000,
+        });
       } finally {
         const elapsedTime = Date.now() - startTime;
 
@@ -78,20 +98,18 @@ export default {
 
         setTimeout(() => {
           this.generalStore.setLoading(false);
-          console.log("Stop loading")
+          console.log("Stop loading");
         }, waitTime);
       }
-
-    }
-  }
-
+    },
+  },
 };
 </script>
 
 <template>
   <Card style="width: 25rem; overflow: hidden">
     <template #header>
-      <img :src="image.thumbnail" alt="Shopware 6 Sandbox">
+      <img :src="image.thumbnail" alt="Shopware 6 Sandbox" />
     </template>
     <template #title>{{ image.title }}</template>
     <template #subtitle>{{ image.imageName }}</template>
@@ -103,6 +121,4 @@ export default {
   </Card>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

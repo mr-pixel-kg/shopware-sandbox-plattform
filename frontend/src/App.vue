@@ -1,6 +1,6 @@
 <script setup>
-import logo from './assets/logo.png'
-import Toast from 'primevue/toast';
+import logo from "./assets/logo.png";
+import Toast from "primevue/toast";
 </script>
 
 <template>
@@ -27,7 +27,6 @@ import Toast from 'primevue/toast';
   padding: 20px;
 }
 .logo-wrapper {
-
 }
 .logo {
   width: 250px;

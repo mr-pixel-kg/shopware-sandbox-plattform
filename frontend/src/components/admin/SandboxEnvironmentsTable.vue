@@ -53,7 +53,7 @@ export default {
       try {
         const result = await ImagesService.getAllImages();
         this.availableSandboxImages = result.map(
-            (item) => `${item.image_name}:${item.image_tag}`
+          (item) => `${item.image_name}:${item.image_tag}`,
         );
         this.createSandboxDialog.visible = true;
       } catch (error) {
@@ -106,7 +106,9 @@ export default {
       const destroyDate = new Date(destroyAt);
       const diffMs = destroyDate - now;
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const diffHrs = Math.floor(
+        (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
       if (diffDays > 0) {
@@ -141,12 +143,17 @@ export default {
           <span class="text-xl font-bold">Sandbox Environments</span>
           <div class="flex gap-2">
             <Button
-                icon="pi pi-plus"
-                rounded
-                raised
-                @click="openCreateSandboxDialog"
+              icon="pi pi-plus"
+              rounded
+              raised
+              @click="openCreateSandboxDialog"
             />
-            <Button icon="pi pi-refresh" rounded raised @click="loadSandboxes" />
+            <Button
+              icon="pi pi-refresh"
+              rounded
+              raised
+              @click="loadSandboxes"
+            />
           </div>
         </div>
       </template>
@@ -161,7 +168,10 @@ export default {
       </Column>
       <Column field="destroy_at" header="Destroy">
         <template #body="{ data }">
-          <Tag :value="getRemainingTime(data.destroy_at)" severity="secondary" />
+          <Tag
+            :value="getRemainingTime(data.destroy_at)"
+            severity="secondary"
+          />
         </template>
       </Column>
       <Column field="state" header="Status">
@@ -173,16 +183,16 @@ export default {
         <template #body="{ data }">
           <div class="flex gap-1 justify-center">
             <Button
-                icon="pi pi-arrow-right"
-                severity="secondary"
-                rounded
-                @click="openSandboxWindow(data)"
+              icon="pi pi-arrow-right"
+              severity="secondary"
+              rounded
+              @click="openSandboxWindow(data)"
             />
             <Button
-                icon="pi pi-trash"
-                severity="secondary"
-                rounded
-                @click="deleteSandbox(data)"
+              icon="pi pi-trash"
+              severity="secondary"
+              rounded
+              @click="deleteSandbox(data)"
             />
           </div>
         </template>
@@ -200,64 +210,65 @@ export default {
 
   <!-- Create Sandbox Dialog -->
   <Dialog
-      v-model:visible="createSandboxDialog.visible"
-      modal
-      header="Create Sandbox"
-      :style="{ width: '25rem' }"
+    v-model:visible="createSandboxDialog.visible"
+    modal
+    header="Create Sandbox"
+    :style="{ width: '25rem' }"
   >
     <div class="flex items-center gap-4 mb-4">
       <label for="sandbox-image" class="font-semibold w-24">Image</label>
       <Select
-          id="sandbox-image"
-          v-model="createSandboxDialog.form.image"
-          :options="availableSandboxImages"
-          class="flex-auto"
+        id="sandbox-image"
+        v-model="createSandboxDialog.form.image"
+        :options="availableSandboxImages"
+        class="flex-auto"
       />
     </div>
     <div class="flex items-center gap-4 mb-8">
       <label for="sandbox-lifetime" class="font-semibold w-24">Lifetime</label>
       <Select
-          id="sandbox-lifetime"
-          v-model="createSandboxDialog.form.lifetime"
-          :options="availableSandboxLifetimes"
-          optionLabel="display"
-          optionValue="value"
-          class="flex-auto"
+        id="sandbox-lifetime"
+        v-model="createSandboxDialog.form.lifetime"
+        :options="availableSandboxLifetimes"
+        optionLabel="display"
+        optionValue="value"
+        class="flex-auto"
       />
     </div>
     <div
-        :class="[
+      :class="[
         'flex gap-2',
         createSandboxDialog.loading ? 'justify-between' : 'justify-end',
       ]"
     >
-      <span v-if="createSandboxDialog.loading" class="flex items-center gap-2 text-primary">
+      <span
+        v-if="createSandboxDialog.loading"
+        class="flex items-center gap-2 text-primary"
+      >
         Deploying Sandbox...
         <ProgressSpinner
-            style="width: 50px; height: 30px"
-            strokeWidth="8"
-            fill="transparent"
-            animationDuration=".5s"
+          style="width: 50px; height: 30px"
+          strokeWidth="8"
+          fill="transparent"
+          animationDuration=".5s"
         />
       </span>
       <div class="flex gap-2">
         <Button
-            type="button"
-            label="Cancel"
-            severity="secondary"
-            @click="createSandboxDialog.visible = false"
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          @click="createSandboxDialog.visible = false"
         />
         <Button
-            type="button"
-            label="Deploy"
-            :disabled="createSandboxDialog.loading"
-            @click="createSandboxEnvironment"
+          type="button"
+          label="Deploy"
+          :disabled="createSandboxDialog.loading"
+          @click="createSandboxEnvironment"
         />
       </div>
     </div>
   </Dialog>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

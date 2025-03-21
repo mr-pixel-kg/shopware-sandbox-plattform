@@ -3,9 +3,7 @@ import SandboxImagesTable from "@/components/admin/SandboxImagesTable.vue";
 </script>
 
 <template>
-<SandboxImagesTable></SandboxImagesTable>
+  <SandboxImagesTable></SandboxImagesTable>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

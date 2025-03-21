@@ -1,6 +1,6 @@
 <script setup>
 import Sidebar from "@/components/admin/Sidebar.vue";
-import Panel from 'primevue/panel';
+import Panel from "primevue/panel";
 </script>
 
 <template>

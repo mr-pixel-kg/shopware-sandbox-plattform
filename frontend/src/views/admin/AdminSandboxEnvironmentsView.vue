@@ -3,9 +3,7 @@ import SandboxEnvironmentsTable from "@/components/admin/SandboxEnvironmentsTabl
 </script>
 
 <template>
-<SandboxEnvironmentsTable></SandboxEnvironmentsTable>
+  <SandboxEnvironmentsTable></SandboxEnvironmentsTable>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>
