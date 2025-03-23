@@ -4,6 +4,7 @@ export const GeneralStore = defineStore("general", {
   state: () => ({
     showLoadingScreen: false, // Initialer Zustand
     sandboxEnvironments: [],
+    sandboxes: [],
   }),
   getters: {
     isLoading() {
@@ -11,6 +12,9 @@ export const GeneralStore = defineStore("general", {
     },
     getSandboxEnvironments() {
       return this.sandboxEnvironments;
+    },
+    getSandboxes() {
+      return this.sandboxes;
     },
   },
   actions: {
@@ -30,6 +34,22 @@ export const GeneralStore = defineStore("general", {
     removeSandbox(sandboxId) {
       this.sandboxEnvironments = this.sandboxEnvironments.filter(
         (env) => env.sandboxId !== sandboxId,
+      );
+    },
+
+    addSandbox2(sandbox) {
+      // Überprüfen, ob die Sandbox schon existiert, um Duplikate zu vermeiden
+      if (
+          !this.sandboxes.some(
+              (env) => env.id === sandbox.id,
+          )
+      ) {
+        this.sandboxes.push(sandbox);
+      }
+    },
+    removeSandbox2(sandboxId) {
+      this.sandboxes = this.sandboxes.filter(
+          (env) => env.id !== sandboxId,
       );
     },
   },

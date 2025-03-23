@@ -2,6 +2,8 @@
 import Card from "primevue/card";
 import Button from "primevue/button";
 import {SandboxImageModel} from "@/models/SandboxImageModel.js";
+import SandboxService from "@/services/sandboxService.js";
+import {GeneralStore} from "@/stores/generalStore.js";
 
 export default {
   name: "ActiveSandboxImageCard",
@@ -18,9 +20,74 @@ export default {
     Button,
   },
 
+  setup() {
+    const store = GeneralStore();
+    return {
+      generalStore: store,
+    };
+  },
+
   methods: {
-    createDemo() {
+    async createDemo() {
       console.log("Create Demo");
+
+      this.generalStore.setLoading(true);
+      console.log("Start loading");
+
+      const startTime = Date.now();
+
+      try {
+        const resp = await SandboxService.createSandbox(this.sandboxImage.imageName, 60);
+
+        if(resp.success) {
+          const sandbox = resp.sandbox;
+          console.log("Sandbox created", sandbox);
+
+          // TODO
+          this.generalStore.addSandbox2(sandbox);
+          //this.generalStore.addSandbox(sandboxEnvironment);
+
+          this.$toast.add({
+            severity: "success",
+            summary: this.sandboxImage.title,
+            detail: "Sandbox erfolgreich erstellt!",
+            life: 3000,
+          });
+        }else{
+          const errorMessage = resp.message
+          console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
+
+          this.$toast.add({
+            severity: "error",
+            summary: "Sandbox konnte nicht erstellt werden!",
+            detail: errorMessage,
+            life: 6000,
+          });
+        }
+
+
+      }catch(error){
+        const errorMessage = error.response?.data.message || error.message || error;
+        console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
+
+        this.$toast.add({
+          severity: "error",
+          summary: "Sandbox konnte nicht erstellt werden!",
+          detail: errorMessage,
+          life: 6000,
+        });
+      }finally{
+        const elapsedTime = Date.now() - startTime;
+
+        const minLoadingTime = 8000; // 8 Sekunden
+        const waitTime = Math.max(minLoadingTime - elapsedTime, 0);
+
+        setTimeout(() => {
+          this.generalStore.setLoading(false);
+          console.log("Stop loading");
+        }, waitTime);
+      }
+
     }
   }
 

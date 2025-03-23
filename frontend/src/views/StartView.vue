@@ -7,11 +7,15 @@ import LoadingScreen from "@/components/home/LoadingScreen.vue";
 import { GeneralStore } from "@/stores/generalStore.js";
 import { SandboxEnvironment } from "@/models/SandboxEnvironment.js";
 import { SandboxImage } from "@/models/SandboxImage.js";
+import SandboxImageGallery from "@/components/home/SandboxImageGallery.vue";
+import SandboxGallery from "@/components/home/SandboxGallery.vue";
 
 export default {
   // Properties returned from data() become reactive state
   // and will be exposed on `this`.
   components: {
+    SandboxGallery,
+    SandboxImageGallery,
     SandboxImageCard,
     LoadingScreen,
     SandboxCard,
@@ -69,6 +73,15 @@ export default {
 </script>
 
 <template>
+
+  <div class="max-w-7xl mx-auto">
+    <SandboxGallery />
+  </div>
+
+  <div class="max-w-7xl mx-auto">
+    <SandboxImageGallery />
+  </div>
+
   <div class="max-w-7xl mx-auto mt-10 ml-10 mr-10">
     <div v-if="environments.length">
       <div class="flex justify-between items-center mb-6">

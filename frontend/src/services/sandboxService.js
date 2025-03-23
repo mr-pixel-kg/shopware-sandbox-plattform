@@ -1,4 +1,5 @@
 import ApiService from "@/services/apiService.js";
+import {SandboxEnvironmentModel} from "@/models/SandboxEnvironmentModel.js";
 
 class SandboxService {
   async getAllSandboxes() {
@@ -6,14 +7,51 @@ class SandboxService {
   }
 
   async deleteSandbox(id) {
-    return await ApiService.request("delete", `/api/sandboxes/${id}`);
+    try {
+      const response = await ApiService.request("delete", `/api/sandboxes/${id}`);
+      return { success: true, message: "Sandbox erfolgreich gelöscht" };
+    } catch(e) {
+      console.error("Failed to delete sandbox", e);
+      const errorMessage = e.response?.data?.message || e.message || "Ein unbekannter Fehler ist aufgetreten";
+      return { success: false, message: errorMessage };
+    }
   }
 
   async createSandbox(image_name, lifetime) {
-    return await ApiService.request("post", "/api/sandboxes", {
-      image_name: image_name,
-      lifetime: lifetime,
-    });
+    try {
+      const response = await ApiService.request("post", "/api/sandboxes", {
+        image_name: image_name,
+        lifetime: lifetime,
+      });
+
+      const sandbox = new SandboxEnvironmentModel(
+          response.sandbox_id,
+          response.image,
+          response.status,
+          response.created_at,
+          response.destroy_at,
+          response.url,
+      );
+
+      return { success: true, sandbox: sandbox };
+    } catch(e) {
+      console.log("Failed to create sandbox", e);
+      const errorMessage = e.response?.data?.message || e.message || "Ein unbekannter Fehler ist aufgetreten";
+      return { success: false, message: errorMessage };
+    }
+  }
+
+  async refreshSandbox(sandbox) {
+    try {
+        const response = await ApiService.request("GET", `/api/sandboxes/${sandbox.id}`);
+
+        sandbox.status = response.status;
+
+        return { success: true, sandbox: sandbox };
+    }catch(e){
+        console.error("Failed to refresh sandbox details", e)
+        return { success: false, sandbox: null };
+    }
   }
 }
 
