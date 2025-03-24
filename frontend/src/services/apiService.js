@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useAuthStore } from "@/stores/authStore";
 
 class ApiService {
   constructor() {
@@ -9,28 +10,26 @@ class ApiService {
         "Access-Control-Allow-Origin": "*",
       },
     });
-    this.authCredentials = null;
   }
 
   async login(username, password) {
-    const response = await this.apiClient.get("/api/auth", {
-      auth: {
-        username: username,
-        password: password,
-      },
-    });
-    console.log(response);
+    try {
+      const response = await this.apiClient.get("/api/auth", {
+        auth: { username, password },
+      });
 
-    if (response.data.loggedIn === "true") {
-      this.authCredentials = { username, password };
-      return true;
+      console.log(response);
+
+      return response.data.loggedIn === "true";
+    } catch (error) {
+      console.error("Login failed:", error);
+      return false;
     }
-
-    return false;
   }
 
   logout() {
-    this.authCredentials = null;
+    const authStore = useAuthStore();
+    return authStore.isAuthenticated;
   }
 
   isLoggedIn() {
@@ -38,11 +37,14 @@ class ApiService {
   }
 
   async request(method, url, data = null) {
+    const authStore = useAuthStore();
     const config = {
       method: method,
       url: url,
       data: data,
-      auth: this.authCredentials ? this.authCredentials : undefined,
+      auth: authStore.isAuthenticated
+        ? { username: authStore.username, password: authStore.password }
+        : undefined,
     };
 
     try {

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import SandboxService from "@/services/sandboxService.js";
+import {SandboxEnvironmentModel} from "@/models/SandboxEnvironmentModel.js";
 
 export const GeneralStore = defineStore("general", {
   state: () => ({
@@ -39,5 +40,24 @@ export const GeneralStore = defineStore("general", {
           }
         }
     }
+  },
+  persist: {
+    key: "general-store",
+    storage: localStorage, // Oder sessionStorage
+    serializer: {
+      serialize: (state) => JSON.stringify(state),
+      deserialize: (data) => {
+        const parsed = JSON.parse(data);
+        parsed.sandboxes = parsed.sandboxes.map(sandbox => new SandboxEnvironmentModel(
+            sandbox.id,
+            sandbox.imageName,
+            sandbox.status,
+            new Date(sandbox.createdAt),
+            new Date(sandbox.destroyAt),
+            sandbox.sandboxUrl
+        ));
+        return parsed;
+      },
+    },
   },
 });

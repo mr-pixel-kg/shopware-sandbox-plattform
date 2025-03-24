@@ -4,6 +4,8 @@ import Card from "primevue/card";
 import InputText from "primevue/inputtext";
 import ProgressSpinner from "primevue/progressspinner";
 import apiService from "@/services/apiService";
+import {GeneralStore} from "@/stores/generalStore.js";
+import {useAuthStore} from "@/stores/authStore.js";
 
 export default {
   components: {
@@ -20,11 +22,18 @@ export default {
     };
   },
 
+  setup() {
+    const authStore = useAuthStore()
+    return {
+      authStore: authStore,
+    };
+  },
+
   methods: {
     async loginClick() {
-      const response = await apiService.login(this.username, this.password);
+      const success = await this.authStore.login(this.username, this.password);
 
-      if (response) {
+      if (success) {
         this.$router.push("/admin");
       } else {
         this.password = "";
