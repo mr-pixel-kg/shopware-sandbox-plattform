@@ -19,18 +19,18 @@ export default {
     return {
       sandboxImages: [
         new SandboxImageModel(
-          "Shopware 6.6 Demo",
+          "Shopware 6.6 Dev",
           "shopware-banner.jpg",
           "dockware/dev:6.6.10.0",
-          "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Inventore sed consequuntur error repudiandae numquam deserunt quisquam repellat libero asperiores earum nam nobis!",
+          "Eine vollständige Shopware 6.6.10.0 Entwicklungsumgebung, ausgestattet mit allen notwendigen Dev-Tools. Ideal für Entwickler.",
           "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
           "Shopware 6.6 Play",
           "shopware-banner.jpg",
-          "dockware/dev:6.6.10.0",
-          "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Inventore sed consequuntur error repudiandae numquam deserunt quisquam repellat libero asperiores earum nam nobis!",
-          "https://www.shopware.com",
+          "dockware/play:6.6.10.0",
+          "Eine sofort einsatzbereite, saubere Shopware 6.6.10.0 Installation zum Testen, Experimentieren und Erkunden.",
+          "https://www.mr-pixel.de",
         ),
       ],
     };
@@ -41,7 +41,7 @@ export default {
 <template>
   <div class="max-w-7xl mx-auto p-5">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Shopware Umgebung</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Shopware Umgebungen</h1>
     </div>
     <div
       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"

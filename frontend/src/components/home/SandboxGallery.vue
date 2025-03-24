@@ -20,13 +20,19 @@ export default {
       generalStore: store,
     };
   },
+
+  mounted() {
+    setInterval(() => {
+      this.generalStore.refreshSandboxes();
+    }, 5000);
+  }
 };
 </script>
 
 <template>
   <div class="max-w-7xl mx-auto p-5">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Meine Sandboxen</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Meine Sandbox Umgebungen</h1>
     </div>
 
     <div

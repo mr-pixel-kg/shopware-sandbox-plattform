@@ -33,9 +33,9 @@ class SandboxService {
       const sandbox = new SandboxEnvironmentModel(
         response.sandbox_id,
         response.image,
-        response.status,
-        response.created_at,
-        response.destroy_at,
+        "starting",
+        Date.parse(response.created_at),
+        Date.parse(response.destroy_at),
         response.url,
       );
 
@@ -57,7 +57,9 @@ class SandboxService {
         `/api/sandboxes/${sandbox.id}`,
       );
 
-      sandbox.status = response.status;
+      sandbox.status = response.state; // Attention when refactor: state is not the same as status
+      sandbox.createdAt = Date.parse(response.created_at);
+      sandbox.destroyAt = Date.parse(response.destroy_at);
 
       return { success: true, sandbox: sandbox };
     } catch (e) {

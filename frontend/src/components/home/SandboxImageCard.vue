@@ -35,6 +35,7 @@ export default {
       console.log("Start loading");
 
       const startTime = Date.now();
+      let sandbox = null;
 
       try {
         const resp = await SandboxService.createSandbox(
@@ -43,17 +44,8 @@ export default {
         );
 
         if (resp.success) {
-          const sandbox = resp.sandbox;
+          sandbox = resp.sandbox;
           console.log("Sandbox created", sandbox);
-
-          this.generalStore.addSandbox(sandbox);
-
-          this.$toast.add({
-            severity: "success",
-            summary: this.sandboxImage.title,
-            detail: "Sandbox erfolgreich erstellt!",
-            life: 3000,
-          });
         } else {
           const errorMessage = resp.message;
           console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
@@ -79,12 +71,23 @@ export default {
       } finally {
         const elapsedTime = Date.now() - startTime;
 
-        const minLoadingTime = 8000; // 8 Sekunden
+        const minLoadingTime = 5000; // 8 Sekunden
         const waitTime = Math.max(minLoadingTime - elapsedTime, 0);
 
         setTimeout(() => {
           this.generalStore.setLoading(false);
           console.log("Stop loading");
+
+          if(sandbox !== null) {
+            this.generalStore.addSandbox(sandbox);
+
+            this.$toast.add({
+              severity: "success",
+              summary: this.sandboxImage.title,
+              detail: "Sandbox erfolgreich erstellt!",
+              life: 3000,
+            });
+          }
         }, waitTime);
       }
     },

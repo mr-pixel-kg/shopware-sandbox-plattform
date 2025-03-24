@@ -27,18 +27,28 @@ export default {
   data() {
     return {
       refreshInterval: null,
+      remainingTime: "0m 1s",
     };
   },
 
   computed: {
     statusColor() {
+      // This does not work to refresh tag color when status changes
       switch (this.sandbox.status) {
         case "running":
           return "bg-green-500";
         case "stopped":
           return "bg-yellow-500";
-        case "error":
+        case "created":
+          return "bg-yellow-500";
+        case "restarting":
+          return "bg-yellow-500";
+        case "exited":
           return "bg-red-500";
+        case "dead":
+          return "bg-red-500";
+        case "paused":
+          return "bg-gray-500";
         default:
           return "bg-gray-500";
       }
@@ -50,6 +60,18 @@ export default {
     return {
       generalStore: store,
     };
+  },
+
+  mounted() {
+    this.refreshData();
+
+    this.refreshInterval = setInterval(() => {
+      this.refreshData();
+    }, 1000);
+  },
+
+  beforeUnmount() {
+    clearInterval(this.refreshInterval);
   },
 
   methods: {
@@ -79,32 +101,10 @@ export default {
       }
     },
 
-    async refreshData() {
-      console.log("refresh");
-      const resp = await SandboxService.refreshSandbox(this.sandbox);
-      if (resp.success) {
-        this.sandbox = resp.sandbox;
-      } else {
-        console.log("Broken");
-        clearInterval(this.refreshInterval);
-      }
+    refreshData() {
+      this.remainingTime = this.sandbox.getRemainingTime();
     },
   },
-
-  /*mounted() {
-    // Sofort beim Laden einmal abrufen
-    this.refreshData();
-
-    // Alle 1 Sekunde (1000ms) erneut abrufen
-    this.refreshInterval = setInterval(() => {
-      this.refreshData();
-    }, 1000);
-  },
-
-  beforeUnmount() {
-    // Interval beim Verlassen der Komponente stoppen
-    clearInterval(this.refreshInterval);
-  }*/
 };
 </script>
 
@@ -116,7 +116,7 @@ export default {
     <template #title>Shopware Sandbox</template>
     <template #header>
       <ProgressBar
-        :value="100 - (sandbox.getRemainingTime().split('m')[0] * 100) / 60"
+        :value="100 - (this.remainingTime.split('m')[0] * 100) / 60"
         :show-value="false"
         style="height: 5px"
       ></ProgressBar>
@@ -129,13 +129,13 @@ export default {
       <div class="space-y-2">
         <div class="flex justify-between items-center">
           <span class="font-semibold">Status:</span>
-          <Tag :class="statusColor" class="px-2 py-1 text-white">{{
+          <Tag :class="[statusColor, 'px-2 py-1 text-white']">{{
             sandbox.status
           }}</Tag>
         </div>
         <div class="flex justify-between items-center">
           <span class="font-semibold">Läuft bis:</span>
-          <span class="text-gray-700">{{ sandbox.getRemainingTime() }}</span>
+          <span class="text-gray-700">{{ this.remainingTime }}</span>
         </div>
 
         <div class="bg-gray-100 p-3 rounded-lg mt-6">

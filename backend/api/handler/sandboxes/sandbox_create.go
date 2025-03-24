@@ -6,6 +6,7 @@ import (
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/middleware"
 	"log"
 	"net/http"
+	"time"
 )
 
 type SandboxCreateRequest struct {
@@ -21,6 +22,8 @@ type SandboxCreateResponse struct {
 	ContainerId   string `json:"container_id" example:"9a7f95b73018432cb88ebed68046c59a4bed05b2abc809f6fbf39a1173c06ac9"`
 	Url           string `json:"url" example:"https://sandbox-67777b4e-946f-4462-b689-3c608d2d7938.shopshredder.zion.mr-pixel.de"`
 	SandboxId     string `json:"sandbox_id" example:"67777b4e-946f-4462-b689-3c608d2d7938"`
+	CreatedAt     string `json:"created_at" example:"2021-09-01T12:00:00Z"`
+	DestroyAt     string `json:"destroy_at" example:"2021-09-01T12:00:00Z"`
 }
 
 // SandboxCreateHandler creates a new sandbox for requested image
@@ -97,6 +100,8 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 		Image:         imageName,
 		Url:           sandbox.URL,
 		SandboxId:     sandbox.ID,
+		CreatedAt:     sandbox.CreatedAt.Format(time.RFC3339),
+		DestroyAt:     sandbox.DestroyAt.Format(time.RFC3339),
 	}
 
 	return c.JSON(http.StatusOK, output)

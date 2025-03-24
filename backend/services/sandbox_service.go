@@ -104,6 +104,7 @@ func (s *SandboxService) GetSandbox(ctx context.Context, sandboxId string) (Sand
 	if err != nil {
 		log.Printf("Failed to fetch info for sandbox %s, because sandbox not found: %v", sandboxId, err)
 		// todo error handling
+		return SandboxInfo{}, err
 	}
 	containerId := sandbox.ContainerID
 
