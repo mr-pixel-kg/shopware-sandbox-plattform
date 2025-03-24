@@ -3,7 +3,7 @@ import axios from "axios";
 class ApiService {
   constructor() {
     this.apiClient = axios.create({
-      baseURL: "http://localhost:8080",
+      baseURL: import.meta.env.VITE_BACKEND_URL || "http://localhost:8080",
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
