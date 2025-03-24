@@ -1,0 +1,42 @@
+name: Build & Push Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Extract Git Tag
+        id: get_tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }} -f backend/Dockerfile ./backend
+          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:latest
+
+      - name: Build Frontend Docker Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} -f backend/Dockerfile ./frontend
+          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest
+
+      - name: Push Docker Image
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }}
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:latest
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }}
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest

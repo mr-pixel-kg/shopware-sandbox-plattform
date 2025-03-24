@@ -2,11 +2,11 @@ name: Build Manager Image
 
 on:
   workflow_dispatch:  
-  push:
-    paths: 
-      - go.mod
-      - go.sum
-      - handler/**
+#  push:
+#    paths:
+#      - go.mod
+#      - go.sum
+#      - handler/**
 
 jobs:
   build:
