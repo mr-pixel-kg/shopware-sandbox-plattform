@@ -31,7 +31,7 @@ jobs:
 
       - name: Build Frontend Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} -f backend/Dockerfile ./frontend
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} -f frontend/Dockerfile ./frontend
           docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest
 
       - name: Push Docker Image
