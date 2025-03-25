@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
@@ -186,11 +187,17 @@ func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string, li
 		"SHOP_DOMAIN=" + hostname,
 	}
 
+	cNetwork := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"internal": {},
+		},
+	}
+
 	resp, err := s.client.ContainerCreate(ctx, &container.Config{
 		Image:  imageName,
 		Labels: labels,
 		Env:    envs,
-	}, nil, nil, nil, containerName)
+	}, nil, cNetwork, nil, containerName)
 	if err != nil {
 		log.Fatal("Failed to create sandbox docker container", err)
 		return models.Sandbox{}, err
