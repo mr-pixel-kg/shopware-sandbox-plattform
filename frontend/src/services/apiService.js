@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 class ApiService {
   constructor() {
+    console.log("Backend URL:", import.meta.env.VITE_BACKEND_URL);
     this.apiClient = axios.create({
       baseURL: import.meta.env.VITE_BACKEND_URL || "http://localhost:8080",
       headers: {

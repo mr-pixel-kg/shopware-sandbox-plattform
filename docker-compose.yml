@@ -25,6 +25,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_URL: http://backend:8080
     ports:
       - "8000:80"
     environment:

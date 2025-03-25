@@ -12,6 +12,10 @@ RUN yarn install
 # Copy application
 COPY . .
 
+# Set build-time environment variable for backend URL
+ARG VITE_BACKEND_URL
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+
 # Build frontend for production
 RUN yarn build
 
