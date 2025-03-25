@@ -1,0 +1,11 @@
+http:
+  middlewares:
+    sandbox-middleware:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          Content-Security-Policy: "upgrade-insecure-requests;"
+      redirectScheme:
+        scheme: https
+        permanent: true

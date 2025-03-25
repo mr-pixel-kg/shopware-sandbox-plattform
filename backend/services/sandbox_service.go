@@ -172,9 +172,24 @@ func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string, li
 		"traefik.enable":    "true",
 		fmt.Sprintf("traefik.http.routers.http-%s.rule", containerName): fmt.Sprintf("Host(`%s`)", hostname),
 	}
+
+	// Add https traefik headers
+	labels["traefik.http.routers.http-"+containerName+".entrypoints"] = "websecure"
+	labels["traefik.http.routers.http-"+containerName+".tls"] = "true"
+	labels["traefik.http.routers.http-"+containerName+".tls.certresolver"] = "production"
+	labels["traefik.http.routers.http-"+containerName+".middleware"] = "sandbox-middleware@file"
+	labels["traefik.http.services.http-"+containerName+".loadbalancer.server.port"] = "80"
+
+	// Add env variables
+	envs := []string{
+		"TRUSTED_PROXIES=0.0.0.0/0",
+		"SHOP_DOMAIN=" + hostname,
+	}
+
 	resp, err := s.client.ContainerCreate(ctx, &container.Config{
 		Image:  imageName,
 		Labels: labels,
+		Env:    envs,
 	}, nil, nil, nil, containerName)
 	if err != nil {
 		log.Fatal("Failed to create sandbox docker container", err)
