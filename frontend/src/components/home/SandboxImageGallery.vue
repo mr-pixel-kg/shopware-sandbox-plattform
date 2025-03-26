@@ -19,19 +19,19 @@ export default {
     return {
       sandboxImages: [
         new SandboxImageModel(
-          "Shopware 6.6 Dev",
+          "Shopware 6.6",
           "shopware-banner.jpg",
-          "dockware/dev:6.6.10.0",
+          "mr-pixel/sw-sandbox:6.6.10.0",
           "Eine vollständige Shopware 6.6.10.0 Entwicklungsumgebung, ausgestattet mit allen notwendigen Dev-Tools. Ideal für Entwickler.",
           "https://www.mr-pixel.de",
-        ),
-        new SandboxImageModel(
+        )
+        /*new SandboxImageModel(
           "Shopware 6.6 Play",
           "shopware-banner.jpg",
           "dockware/play:6.6.10.0",
           "Eine sofort einsatzbereite, saubere Shopware 6.6.10.0 Installation zum Testen, Experimentieren und Erkunden.",
           "https://www.mr-pixel.de",
-        ),
+        ),*/
       ],
     };
   },

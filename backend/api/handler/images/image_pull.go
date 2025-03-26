@@ -44,7 +44,10 @@ func (h *ImageHandler) PullImageHandler(c echo.Context) error {
 	}
 
 	imageName := input.ImageName + ":" + input.ImageTag
-	h.ImageService.PullImage(ctx, imageName)
+	_, err := h.ImageService.PullImage(ctx, imageName)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to pull image", err.Error())
+	}
 
 	// Write audit log
 	h.AuditLogService.LogRequest(c, models.IMAGE_CREATE, map[string]interface{}{

@@ -8,37 +8,13 @@ Start application with docker compose:
 docker-compose up --build
 ```
 
-## Backend
 
-Requires a environment variable for docker and it has to be started as root:
-```
-DOCKER_HOST=unix:///Users/manuel.kienlein/.docker/run/docker.sock
-```
-
-### Swagger Docs
-Command to compile swagger documentation page under http://localhost:8080/swagger/index.html
-```
-swag init
-```
-
-
-## Frontend
-Start development server
-```
-yarn dev
-```
-
-
-
-
-
-
-# Configuration Guide
+## Configuration Guide
 
 This document provides an overview of the configuration settings for the application.  
 The configuration is loaded from a `config.yml` file and can be overridden using environment variables.
 
-## Configuration File (`config.yml`)
+### Configuration File (`config.yml`)
 
 The application configuration is structured as follows:
 
@@ -62,9 +38,9 @@ auth:
   password: "password"
 
 guard:
-  max_total_sandboxes: 1
+  max_total_sandboxes: 32
   max_sandboxes_per_ip: 5
-  max_sandbox_lifetime: 32
+  max_sandbox_lifetime: 60
 
 #database:
 #  host: "localhost"
@@ -75,7 +51,7 @@ guard:
 ```
 
 
-## Configuration Overview
+### Configuration Overview
 
 | Section   | 	Key                  | 	Type    | 	Default            | 	Description                                            |
 |-----------|-----------------------|----------|---------------------|---------------------------------------------------------|
@@ -99,7 +75,7 @@ guard:
 *Database configuration is currently disabled. Uncomment it in config.yml to enable.
 If no database is specified a SQLite database is used automatically.
 
-## Overriding Configuration with Environment Variables
+### Overriding Configuration with Environment Variables
 The application supports environment variables to override configuration values.
 Here is a list of environment variables and their corresponding settings:
 
@@ -116,67 +92,31 @@ Here is a list of environment variables and their corresponding settings:
 | GUARD_MAX_SANDBOX_LIFETIME	 | guard.max_sandbox_lifetime |
 
 
+## Development
 
+This project uses automated CI/CD pipeline and pushes production ready images to Github Packages.
+The configuration and build options can be found at ./github/workflows/release.yml
 
+### Backend
 
-# Old Documentation from Fork
-
-This environment is in use internally for testing store plugins.
-
-Each created instance has an own subdomain. The Shopware installation runs in a subfolder `/shop/public`.
-The Adminer Plugin and App-System are preinstalled.
-
-**This Application has only an API**
-
-**This Application should run only in internal networks**
-
-## Just running the Docker Container
-
-```bash
-docker run --rm -p 80:80 -e VIRTUAL_HOST=localhost ghcr.io/shopwarelabs/testenv:6.4.3
+#### Change Docker Host
+If you have multiple users on your system, you maybe have to specify your docker host and run the application as root:
+```
+DOCKER_HOST=unix:///Users/<username>/.docker/run/docker.sock
 ```
 
-Access shop at http://localhost/shop/public
 
-### Admin Credentials
-
-User: `demo`
-Password: `demodemo`
-
-## API
-
-### GET /environments
-
-Returns all running containers
-
-
-### POST /environments
-
-JSON Request:
-
-```json
-{
-    "installVersion": "<lowest supported version of plugin>",
-    "plugin": "<plugin zip encoded>"
-}
+#### Swagger Docs
+Command to compile swagger documentation page under http://localhost:8080/swagger/index.html
+```
+swag init
 ```
 
-Response
 
-```json
-{
-    "id": "<docker id>",
-    "domain": "<running url>",
-    "installedVersion": "<installed version>"
-}
+### Frontend
+Start development server
+```
+yarn dev
 ```
 
-### DELETE /environments?id=dockerId
-
-Response
-
-```json
-{
-    "success": true
-}
-```
+The `VITE_BACKEND_URL` can be set in the .env files. For production use, the pipeline will set the correct value by using docker build arguments.

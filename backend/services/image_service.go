@@ -8,6 +8,7 @@ import (
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/repository"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -111,17 +112,36 @@ func (s *ImageService) GetImage(ctx context.Context, imageId string) (Image, err
 
 func (s *ImageService) PullImage(ctx context.Context, imageName string) (Image, error) {
 
-	out, err := s.client.ImagePull(ctx, imageName, image.PullOptions{})
-	if err != nil {
-		return Image{}, err
+	// Check if image already exists locally
+	exists := true
+	_, _, err2 := s.client.ImageInspectWithRaw(context.Background(), imageName)
+	if err2 != nil {
+		// Falls das Image nicht existiert, gibt Docker einen speziellen Fehler zurück
+		if client.IsErrNotFound(err2) {
+			exists = false
+			slog.Info("Docker Image not found locally", "imageName", imageName)
+		} else {
+			// Sonstiger fehler
+			return Image{}, err2
+		}
 	}
 
-	defer out.Close()
+	if !exists {
+		slog.Info("Pull Docker Image ...", "imageName", imageName)
+		out, err := s.client.ImagePull(ctx, imageName, image.PullOptions{})
+		if err != nil {
+			slog.Error("Failed to pull docker image", "imageName", imageName, "err", err)
+			return Image{}, err
+		}
 
-	io.Copy(os.Stdout, out)
+		defer out.Close()
+
+		io.Copy(os.Stdout, out)
+	}
 
 	image, _, err := s.client.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
+		slog.Error("Failed to read docker image details", "imageName", imageName, "err", err)
 		return Image{}, err
 	}
 

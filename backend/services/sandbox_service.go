@@ -5,17 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/models"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/repository"
-	"io"
 	"log"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 )
@@ -157,13 +154,25 @@ func (s *SandboxService) CreateSandbox(ctx context.Context, imageName string, li
 	}
 
 	// Pull docker container
-	out, err := s.client.ImagePull(ctx, imageName, image.PullOptions{})
+	/*out, err := s.client.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		log.Print("Failed to pull sandbox docker container", err)
 		return models.Sandbox{}, err
 	}
 	defer out.Close()
-	io.Copy(os.Stdout, out)
+	io.Copy(os.Stdout, out)*/
+
+	// Check if image exists
+	_, _, err2 := s.client.ImageInspectWithRaw(context.Background(), imageName)
+	if err2 != nil {
+		// Falls das Image nicht existiert, gibt Docker einen speziellen Fehler zurück
+		if client.IsErrNotFound(err2) {
+			slog.Error("Can not create docker sandbox because image not found", "imageName", imageName)
+			return models.Sandbox{}, errors.New("maximum number of total sandboxes is reached")
+		}
+		slog.Error("Can not create docker sandbox because error while reading image details", "imageName", imageName, "err", err2)
+		return models.Sandbox{}, errors.New("failed to create sandbox because of unknown error")
+	}
 
 	// Create docker container
 	labels := map[string]string{
