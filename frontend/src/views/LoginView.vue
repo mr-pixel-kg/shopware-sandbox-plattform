@@ -48,25 +48,27 @@ export default {
     <Card>
       <template #title>Login</template>
       <template #content>
-        <div class="flex justify-center flex-col gap-4">
-          <div class="flex flex-col gap-1">
-            <InputText
-              name="username"
-              type="text"
-              placeholder="Username"
-              v-model="username"
-            />
+        <form @submit.prevent="loginClick">
+          <div class="flex justify-center flex-col gap-4">
+            <div class="flex flex-col gap-1">
+              <InputText
+                name="username"
+                type="text"
+                placeholder="Username"
+                v-model="username"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <InputText
+                name="password"
+                type="password"
+                placeholder="Password"
+                v-model="password"
+              />
+            </div>
+            <Button label="Login" type="submit" />
           </div>
-          <div class="flex flex-col gap-1">
-            <InputText
-              name="password"
-              type="password"
-              placeholder="Password"
-              v-model="password"
-            />
-          </div>
-          <Button label="Login" @click="loginClick" />
-        </div>
+        </form>
       </template>
     </Card>
   </div>

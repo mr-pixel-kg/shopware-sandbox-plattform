@@ -12,7 +12,7 @@ function handleLogout() {
 
 <template>
   <header>
-    <nav class="bg-zinc-800 border-gray-200 px-4 lg:px-6 py-6">
+    <nav class="bg-zinc-800 dark:bg-zinc-900 border-gray-200 px-4 lg:px-6 py-6">
       <div class="flex flex-wrap justify-between items-center mx-auto max-w-full">
         <RouterLink to="/" class="flex items-center">
           <img :src="logo" class="mr-3 h-6 sm:h-12" alt="mr. pixel Logo" />

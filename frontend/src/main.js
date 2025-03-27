@@ -15,9 +15,9 @@ const pinia = createPinia();
 pinia.use(piniaPluginPersistedState)
 app.use(pinia);
 app.use(ToastService);
-const MyPreset = definePreset(Aura, {
+/*const MyPreset = definePreset(Aura, {
   semantic: {
-    /*primary: {
+    primary: {
       50: '{lime.50}',
       100: '{lime.100}',
       200: '{lime.200}',
@@ -29,8 +29,8 @@ const MyPreset = definePreset(Aura, {
       800: '{lime.800}',
       900: '{lime.900}',
       950: '{lime.950}'
-    }
-    dark: {
+    },
+    gray: {
       50: "{zinc.50}",
       100: "{zinc.100}",
       200: "{zinc.200}",
@@ -39,12 +39,12 @@ const MyPreset = definePreset(Aura, {
       500: "{zinc.500}",
       600: "{zinc.600}",
       700: "{zinc.700}",
-      800: "{zinc.800}",
+      800: "{zinc.100}",
       900: "{zinc.900}",
       950: "{zinc.950}",
-    },*/
+    },
   },
-});
+});*/
 app.use(PrimeVue, {
   theme: {
     preset: Aura,

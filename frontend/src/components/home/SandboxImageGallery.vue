@@ -41,7 +41,7 @@ export default {
 <template>
   <div class="max-w-7xl mx-auto p-5">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Shopware Umgebungen</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-200">Shopware Umgebungen</h1>
     </div>
     <div
       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"

@@ -1,10 +1,9 @@
 @import "tailwindcss";
 @import "tailwindcss-primeui";
 
-body {
-    background-color: #f4f4f4;
+@theme {
+    --color-gray-800: var(--color-zinc-800);
 }
-
 
 /*
 :root {
