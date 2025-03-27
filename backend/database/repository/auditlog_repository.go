@@ -34,3 +34,14 @@ func (r *AuditLogRepository) GetAll() ([]models.AuditLogEntry, error) {
 	}
 	return entries, nil
 }
+
+func (r *AuditLogRepository) GetLast(limit int) ([]models.AuditLogEntry, error) {
+	var entries []models.AuditLogEntry
+	query := `SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT $1`
+	err := r.db.Select(&entries, query, limit)
+	if err != nil {
+		log.Printf("Error getting all audit log entries: %v", err)
+		return nil, err
+	}
+	return entries, nil
+}

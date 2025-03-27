@@ -13,6 +13,11 @@ const items = ref([
     icon: "pi pi-image",
     route: "/admin/sandbox-images",
   },
+  {
+    label: "Audit Log",
+    icon: "pi pi-align-left",
+    route: "/admin/auditlog",
+  },
 ]);
 </script>
 

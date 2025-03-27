@@ -44,6 +44,12 @@ definitions:
       container_name:
         example: sandbox-67777b4e-946f-4462-b689-3c608d2d7938
         type: string
+      created_at:
+        example: "2021-09-01T12:00:00Z"
+        type: string
+      destroy_at:
+        example: "2021-09-01T12:00:00Z"
+        type: string
       image:
         example: dockware/dev:6.6.8.2
         type: string
@@ -117,6 +123,24 @@ info:
   title: mpXsandbox API
   version: 1.0.0
 paths:
+  /api/auditlog:
+    get:
+      consumes:
+      - '*/*'
+      description: Get the last 300 audit log entries.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BasicAuth: []
+      summary: Endpoint to the last 300 audit log entries.
+      tags:
+      - System Management
   /api/auth:
     get:
       consumes:

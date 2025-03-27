@@ -6,6 +6,7 @@ import AdminView from "./views/AdminView.vue";
 import AdminSandboxEnvironments from "./views/admin/AdminSandboxEnvironmentsView.vue";
 import AdminSandboxImages from "./views/admin/AdminSandboxImagesView.vue";
 import ApiService from "@/services/apiService.js";
+import AdminAuditLogView from "@/views/admin/AdminAuditLogView.vue";
 
 const routes = [
   { path: "/", component: StartView },
@@ -18,6 +19,7 @@ const routes = [
     children: [
       { path: "sandbox-environments", component: AdminSandboxEnvironments },
       { path: "sandbox-images", component: AdminSandboxImages },
+      { path: "auditlog", component: AdminAuditLogView },
     ],
   },
 ];

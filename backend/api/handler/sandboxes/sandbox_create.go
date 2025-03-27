@@ -84,7 +84,7 @@ func (h *SandboxHandler) SandboxCreateHandler(c echo.Context) error {
 	// Write audit log
 	h.AuditLogService.LogRequest(c, models.SANDBOX_CREATE, map[string]interface{}{
 		"sandbox_id":     sandbox.ID,
-		"image_name":     sandbox.ImageID,
+		"image_id":       sandbox.ImageID,
 		"created_at":     sandbox.CreatedAt,
 		"destroy_at":     sandbox.DestroyAt,
 		"container_id":   sandbox.ContainerID,

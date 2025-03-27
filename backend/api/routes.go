@@ -5,6 +5,7 @@ import (
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/images"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/sandboxes"
+	"github.com/mr-pixel-kg/shopware-sandbox-plattform/api/handler/system"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/config"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database"
 	"github.com/mr-pixel-kg/shopware-sandbox-plattform/database/repository"
@@ -44,6 +45,7 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 	// Init handlers
 	imageHandler := images.NewImageHandler(dockerService, imageService, auditLogService)
 	sandboxHandler := sandboxes.NewSandboxHandler(sandboxService, auditLogService, guardService)
+	systemHandler := system.NewSystemHandler(auditLogService)
 
 	// Init middlewares
 	//authMiddleware := middleware.OptionalAuthMiddleware(config.Auth)
@@ -56,6 +58,7 @@ func RegisterRoutes(e *echo.Echo, config *config.Config) {
 
 	api.GET("/health", handler.HealthCheckHandler)
 	api.GET("/auth", handler.AuthCheckHandler)
+	api.GET("/auditlog", systemHandler.SystemGetLastAuditLog, authRequiredMiddleware)
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	api.GET("/sandboxes", sandboxHandler.SandboxListHandler, authRequiredMiddleware)

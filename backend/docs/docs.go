@@ -18,6 +18,35 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/auditlog": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Get the last 300 audit log entries.",
+                "consumes": [
+                    "*/*"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System Management"
+                ],
+                "summary": "Endpoint to the last 300 audit log entries.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/auth": {
             "get": {
                 "description": "Test the authentication.",
@@ -466,6 +495,14 @@ const docTemplate = `{
                 "container_name": {
                     "type": "string",
                     "example": "sandbox-67777b4e-946f-4462-b689-3c608d2d7938"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2021-09-01T12:00:00Z"
+                },
+                "destroy_at": {
+                    "type": "string",
+                    "example": "2021-09-01T12:00:00Z"
                 },
                 "image": {
                     "type": "string",

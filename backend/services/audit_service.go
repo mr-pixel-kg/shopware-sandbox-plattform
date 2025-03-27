@@ -10,11 +10,11 @@ import (
 )
 
 type AuditLogService struct {
-	auditLogRepository *repository.AuditLogRepository
+	AuditLogRepository *repository.AuditLogRepository
 }
 
 func NewAuditLogService(auditLogRepository *repository.AuditLogRepository) *AuditLogService {
-	return &AuditLogService{auditLogRepository: auditLogRepository}
+	return &AuditLogService{AuditLogRepository: auditLogRepository}
 }
 
 func (s *AuditLogService) Log(ip, userAgent string, username *string, action models.AuditAction, details map[string]interface{}) error {
@@ -30,7 +30,7 @@ func (s *AuditLogService) Log(ip, userAgent string, username *string, action mod
 		return err
 	}
 
-	err = s.auditLogRepository.Create(&models.AuditLogEntry{
+	err = s.AuditLogRepository.Create(&models.AuditLogEntry{
 		IpAddress: ip,
 		UserAgent: userAgent,
 		Username:  username,
