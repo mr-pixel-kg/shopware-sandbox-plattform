@@ -277,11 +277,10 @@ func (s *SandboxService) DeleteSandbox(ctx context.Context, sandboxId string) {
 	}
 }
 
-func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, imageName string) {
+func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, imageName string) (Image, error) {
 
 	/*
 		TODO: Refactoring
-		TODO: Implement image commit
 		- Commit the sandbox container to a new image
 		- Remove all traefik labels from the new image
 		- Save the new image
@@ -292,7 +291,8 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 	// Determine the containerId of the given sandbox container id
 	sandbox, err := s.GetSandbox(ctx, sandboxId)
 	if err != nil {
-		log.Fatalf("Failed to fetch sandbox container: %v", err)
+		slog.Error("Failed to fetch sandbox container", "err", err)
+		return Image{}, err
 	}
 
 	// Create new snapshot image from sandbox container (docker commit)
@@ -304,7 +304,8 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 		Author:    "mpXsandbox Engine",
 	})
 	if err != nil {
-		log.Fatalf("Fehler beim Committen des Containers: %v", err)
+		slog.Error("Failed to commit container", "err", err)
+		return Image{}, err
 	}
 	fmt.Printf("Neues Snapshot-Image von Sandbox Container erstellt: %s (%s)\n", resp.ID, snapshotImageName)
 
@@ -314,24 +315,28 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 	baseImg, _, err := s.client.ImageInspectWithRaw(context.Background(), baseImageName)
 	if err != nil {
 		if client.IsErrNotFound(err) {
-			log.Panicf("Failed to fetch image id: %s", err.Error())
+			slog.Error("Failed to fetch image id", "err", err)
+			return Image{}, err
 		}
 	}
 
 	slog.Info("Creating new image from base image", "baseImageName", baseImageName, "imageName", imageName)
 	img, err := local.NewImage(imageName, s.client, local.FromBaseImage(baseImageName))
 	if err != nil {
-		log.Panicf("Failed to create new docker image: %s", err.Error())
+		slog.Error("Failed to create new docker image", "err", err)
+		return Image{}, err
 	}
 
 	originalImageID, err := img.Identifier()
 	if err != nil {
-		log.Panicf("Failed to fetch image id: %s", err.Error())
+		slog.Error("Failed to fetch image id", "err", err)
+		return Image{}, err
 	}
 
 	inspect, _, err := s.client.ImageInspectWithRaw(context.Background(), originalImageID.String())
 	if err != nil {
-		log.Panicf("Failed to inspect the source image: %s", err.Error())
+		slog.Error("Failed to inspect the source image id", "err", err)
+		return Image{}, err
 	}
 
 	repoTags := inspect.RepoTags
@@ -353,13 +358,14 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 
 		if strings.HasPrefix(lbl, "traefik.") || strings.HasPrefix(lbl, "sandbox") {
 			removeLabels = append(removeLabels, lbl)
-			log.Printf("Added Label for removal: %s", lbl)
+			slog.Debug("Added Label for removal", "label", lbl)
 		}
 	}
 
 	removed, err := removeImageLabels(img, removeLabels)
 	if err != nil {
-		log.Panicf("Failed removing labels: %s", err.Error())
+		slog.Error("Failed removing labels", "err", err)
+		return Image{}, err
 	}
 
 	/*added, err := addImageLabels(img, appendLabels)
@@ -372,17 +378,20 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 	}
 
 	if err := img.Save(); err != nil {
-		log.Panicf("Failed to save image: %s", err.Error())
+		slog.Error("Failed to save image", "err", err)
+		return Image{}, err
 	}
 	slog.Info("Saved new image", "imageName", img.Name())
 
 	newImageID, err := img.Identifier()
 	if err != nil {
-		log.Panicf("Failed to fetch image id: %s", err.Error())
+		slog.Error("Failed to fetch image id", "err", err)
+		return Image{}, err
 	}
 
 	if newImageID == originalImageID {
-		log.Panicf("New and old image have the same identifier: %s", newImageID)
+		slog.Error("New and old image have the same identifier", "imageId", newImageID)
+		return Image{}, errors.New("new and old image have the same identifier")
 	}
 
 	if len(repoTags) > 1 {
@@ -401,11 +410,21 @@ func (s *SandboxService) CommitSandbox(ctx context.Context, sandboxId string, im
 
 	if _, err := s.client.ImageRemove(context.Background(), originalImageID.String(), options); err != nil {
 		if _, ok := err.(errdefs.ErrConflict); ok {
-			log.Panicf("Warning: Failed to delete old image: %s", err.Error())
+			slog.Error("Warning: Failed to delete old image", "err", err.Error())
+			return Image{}, err
 		}
-		log.Panicf("Failed to delete old image: %s", err.Error())
+		slog.Error("Failed to delete old image", "err", err.Error())
+		return Image{}, err
 	}
 
+	// Register sandbox image
+	pullImage, err := s.imageService.PullImage(ctx, imageName)
+	if err != nil {
+		slog.Error("Failed register new sandbox image", "err", err.Error())
+		return Image{}, err
+	}
+
+	return pullImage, nil
 }
 
 func removeImageLabels(img *local.Image, labels []string) (bool, error) {

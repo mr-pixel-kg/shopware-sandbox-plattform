@@ -431,8 +431,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/sandboxes/{id}/commit": {
+        "/api/sandboxes/{id}/snapshot": {
             "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
                 "description": "Creates a new sandbox image from the sandbox container",
                 "consumes": [
                     "application/json"
@@ -452,6 +457,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Image Input",
+                        "name": "image",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sandboxes.SandboxSnapshotCreateRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -581,6 +595,15 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "example": "success"
+                }
+            }
+        },
+        "sandboxes.SandboxSnapshotCreateRequest": {
+            "type": "object",
+            "properties": {
+                "image_name": {
+                    "type": "string",
+                    "example": "mr-pixel/shopware-demoshop:6.6.8.2"
                 }
             }
         },

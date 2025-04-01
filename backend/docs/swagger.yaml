@@ -75,6 +75,12 @@ definitions:
         example: success
         type: string
     type: object
+  sandboxes.SandboxSnapshotCreateRequest:
+    properties:
+      image_name:
+        example: mr-pixel/shopware-demoshop:6.6.8.2
+        type: string
+    type: object
   services.Image:
     properties:
       created_at:
@@ -389,7 +395,7 @@ paths:
       summary: Details about a Sandbox
       tags:
       - Sandbox Management
-  /api/sandboxes/{id}/commit:
+  /api/sandboxes/{id}/snapshot:
     post:
       consumes:
       - application/json
@@ -401,6 +407,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Image Input
+        in: body
+        name: image
+        required: true
+        schema:
+          $ref: '#/definitions/sandboxes.SandboxSnapshotCreateRequest'
       produces:
       - application/json
       responses:
@@ -416,6 +428,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BasicAuth: []
       summary: Creates a new sandbox image from the sandbox container
       tags:
       - Sandbox Management
