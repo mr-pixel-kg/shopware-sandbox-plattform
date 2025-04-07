@@ -47,6 +47,8 @@ export default {
           sandbox = resp.sandbox;
           console.log("Sandbox created", sandbox);
         } else {
+          this.generalStore.setLoading(false);
+
           const errorMessage = resp.message;
           console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
 
@@ -58,6 +60,8 @@ export default {
           });
         }
       } catch (error) {
+        this.generalStore.setLoading(false);
+
         const errorMessage =
           error.response?.data.message || error.message || error;
         console.error("Fehler beim Erstellen der Sandbox:", errorMessage);
