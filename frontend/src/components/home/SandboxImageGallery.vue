@@ -20,100 +20,91 @@ export default {
       sandboxImages: [
         new SandboxImageModel(
             "mpXvoucher",
-            "shopware-banner.jpg",
+            "mpx-voucher.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "mpXvoucher für Shopware 6: Gutscheine erstellen, verwalten & verkaufen – individuell, sicher & einfach.",
             "https://www.mr-pixel.de",
         ),
-
-        new SandboxImageModel(
-            "mpXDirectOrder - Direkte Bestellungen im Shop",
-            "shopware-banner.jpg",
-            "mr-pixel/sw-sandbox:6.6.7.0-rc1",
-            "B2B-Schnellbestellungen per CSV-Upload – wiederkehrende Bestellungen mit einem Klick erledigen. B2B-Schnellbestellungen per CSV-Upload – wiederkehrende Bestellungen mit einem Klick erledigen. B2B-Schnellbestellungen per CSV-Upload – wiederkehrende Bestellungen mit einem Klick erledigen.",
-            "https://www.mr-pixel.de",
-        ),
-
-
         new SandboxImageModel(
             "mpXcolorTabs",
-            "shopware-banner.jpg",
+            "mpx-color.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "Ermöglicht das Zuordnen einer individuellen Tab-Hintergrundfarbe und einer Tab-Textfarbe für Kategorien.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "mpXcheckout",
-            "shopware-banner.jpg",
+            "mpx-checkout.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "mpXcheckout erweitert Shopware für Gastronomie: Lieferservice, Vorbestellungen & automatische Zeitberechnung.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "Gastro Berlin Theme",
-            "shopware-banner.jpg",
+            "mpx-flex.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "Berlin Theme für mpXcheckout. Es wurde speziell an die Anforderungen eines Shops der Gastronomie erstellt.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "Gastro Stockholm Theme",
-            "shopware-banner.jpg",
+            "mpx-flex.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "Stockholm Theme für mpXcheckout. Es wurde speziell an die Anforderungen eines Shops der Gastronomie erstellt.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "Gastro Rom Theme",
-            "shopware-banner.jpg",
+            "mpx-flex.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "Rom Theme für mpXcheckout. Es wurde speziell an die Anforderungen eines Shops der Gastronomie erstellt.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "Fester Link für Medien",
-            "shopware-banner.jpg",
+            "mpx-link.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "Das Plugin erstellt statische Medien-Links und leitet diese automatisch auf die aktuelle Datei weiter.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "mpXFAQPro",
-            "shopware-banner.jpg",
+            "mpx-faq.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "mpXfaqpro zeigt FAQs direkt am Artikel & ermöglicht individuelle Kundenfragen mit Backend-Management.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "mpXDirectOrder",
-            "shopware-banner.jpg",
+            "mpx-directorder.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
             "B2B-Schnellbestellungen per CSV-Upload – wiederkehrende Bestellungen mit einem Klick erledigen.",
             "https://www.mr-pixel.de",
         ),
 
-        /*new SandboxImageModel(
-        "Shopware 6.6 Play",
-        "shopware-banner.jpg",
-        "dockware/play:6.6.10.0",
-        "Eine sofort einsatzbereite, saubere Shopware 6.6.10.0 Installation zum Testen, Experimentieren und Erkunden.",
-        "https://www.mr-pixel.de",
-      ),*/
-
         new SandboxImageModel(
             "Shopware 6.6",
-            "shopware-banner.jpg",
+            "shopware6.png",
             "mr-pixel/sw-sandbox:6.6.10.0",
             "Eine sofort einsatzbereite, saubere Shopware 6.6.10.0 Installation zum Testen, Experimentieren und Erkunden.",
             "https://www.mr-pixel.de",
         ),
         new SandboxImageModel(
             "Shopware 6.7 RC-1",
-            "shopware-banner.jpg",
+            "shopware6.png",
             "mr-pixel/sw-sandbox:6.6.7.0-rc1",
-            "Shopware 6.7.0.0 RC-1 welcher es dir erlaubt Plugins und Themes auf der neuen Shopware Version zu testen.",
+            "Shopware 6.7.0.0 RC-1 welche es dir erlaubt, Plugins und Themes auf der neuen Shopware Version zu testen.",
             "https://www.mr-pixel.de",
         ),
+
+
+        /*new SandboxImageModel(
+          "Dockware",
+          "shopware-banner.jpg",
+          "dockware/dev:6.6.10.0",
+          "Eine sofort einsatzbereite, saubere Shopware 6.6.10.0 Installation zum Testen, Experimentieren und Erkunden.",
+          "https://www.mr-pixel.de",
+        ),*/
       ],
     };
   },
