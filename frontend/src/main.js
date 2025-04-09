@@ -15,22 +15,22 @@ const pinia = createPinia();
 pinia.use(piniaPluginPersistedState)
 app.use(pinia);
 app.use(ToastService);
-/*const MyPreset = definePreset(Aura, {
+const MrPixelPreset = definePreset(Aura, {
   semantic: {
     primary: {
-      50: '{lime.50}',
-      100: '{lime.100}',
-      200: '{lime.200}',
-      300: '{lime.300}',
-      400: '{lime.400}',
-      500: '{lime.500}',
-      600: '{lime.600}',
-      700: '{lime.700}',
-      800: '{lime.800}',
-      900: '{lime.900}',
-      950: '{lime.950}'
+      50: '#effc00',
+      100: '#e8f500',
+      200: '#e1ed00',
+      300: '#d7e300',
+      400: '#cfdb00',
+      500: '#c8d400', // mr. pixel green
+      600: '#b2bd00',
+      700: '#9fa800',
+      800: '#8e9600',
+      900: '#767d00',
+      950: '#6a7000'
     },
-    gray: {
+    /*gray: {
       50: "{zinc.50}",
       100: "{zinc.100}",
       200: "{zinc.200}",
@@ -42,12 +42,12 @@ app.use(ToastService);
       800: "{zinc.100}",
       900: "{zinc.900}",
       950: "{zinc.950}",
-    },
+    },*/
   },
-});*/
+});
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: MrPixelPreset, // Default: Aura
   },
 });
 app.use(router);
