@@ -1,7 +1,0 @@
-middlewares:
-  web-redirect:
-    redirectScheme:
-      scheme: https
-      permanent: true
-  compress:
-    compress: {}
