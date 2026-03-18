@@ -23,4 +23,4 @@ go run ./cmd/api
 - Mitarbeiter erhalten JWTs und koennen eigene sowie alle aktiven Sandboxes sehen.
 - Limits greifen global, pro IP fuer Gaeste und pro User fuer eingeloggte Mitarbeiter.
 - Swagger/OpenAPI ist unter `/swagger` und `/swagger/openapi.yaml` verfuegbar.
-- Der Docker-Client ist aktuell noch als `NoopClient` vorbereitet.
+- Fuer Traefik sollten `docker.network`, `docker.traefik_*` und `sandbox.internal_port` passend zur Laufzeitumgebung gesetzt werden.

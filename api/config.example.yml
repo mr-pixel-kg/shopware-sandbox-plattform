@@ -25,6 +25,17 @@ sandbox:
   default_lifetime: 60
   max_lifetime: 1440
   cleanup_interval_seconds: 60
+  internal_port: 80
+
+docker:
+  network: "internal"
+  trusted_proxies: "0.0.0.0/0"
+  traefik_enable: true
+  traefik_entrypoints: "websecure"
+  traefik_certresolver: "production"
+  traefik_middlewares: "sandbox-middleware@file,https-redirect@file"
+  snapshot_author: "shopshredder-api"
+  snapshot_comment: "Sandbox snapshot created by Shopshredder API"
 
 guard:
   max_total_sandboxes: 32

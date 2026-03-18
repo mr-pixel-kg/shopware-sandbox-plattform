@@ -91,6 +91,9 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if err != nil {
 		return nil, err
 	}
+	if err := s.docker.EnsureImage(ctx, image.FullName()); err != nil {
+		return nil, err
+	}
 
 	sandboxID := uuid.New()
 	containerName := fmt.Sprintf("%s%s", s.cfg.URLPrefix, sandboxID.String())
@@ -199,6 +202,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 	}
 
 	image, err := s.images.CreateForUser(
+		ctx,
 		input.UserID,
 		input.Name,
 		input.Tag,

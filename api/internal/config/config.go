@@ -13,6 +13,7 @@ type Config struct {
 	Database DatabaseConfig
 	Auth     AuthConfig
 	Sandbox  SandboxConfig
+	Docker   DockerConfig
 	Guard    GuardConfig
 }
 
@@ -44,6 +45,18 @@ type SandboxConfig struct {
 	DefaultTTL      time.Duration
 	MaxTTL          time.Duration
 	CleanupInterval time.Duration
+	InternalPort    int
+}
+
+type DockerConfig struct {
+	Network             string
+	TrustedProxies      string
+	TraefikEnable       bool
+	TraefikEntrypoints  string
+	TraefikCertResolver string
+	TraefikMiddlewares  string
+	SnapshotAuthor      string
+	SnapshotComment     string
 }
 
 type GuardConfig struct {
@@ -88,6 +101,17 @@ func MustLoad() Config {
 			DefaultTTL:      time.Duration(v.GetInt("sandbox.default_lifetime")) * time.Minute,
 			MaxTTL:          time.Duration(v.GetInt("sandbox.max_lifetime")) * time.Minute,
 			CleanupInterval: time.Duration(v.GetInt("sandbox.cleanup_interval_seconds")) * time.Second,
+			InternalPort:    v.GetInt("sandbox.internal_port"),
+		},
+		Docker: DockerConfig{
+			Network:             v.GetString("docker.network"),
+			TrustedProxies:      v.GetString("docker.trusted_proxies"),
+			TraefikEnable:       v.GetBool("docker.traefik_enable"),
+			TraefikEntrypoints:  v.GetString("docker.traefik_entrypoints"),
+			TraefikCertResolver: v.GetString("docker.traefik_certresolver"),
+			TraefikMiddlewares:  v.GetString("docker.traefik_middlewares"),
+			SnapshotAuthor:      v.GetString("docker.snapshot_author"),
+			SnapshotComment:     v.GetString("docker.snapshot_comment"),
 		},
 		Guard: GuardConfig{
 			MaxActiveTotal:      v.GetInt("guard.max_total_sandboxes"),
@@ -125,6 +149,30 @@ func MustLoad() Config {
 	}
 	if cfg.Sandbox.CleanupInterval == 0 {
 		cfg.Sandbox.CleanupInterval = 60 * time.Second
+	}
+	if cfg.Sandbox.InternalPort == 0 {
+		cfg.Sandbox.InternalPort = 80
+	}
+	if cfg.Docker.Network == "" {
+		cfg.Docker.Network = "internal"
+	}
+	if cfg.Docker.TrustedProxies == "" {
+		cfg.Docker.TrustedProxies = "0.0.0.0/0"
+	}
+	if cfg.Docker.TraefikEntrypoints == "" {
+		cfg.Docker.TraefikEntrypoints = "websecure"
+	}
+	if cfg.Docker.TraefikCertResolver == "" {
+		cfg.Docker.TraefikCertResolver = "production"
+	}
+	if cfg.Docker.TraefikMiddlewares == "" {
+		cfg.Docker.TraefikMiddlewares = "sandbox-middleware@file,https-redirect@file"
+	}
+	if cfg.Docker.SnapshotAuthor == "" {
+		cfg.Docker.SnapshotAuthor = "shopshredder-api"
+	}
+	if cfg.Docker.SnapshotComment == "" {
+		cfg.Docker.SnapshotComment = "Sandbox snapshot created by Shopshredder API"
 	}
 
 	return cfg

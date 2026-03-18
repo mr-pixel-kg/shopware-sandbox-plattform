@@ -44,6 +44,7 @@ func (h *ImageHandler) Create(c echo.Context) error {
 
 	auth := mw.MustAuth(c)
 	image, err := h.images.CreateForUser(
+		c.Request().Context(),
 		&auth.UserID,
 		input.Name,
 		input.Tag,
@@ -67,7 +68,7 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 		return responses.Error(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid image id")
 	}
 
-	if err := h.images.Delete(id); err != nil {
+	if err := h.images.Delete(c.Request().Context(), id); err != nil {
 		return responses.Error(c, http.StatusInternalServerError, "IMAGE_DELETE_FAILED", "Could not delete image")
 	}
 
