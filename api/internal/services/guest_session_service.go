@@ -25,6 +25,8 @@ func NewGuestSessionService(sessions *repositories.SessionRepository, tokens *To
 
 func (s *GuestSessionService) Ensure(tokenValue string) (string, uuid.UUID, error) {
 	if tokenValue != "" {
+		// Reuse the existing guest identity whenever the cookie is still valid so
+		// anonymous users keep seeing the same sandbox ownership.
 		sessionID, _, err := s.Validate(tokenValue)
 		if err == nil {
 			return tokenValue, sessionID, nil
@@ -58,6 +60,8 @@ func (s *GuestSessionService) Validate(tokenValue string) (uuid.UUID, string, er
 		return uuid.Nil, "", ErrInvalidGuestSession
 	}
 
+	// Guest tokens are stored in the same session table so cleanup and expiry
+	// behaviour stay consistent with authenticated employee sessions.
 	valid, err := s.sessions.ExistsActiveToken(claims.TokenID, time.Now().UTC())
 	if err != nil {
 		return uuid.Nil, "", err

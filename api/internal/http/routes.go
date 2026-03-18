@@ -33,6 +33,8 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 		AllowCredentials: true,
 	}))
 
+	// Repositories stay close to persistence concerns, while services own the
+	// business rules built on top of them.
 	userRepo := repositories.NewUserRepository(db)
 	sessionRepo := repositories.NewSessionRepository(db)
 	imageRepo := repositories.NewImageRepository(db)
@@ -52,6 +54,8 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	imageService := services.NewImageService(imageRepo, dockerClient)
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient)
 
+	// Sandbox expiration is handled inside the same process on purpose to keep
+	// deployment simple for the single-service architecture.
 	sandboxService.StartCleanupLoop(context.Background())
 
 	authHandler := handlers.NewAuthHandler(authService, auditService)
@@ -68,6 +72,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	auth := api.Group("/auth")
 	private := api.Group("")
 	private.Use(authmw.Auth(authService))
+	// Public routes create or refresh the guest cookie automatically.
 	public.Use(authmw.EnsureGuestSession(guestService, cfg.Auth.GuestCookieName))
 
 	public.GET("/images", imageHandler.ListPublic)

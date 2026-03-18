@@ -75,6 +75,8 @@ func MustLoad() Config {
 		panic(fmt.Sprintf("read config file %s: %v", cfgPath, err))
 	}
 
+	// Map the raw Viper values into typed config structs once so the rest of the
+	// application can avoid stringly-typed lookups.
 	cfg := Config{
 		Server: ServerConfig{
 			Port:           v.GetInt("server.port"),
@@ -175,6 +177,8 @@ func MustLoad() Config {
 		cfg.Docker.SnapshotComment = "Sandbox snapshot created by Shopshredder API"
 	}
 
+	// Defaults are applied after reading YAML so partially filled config files
+	// stay valid in local development and in container environments.
 	return cfg
 }
 

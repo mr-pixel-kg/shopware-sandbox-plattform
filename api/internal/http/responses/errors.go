@@ -12,6 +12,8 @@ func Error(c echo.Context, status int, code, message string) error {
 }
 
 func FromAppError(c echo.Context, err *apperror.AppError) error {
+	// Keep the external payload intentionally small and stable even if the
+	// internal error object carries more debugging context.
 	body := map[string]any{
 		"error": map[string]any{
 			"code":    err.Code,
@@ -32,6 +34,8 @@ func FromError(c echo.Context, err error) error {
 		return FromAppError(c, appErr)
 	}
 
+	// Unknown errors are normalized into the shared response format so handlers
+	// do not accidentally leak arbitrary error strings or stack details.
 	return FromAppError(c, apperror.Internal("INTERNAL_ERROR", http.StatusText(http.StatusInternalServerError)).WithCause(err))
 }
 

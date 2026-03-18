@@ -87,6 +87,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, err
 	}
 
+	// Sandbox creation always starts from a registered image record so the
+	// platform can show metadata and audit trails consistently.
 	image, err := s.imageRepo.FindByID(input.ImageID)
 	if err != nil {
 		return nil, err
@@ -102,6 +104,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if input.TTL != nil {
 		ttl = *input.TTL
 	}
+	// Clamp requested lifetimes to the configured maximum to keep cleanup
+	// predictable even for authenticated users.
 	if ttl > s.cfg.MaxTTL {
 		ttl = s.cfg.MaxTTL
 	}
@@ -133,6 +137,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, err
 	}
 
+	// Persisting a sandbox event gives the admin area a lightweight lifecycle log
+	// without introducing a separate event bus.
 	if err := s.addEvent(sandbox.ID, "created", map[string]any{
 		"image": image.FullName(),
 		"actor": sandboxActorType(sandbox),
@@ -197,6 +203,8 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, ErrSandboxNotFound
 	}
 
+	// The Docker commit creates the runtime image, then the image service stores
+	// the corresponding template metadata in PostgreSQL.
 	if err := s.docker.CommitContainer(ctx, sandbox.ContainerID, targetImage); err != nil {
 		return nil, err
 	}
@@ -254,6 +262,8 @@ func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 		return err
 	}
 
+	// Expiration is database-driven so a process restart does not lose the
+	// deletion schedule for previously created sandboxes.
 	for _, sandbox := range expired {
 		if err := s.docker.DeleteContainer(ctx, sandbox.ContainerID); err != nil {
 			log.Printf("delete expired container %s: %v", sandbox.ContainerID, err)
@@ -279,11 +289,14 @@ func (s *SandboxService) enforceLimits(input CreateSandboxInput) error {
 	if err != nil {
 		return err
 	}
+	// The global guard protects the Docker host itself before user-specific
+	// limits are evaluated.
 	if total >= int64(s.guard.MaxActiveTotal) {
 		return ErrSandboxLimitReached
 	}
 
 	if input.UserID == nil {
+		// Guests are limited by IP because they do not have an employee account.
 		ipCount, err := s.repo.CountActiveByIP(input.ClientIP)
 		if err != nil {
 			return err
@@ -298,6 +311,8 @@ func (s *SandboxService) enforceLimits(input CreateSandboxInput) error {
 	if err != nil {
 		return err
 	}
+	// Employee limits intentionally bypass the guest IP limit because a team may
+	// work behind the same office NAT.
 	if userCount >= int64(s.guard.MaxActivePerUser) {
 		return ErrSandboxLimitReached
 	}

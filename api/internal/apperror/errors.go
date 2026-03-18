@@ -3,11 +3,16 @@ package apperror
 import "net/http"
 
 type AppError struct {
+	// StatusCode is the HTTP status that should be exposed to API clients.
 	StatusCode int
-	Code       string
-	Message    string
-	Details    any
-	Cause      error
+	// Code is a stable machine-readable identifier for frontend branching.
+	Code string
+	// Message is the user-facing error message returned by the API.
+	Message string
+	// Details can carry optional structured context for clients and debugging.
+	Details any
+	// Cause keeps the original internal error without forcing it into the response.
+	Cause error
 }
 
 func (e *AppError) Error() string {

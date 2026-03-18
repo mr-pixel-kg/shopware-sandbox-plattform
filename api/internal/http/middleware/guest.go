@@ -13,6 +13,8 @@ const guestContextKey = "guest"
 func EnsureGuestSession(guestService *services.GuestSessionService, cookieName string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Public routes auto-provision a guest identity so anonymous users can
+			// still list "their" sandbox sessions later on.
 			cookie, _ := c.Cookie(cookieName)
 			tokenValue := ""
 			if cookie != nil {
@@ -25,6 +27,8 @@ func EnsureGuestSession(guestService *services.GuestSessionService, cookieName s
 			}
 
 			if token != tokenValue {
+				// The cookie is http-only because the frontend only needs the backend
+				// to correlate the guest session, not direct cookie access from JS.
 				c.SetCookie(&http.Cookie{
 					Name:     cookieName,
 					Value:    token,

@@ -69,6 +69,8 @@ func (s *AuthService) Login(email, password string) (string, *models.User, error
 		return "", nil, err
 	}
 
+	// A persisted session lets us invalidate tokens server-side on logout even
+	// though the API uses JWTs for request authentication.
 	if err := s.sessions.Create(&models.Session{
 		ID:          uuid.New(),
 		UserID:      &user.ID,
@@ -88,6 +90,7 @@ func (s *AuthService) Authenticate(tokenValue string) (*models.User, string, err
 		return nil, "", err
 	}
 
+	// JWT validation alone is not enough because sessions may have been revoked.
 	valid, err := s.sessions.ExistsActiveToken(claims.TokenID, time.Now().UTC())
 	if err != nil {
 		return nil, "", err

@@ -49,6 +49,8 @@ func (s *ImageService) CreateForUser(
 	isPublic bool,
 ) (*models.Image, error) {
 	fullName := name + ":" + tag
+	// Registering an image in the database should only succeed if Docker can
+	// actually resolve and fetch that image reference.
 	if err := s.docker.EnsureImage(ctx, fullName); err != nil {
 		return nil, err
 	}
@@ -77,6 +79,8 @@ func (s *ImageService) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	// Remove the local Docker image first so the database does not claim an
+	// image exists after the runtime artifact was already cleaned up.
 	if err := s.docker.RemoveImage(ctx, image.FullName()); err != nil {
 		return err
 	}

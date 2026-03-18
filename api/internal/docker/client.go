@@ -62,10 +62,14 @@ func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error 
 		return fmt.Errorf("invalid image reference")
 	}
 
+	// Reuse an already available image locally to avoid unnecessary pulls on
+	// every sandbox start.
 	if _, _, err := c.client.ImageInspectWithRaw(ctx, imageName); err == nil {
 		return nil
 	}
 
+	// Pulling here keeps image creation and sandbox creation idempotent from the
+	// caller's point of view.
 	reader, err := c.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("pull image %s: %w", imageName, err)
@@ -96,6 +100,8 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 		return nil, err
 	}
 
+	// Labels are the contract with Traefik, so the API owns them in one place
+	// instead of spreading routing rules across higher layers.
 	containerConfig := &container.Config{
 		Image:  request.ImageName,
 		Labels: c.buildTraefikLabels(request.ContainerName, request.Hostname),
@@ -107,6 +113,8 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 
 	var networkingConfig *network.NetworkingConfig
 	if c.dockerCfg.Network != "" {
+		// The sandbox container must join the same network Traefik is watching so
+		// host-based routing can resolve it immediately.
 		networkingConfig = &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
 				c.dockerCfg.Network: {},
@@ -132,6 +140,8 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 
 func (c *DockerClient) DeleteContainer(ctx context.Context, containerID string) error {
 	timeout := 0
+	// Force removal is intentional because expired demo sandboxes should not
+	// block cleanup on graceful shutdown behaviour.
 	if err := c.client.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("stop container %s: %w", containerID, err)
 	}
@@ -160,6 +170,8 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 }
 
 func (c *DockerClient) buildTraefikLabels(containerName, hostname string) map[string]string {
+	// Build all dynamic router/service labels from config so every sandbox uses
+	// the same Traefik conventions.
 	labels := map[string]string{
 		"sandbox_container": "true",
 		"traefik.enable":    strconv.FormatBool(c.dockerCfg.TraefikEnable),
