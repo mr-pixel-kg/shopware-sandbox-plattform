@@ -18,9 +18,9 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: "", redirect: "/admin/images" },
-        { path: "images", name: "admin-images", component: AdminImagesView, meta: { requiresAuth: true } },
-        { path: "sandboxes", name: "admin-sandboxes", component: AdminSandboxesView, meta: { requiresAuth: true } },
-        { path: "audit-log", name: "admin-audit-log", component: AdminAuditLogView, meta: { requiresAuth: true } },
+        { path: "images", name: "admin-images", component: AdminImagesView, meta: { requiresAuth: true, title: "Images" } },
+        { path: "sandboxes", name: "admin-sandboxes", component: AdminSandboxesView, meta: { requiresAuth: true, title: "Sandboxes" } },
+        { path: "audit-log", name: "admin-audit-log", component: AdminAuditLogView, meta: { requiresAuth: true, title: "Audit Log" } },
       ],
     },
   ],

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter, RouterLink, RouterView } from "vue-router";
-import { Boxes, FolderKanban, Logs, PlaySquare } from "lucide-vue-next";
+import { useRoute, useRouter, RouterLink, RouterView } from "vue-router";
+import { ArrowLeft, Boxes, FolderKanban, Logs, PlaySquare } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import NavUser from "@/components/layout/NavUser.vue";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +25,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 const auth = useAuthStore();
+const route = useRoute();
 const router = useRouter();
 
 const navUser = computed(() => {
@@ -42,6 +44,8 @@ const items = [
   { title: "Sandboxes", to: "/admin/sandboxes", icon: PlaySquare },
   { title: "Audit Log", to: "/admin/audit-log", icon: Logs },
 ];
+
+const pageTitle = computed(() => (typeof route.meta.title === "string" ? route.meta.title : "Admin"));
 
 function logout() {
   auth.logout();
@@ -89,10 +93,19 @@ function logout() {
     </Sidebar>
 
     <SidebarInset>
-      <header class="flex h-14 shrink-0 items-center gap-2 bg-background px-4">
-        <SidebarTrigger class="-ml-1" />
-        <Separator orientation="vertical" class="mr-2 h-4" />
-        <div class="text-sm font-medium">Admin</div>
+      <header class="flex h-14 shrink-0 items-center justify-between gap-4 bg-background px-4">
+        <div class="flex items-center gap-2">
+          <SidebarTrigger class="-ml-1" />
+          <Separator orientation="vertical" class="mr-2 h-4" />
+          <div class="text-sm font-medium">{{ pageTitle }}</div>
+        </div>
+
+        <RouterLink to="/">
+          <Button variant="outline" size="sm">
+            <ArrowLeft class="mr-2 h-4 w-4" />
+            Zurück zur Storefront
+          </Button>
+        </RouterLink>
       </header>
 
       <main class="flex-1 bg-muted/30 p-4 md:p-6">

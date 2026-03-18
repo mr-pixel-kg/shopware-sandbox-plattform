@@ -32,7 +32,7 @@ const items: Array<{ key: AdminTab; label: string; icon: typeof FolderKanban }> 
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="self-start border-r">
+  <Sidebar collapsible="none" class="self-start">
     <SidebarHeader>
       <div class="flex items-center gap-3 rounded-lg border bg-background px-3 py-3">
         <div class="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
