@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomePage from "@/views/HomePage.vue";
 import LoginPage from "@/views/LoginPage.vue";
-import AdminPage from "@/views/AdminPage.vue";
+import AdminLayout from "@/layouts/AdminLayout.vue";
+import AdminAuditLogView from "@/views/admin/AdminAuditLogView.vue";
+import AdminImagesView from "@/views/admin/AdminImagesView.vue";
+import AdminSandboxesView from "@/views/admin/AdminSandboxesView.vue";
 import { useAuthStore } from "@/stores/auth";
 
 const router = createRouter({
@@ -9,7 +12,17 @@ const router = createRouter({
   routes: [
     { path: "/", name: "home", component: HomePage },
     { path: "/login", name: "login", component: LoginPage },
-    { path: "/admin", name: "admin", component: AdminPage, meta: { requiresAuth: true } },
+    {
+      path: "/admin",
+      component: AdminLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: "", redirect: "/admin/images" },
+        { path: "images", name: "admin-images", component: AdminImagesView, meta: { requiresAuth: true } },
+        { path: "sandboxes", name: "admin-sandboxes", component: AdminSandboxesView, meta: { requiresAuth: true } },
+        { path: "audit-log", name: "admin-audit-log", component: AdminAuditLogView, meta: { requiresAuth: true } },
+      ],
+    },
   ],
   scrollBehavior() {
     return { top: 0 };
@@ -28,7 +41,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name === "login" && auth.isAuthenticated) {
-    return { name: "admin" };
+    return { name: "admin-images" };
   }
 
   return true;

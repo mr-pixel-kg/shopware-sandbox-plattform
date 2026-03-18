@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { reactive } from "vue";
-import Button from "@/components/ui/Button.vue";
-import Card from "@/components/ui/Card.vue";
-import Input from "@/components/ui/Input.vue";
-import Textarea from "@/components/ui/Textarea.vue";
-import Badge from "@/components/ui/Badge.vue";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import type { CreateImagePayload, ImageRecord } from "@/types/api";
 
 defineProps<{
@@ -18,7 +28,7 @@ const emit = defineEmits<{
   remove: [id: string];
 }>();
 
-const form = reactive<CreateImagePayload>({
+const form = reactive({
   name: "",
   tag: "latest",
   title: "",
@@ -39,77 +49,76 @@ function submit() {
 
 <template>
   <div class="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-    <Card class="space-y-4">
-      <div>
-        <h2 class="section-title text-xl">Register image</h2>
-        <p class="text-sm text-muted-foreground">The backend pulls the Docker image if it is not already available locally.</p>
-      </div>
-
-      <div class="space-y-3">
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Name</label>
-          <Input v-model="form.name" placeholder="ghcr.io/shopshredder/shopware-demo" />
+    <Card>
+      <CardHeader>
+        <CardTitle>Register image</CardTitle>
+        <CardDescription>The backend pulls the Docker image if it is not already available locally.</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="space-y-2">
+          <Label for="image-name">Name</Label>
+          <Input id="image-name" v-model="form.name" placeholder="ghcr.io/shopshredder/shopware-demo" />
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Tag</label>
-          <Input v-model="form.tag" placeholder="latest" />
+        <div class="space-y-2">
+          <Label for="image-tag">Tag</Label>
+          <Input id="image-tag" v-model="form.tag" placeholder="latest" />
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Title</label>
-          <Input v-model="form.title" placeholder="Shopware Demo" />
+        <div class="space-y-2">
+          <Label for="image-title">Title</Label>
+          <Input id="image-title" v-model="form.title" placeholder="Shopware Demo" />
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Description</label>
-          <Textarea v-model="form.description" placeholder="Public demo image for storefront previews" />
+        <div class="space-y-2">
+          <Label for="image-description">Description</Label>
+          <Textarea id="image-description" v-model="form.description" placeholder="Public demo image for storefront previews" />
         </div>
-        <div class="space-y-1">
-          <label class="text-sm font-medium">Thumbnail URL</label>
-          <Input v-model="form.thumbnailUrl" placeholder="https://..." />
+        <div class="space-y-2">
+          <Label for="image-thumbnail">Thumbnail URL</Label>
+          <Input id="image-thumbnail" v-model="form.thumbnailUrl" placeholder="https://..." />
         </div>
-        <label class="flex items-center gap-3 rounded-xl bg-secondary/60 px-3 py-3 text-sm">
-          <input v-model="form.isPublic" type="checkbox" class="h-4 w-4 rounded border-input" />
+        <label class="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-3 text-sm">
+          <Checkbox :checked="form.isPublic" @update:checked="form.isPublic = !!$event" />
           Visible on the public storefront
         </label>
-      </div>
-
-      <Button class="w-full" :disabled="creating" @click="submit">Create image</Button>
+        <Button class="w-full" :disabled="creating" @click="submit">Create image</Button>
+      </CardContent>
     </Card>
 
-    <Card class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="section-title text-xl">Image catalog</h2>
-          <p class="text-sm text-muted-foreground">All registered templates managed by the internal team.</p>
+    <Card>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0">
+        <div class="space-y-1">
+          <CardTitle>Image catalog</CardTitle>
+          <CardDescription>All registered templates managed by the internal team.</CardDescription>
         </div>
-        <Badge>{{ images.length }} images</Badge>
-      </div>
-
-      <div class="overflow-hidden rounded-2xl border border-border/70">
-        <table class="min-w-full divide-y divide-border text-sm">
-          <thead class="bg-secondary/60 text-left text-muted-foreground">
-            <tr>
-              <th class="px-4 py-3 font-medium">Image</th>
-              <th class="px-4 py-3 font-medium">Title</th>
-              <th class="px-4 py-3 font-medium">Public</th>
-              <th class="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border bg-white/80">
-            <tr v-for="image in images" :key="image.id">
-              <td class="px-4 py-3 font-medium">{{ image.name }}:{{ image.tag }}</td>
-              <td class="px-4 py-3">{{ image.title || "Untitled" }}</td>
-              <td class="px-4 py-3">
-                <Badge :tone="image.isPublic ? 'success' : 'neutral'">{{ image.isPublic ? "Yes" : "No" }}</Badge>
-              </td>
-              <td class="px-4 py-3">
-                <Button variant="outline" size="sm" :disabled="deletingId === image.id" @click="$emit('remove', image.id)">
-                  Delete
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <Badge variant="secondary">{{ images.length }} images</Badge>
+      </CardHeader>
+      <CardContent>
+        <div class="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Image</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Public</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="image in images" :key="image.id">
+                <TableCell class="font-medium">{{ image.name }}:{{ image.tag }}</TableCell>
+                <TableCell>{{ image.title || "Untitled" }}</TableCell>
+                <TableCell>
+                  <Badge :variant="image.isPublic ? 'default' : 'outline'">{{ image.isPublic ? "Yes" : "No" }}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Button variant="outline" size="sm" :disabled="deletingId === image.id" @click="$emit('remove', image.id)">
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
     </Card>
   </div>
 </template>

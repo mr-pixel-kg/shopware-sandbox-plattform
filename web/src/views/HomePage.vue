@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import AppHeader from "@/components/layout/AppHeader.vue";
-import Card from "@/components/ui/Card.vue";
+import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import type { ImageRecord, SandboxRecord } from "@/types/api";
 import PublicImageCard from "@/features/public/PublicImageCard.vue";
@@ -62,66 +62,57 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="app-shell">
+  <div>
     <AppHeader />
 
-    <section class="hero-panel mb-8 px-6 py-10 md:px-10">
-      <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
-        <div class="space-y-5">
-          <span class="inline-flex rounded-full bg-accent/15 px-3 py-1 text-sm font-semibold text-accent">
-            Public storefront
-          </span>
-          <div class="space-y-3">
-            <h1 class="text-4xl font-extrabold tracking-tight text-foreground md:text-6xl">
-              Launch guest-ready Docker demos in one click.
-            </h1>
-            <p class="max-w-2xl text-base text-muted-foreground md:text-lg">
-              Browse public templates, create time-limited sandbox instances, and jump straight into live demos behind Traefik-managed URLs.
-            </p>
-          </div>
-        </div>
-
-        <Card class="bg-white/70">
-          <div class="space-y-3">
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Live overview</p>
-            <div class="text-3xl font-extrabold">{{ heroCount }}</div>
-            <p class="text-sm text-muted-foreground">
-              {{ sandboxes.length }} active demo sandboxes tracked for this browser session.
-            </p>
-          </div>
-        </Card>
-      </div>
-    </section>
-
-    <div v-if="error" class="mb-6 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
-      {{ error }}
-    </div>
-
-    <div class="grid gap-8">
-      <section class="space-y-5">
-        <div class="flex items-end justify-between gap-4">
-          <div>
-            <h2 class="section-title">Public images</h2>
-            <p class="text-sm text-muted-foreground">Start a fresh demo sandbox from any published image template.</p>
-          </div>
-        </div>
-
-        <div v-if="loading" class="rounded-2xl border border-dashed border-border bg-secondary/30 px-4 py-12 text-center text-sm text-muted-foreground">
-          Loading public image catalog...
-        </div>
-
-        <div v-else class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <PublicImageCard
-            v-for="image in images"
-            :key="image.id"
-            :image="image"
-            :busy="creatingId === image.id"
-            @demo="startDemo"
-          />
+    <div class="app-shell">
+      <section class="mb-8">
+        <div class="space-y-3">
+          <h1 class="text-3xl font-semibold tracking-tight md:text-4xl">Public Images</h1>
+          <p class="max-w-3xl text-sm text-muted-foreground md:text-base">
+            Start a demo from the public image gallery and keep your active guest sandboxes in view on the right.
+          </p>
         </div>
       </section>
 
-      <GuestSandboxList :sandboxes="sandboxes" :deleting-id="deletingId" @remove="deleteGuestSandbox" />
+      <div v-if="error" class="mb-6 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+        {{ error }}
+      </div>
+
+      <div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="space-y-5">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h2 class="section-title">Gallery</h2>
+              <p class="text-sm text-muted-foreground">Published image templates available for guests.</p>
+            </div>
+
+            <Card>
+              <CardContent class="px-4 py-3">
+                <div class="text-sm font-semibold text-foreground">{{ heroCount }}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div v-if="loading" class="rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-12 text-center text-sm text-muted-foreground">
+            Loading public image catalog...
+          </div>
+
+          <div v-else class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <PublicImageCard
+              v-for="image in images"
+              :key="image.id"
+              :image="image"
+              :busy="creatingId === image.id"
+              @demo="startDemo"
+            />
+          </div>
+        </section>
+
+        <aside class="xl:sticky xl:top-6 xl:self-start">
+          <GuestSandboxList :sandboxes="sandboxes" :deleting-id="deletingId" @remove="deleteGuestSandbox" />
+        </aside>
+      </div>
     </div>
   </div>
 </template>

@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import Card from "@/components/ui/Card.vue";
-import Badge from "@/components/ui/Badge.vue";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDateTime } from "@/lib/utils";
 import type { AuditLogRecord } from "@/types/api";
 
@@ -10,38 +18,40 @@ defineProps<{
 </script>
 
 <template>
-  <Card class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="section-title text-xl">Audit log</h2>
-        <p class="text-sm text-muted-foreground">Recent backend actions for troubleshooting and traceability.</p>
+  <Card>
+    <CardHeader class="flex flex-row items-center justify-between space-y-0">
+      <div class="space-y-1">
+        <CardTitle>Audit log</CardTitle>
+        <CardDescription>Recent backend actions for troubleshooting and traceability.</CardDescription>
       </div>
-      <Badge>{{ logs.length }} entries</Badge>
-    </div>
+      <Badge variant="secondary">{{ logs.length }} entries</Badge>
+    </CardHeader>
 
-    <div class="overflow-hidden rounded-2xl border border-border/70">
-      <table class="min-w-full divide-y divide-border text-sm">
-        <thead class="bg-secondary/60 text-left text-muted-foreground">
-          <tr>
-            <th class="px-4 py-3 font-medium">Time</th>
-            <th class="px-4 py-3 font-medium">Action</th>
-            <th class="px-4 py-3 font-medium">User</th>
-            <th class="px-4 py-3 font-medium">IP</th>
-            <th class="px-4 py-3 font-medium">Details</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border bg-white/80">
-          <tr v-for="entry in logs" :key="entry.id">
-            <td class="px-4 py-3">{{ formatDateTime(entry.createdAt) }}</td>
-            <td class="px-4 py-3 font-medium">{{ entry.action }}</td>
-            <td class="px-4 py-3">{{ entry.userId || "Guest" }}</td>
-            <td class="px-4 py-3">{{ entry.ipAddress || "-" }}</td>
-            <td class="max-w-lg px-4 py-3 text-xs text-muted-foreground">
-              <pre class="whitespace-pre-wrap break-all">{{ JSON.stringify(entry.details ?? {}, null, 2) }}</pre>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <CardContent>
+      <div class="overflow-hidden rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Time</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>IP</TableHead>
+              <TableHead>Details</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="entry in logs" :key="entry.id">
+              <TableCell>{{ formatDateTime(entry.createdAt) }}</TableCell>
+              <TableCell class="font-medium">{{ entry.action }}</TableCell>
+              <TableCell>{{ entry.userId || "Guest" }}</TableCell>
+              <TableCell>{{ entry.ipAddress || "-" }}</TableCell>
+              <TableCell class="max-w-lg text-xs text-muted-foreground">
+                <pre class="whitespace-pre-wrap break-all">{{ JSON.stringify(entry.details ?? {}, null, 2) }}</pre>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+    </CardContent>
   </Card>
 </template>
