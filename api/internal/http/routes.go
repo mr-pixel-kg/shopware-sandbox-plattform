@@ -12,6 +12,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/docker"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/handlers"
 	authmw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
+	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 	"gorm.io/gorm"
@@ -27,7 +28,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	e.HideBanner = true
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
-	e.Use(echomw.Logger())
+	e.Use(logging.EchoRequestLogger())
 	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
 		AllowOrigins:     cfg.Server.AllowedOrigins,
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
