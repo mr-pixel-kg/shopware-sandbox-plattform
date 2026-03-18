@@ -26,6 +26,7 @@ type SandboxService struct {
 	guard     config.GuardConfig
 	repo      *repositories.SandboxRepository
 	imageRepo *repositories.ImageRepository
+	images    *ImageService
 	eventRepo *repositories.SandboxEventRepository
 	audit     *AuditService
 	docker    docker.Client
@@ -36,6 +37,7 @@ func NewSandboxService(
 	guard config.GuardConfig,
 	repo *repositories.SandboxRepository,
 	imageRepo *repositories.ImageRepository,
+	images *ImageService,
 	eventRepo *repositories.SandboxEventRepository,
 	audit *AuditService,
 	dockerClient docker.Client,
@@ -45,6 +47,7 @@ func NewSandboxService(
 		guard:     guard,
 		repo:      repo,
 		imageRepo: imageRepo,
+		images:    images,
 		eventRepo: eventRepo,
 		audit:     audit,
 		docker:    dockerClient,
@@ -171,28 +174,57 @@ func (s *SandboxService) Delete(ctx context.Context, id uuid.UUID, clientIP stri
 	return nil
 }
 
-func (s *SandboxService) CreateSnapshot(ctx context.Context, sandboxID uuid.UUID, targetImage string, clientIP string, userID *uuid.UUID) error {
-	sandbox, err := s.repo.FindByID(sandboxID)
+type CreateSnapshotInput struct {
+	SandboxID    uuid.UUID
+	Name         string
+	Tag          string
+	Title        *string
+	Description  *string
+	ThumbnailURL *string
+	IsPublic     bool
+	ClientIP     string
+	UserID       *uuid.UUID
+}
+
+func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapshotInput) (*models.Image, error) {
+	targetImage := input.Name + ":" + input.Tag
+
+	sandbox, err := s.repo.FindByID(input.SandboxID)
 	if err != nil {
-		return ErrSandboxNotFound
+		return nil, ErrSandboxNotFound
 	}
 
 	if err := s.docker.CommitContainer(ctx, sandbox.ContainerID, targetImage); err != nil {
-		return err
+		return nil, err
+	}
+
+	image, err := s.images.CreateForUser(
+		input.UserID,
+		input.Name,
+		input.Tag,
+		input.Title,
+		input.Description,
+		input.ThumbnailURL,
+		input.IsPublic,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.addEvent(sandbox.ID, "snapshotted", map[string]any{
 		"targetImage": targetImage,
+		"imageId":     image.ID.String(),
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
-	_ = s.audit.Log(userID, "sandbox.snapshotted", clientIP, map[string]any{
+	_ = s.audit.Log(input.UserID, "sandbox.snapshotted", input.ClientIP, map[string]any{
 		"sandboxId":   sandbox.ID.String(),
 		"targetImage": targetImage,
+		"imageId":     image.ID.String(),
 	})
 
-	return nil
+	return image, nil
 }
 
 func (s *SandboxService) StartCleanupLoop(ctx context.Context) {

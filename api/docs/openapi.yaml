@@ -120,14 +120,17 @@ components:
           example: latest
         title:
           type: string
+          nullable: true
           description: Public or internal display title.
           example: Shopware Demo
         description:
           type: string
+          nullable: true
           description: Human-readable image description.
           example: Demo image for the public storefront.
         thumbnailUrl:
           type: string
+          nullable: true
           description: Optional preview image URL for the storefront card.
           example: https://cdn.shopshredder.de/thumbs/shopware-demo.png
         isPublic:
@@ -137,8 +140,6 @@ components:
       required:
         - name
         - tag
-        - title
-        - description
     CreateSandboxRequest:
       type: object
       description: Payload for creating a sandbox from an existing image.
@@ -155,16 +156,40 @@ components:
           example: 120
       required:
         - imageId
-    SnapshotRequest:
+    CreateSnapshotRequest:
       type: object
-      description: Payload for committing a running sandbox into a new docker image.
+      description: Payload for committing a running sandbox into a new docker image and registering it as a new image template.
       properties:
-        targetImage:
+        name:
           type: string
-          description: Full docker image reference for the resulting snapshot.
-          example: ghcr.io/shopshredder/shopware-custom:demo-v2
+          description: Docker image repository/name without the tag.
+          example: ghcr.io/shopshredder/shopware-custom
+        tag:
+          type: string
+          description: Docker image tag for the snapshot.
+          example: demo-v2
+        title:
+          type: string
+          nullable: true
+          description: Title for the new image template.
+          example: Shopware Custom Demo V2
+        description:
+          type: string
+          nullable: true
+          description: Description for the new image template.
+          example: Snapshot taken from a configured employee sandbox.
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: Optional preview image URL for the new template.
+          example: https://cdn.shopshredder.de/thumbs/shopware-custom-v2.png
+        isPublic:
+          type: boolean
+          description: Whether the snapshot should be visible in the public storefront.
+          example: true
       required:
-        - targetImage
+        - name
+        - tag
     Image:
       type: object
       description: Registered docker image template.
@@ -181,12 +206,15 @@ components:
           example: latest
         title:
           type: string
+          nullable: true
           example: Shopware Demo
         description:
           type: string
+          nullable: true
           example: Demo image for the public storefront.
         thumbnailUrl:
           type: string
+          nullable: true
           example: https://cdn.shopshredder.de/thumbs/shopware-demo.png
         isPublic:
           type: boolean
@@ -208,8 +236,6 @@ components:
         - id
         - name
         - tag
-        - title
-        - description
         - isPublic
         - createdAt
         - updatedAt
@@ -743,14 +769,23 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SnapshotRequest'
+              $ref: '#/components/schemas/CreateSnapshotRequest'
             examples:
               snapshot:
                 value:
-                  targetImage: ghcr.io/shopshredder/shopware-custom:demo-v2
+                  name: ghcr.io/shopshredder/shopware-custom
+                  tag: demo-v2
+                  title: Shopware Custom Demo V2
+                  description: Snapshot taken from a configured employee sandbox.
+                  thumbnailUrl: https://cdn.shopshredder.de/thumbs/shopware-custom-v2.png
+                  isPublic: true
       responses:
         '201':
           description: Snapshot created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Image'
         '400':
           description: Validation error
           content:

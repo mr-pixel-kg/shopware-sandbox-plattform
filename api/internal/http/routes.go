@@ -46,7 +46,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService)
 	guestService := services.NewGuestSessionService(sessionRepo, tokenService)
 	imageService := services.NewImageService(imageRepo)
-	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Guard, sandboxRepo, imageRepo, eventRepo, auditService, docker.NewNoopClient())
+	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, docker.NewNoopClient())
 
 	sandboxService.StartCleanupLoop(context.Background())
 

@@ -34,3 +34,30 @@ func (s *ImageService) Delete(id uuid.UUID) error {
 func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
 	return s.repo.FindByID(id)
 }
+
+func (s *ImageService) CreateForUser(
+	userID *uuid.UUID,
+	name string,
+	tag string,
+	title *string,
+	description *string,
+	thumbnailURL *string,
+	isPublic bool,
+) (*models.Image, error) {
+	image := &models.Image{
+		ID:              uuid.New(),
+		Name:            name,
+		Tag:             tag,
+		Title:           title,
+		Description:     description,
+		ThumbnailURL:    thumbnailURL,
+		IsPublic:        isPublic,
+		CreatedByUserID: userID,
+	}
+
+	if err := s.repo.Create(image); err != nil {
+		return nil, err
+	}
+
+	return image, nil
+}

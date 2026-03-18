@@ -5,6 +5,6 @@ type CreateSandboxRequest struct {
 	TTLMinutes *int   `json:"ttlMinutes"`
 }
 
-type SnapshotRequest struct {
-	TargetImage string `json:"targetImage"`
+type CreateSnapshotRequest struct {
+	ImagePayload
 }

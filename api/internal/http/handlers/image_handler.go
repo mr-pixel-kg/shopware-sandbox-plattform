@@ -8,7 +8,6 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
@@ -44,17 +43,16 @@ func (h *ImageHandler) Create(c echo.Context) error {
 	}
 
 	auth := mw.MustAuth(c)
-	image := &models.Image{
-		Name:            input.Name,
-		Tag:             input.Tag,
-		Title:           input.Title,
-		Description:     input.Description,
-		ThumbnailURL:    input.ThumbnailURL,
-		IsPublic:        input.IsPublic,
-		CreatedByUserID: &auth.UserID,
-	}
-
-	if err := h.images.Create(image); err != nil {
+	image, err := h.images.CreateForUser(
+		&auth.UserID,
+		input.Name,
+		input.Tag,
+		input.Title,
+		input.Description,
+		input.ThumbnailURL,
+		input.IsPublic,
+	)
+	if err != nil {
 		return responses.Error(c, http.StatusBadRequest, "IMAGE_CREATE_FAILED", err.Error())
 	}
 

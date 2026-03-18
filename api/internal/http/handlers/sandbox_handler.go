@@ -134,17 +134,28 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		return responses.Error(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid sandbox id")
 	}
 
-	var input dto.SnapshotRequest
+	var input dto.CreateSnapshotRequest
 	if err := c.Bind(&input); err != nil {
 		return responses.Error(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
 	}
 
 	auth := mw.MustAuth(c)
-	if err := h.sandboxes.CreateSnapshot(c.Request().Context(), id, input.TargetImage, c.RealIP(), &auth.UserID); err != nil {
+	image, err := h.sandboxes.CreateSnapshot(c.Request().Context(), services.CreateSnapshotInput{
+		SandboxID:    id,
+		Name:         input.Name,
+		Tag:          input.Tag,
+		Title:        input.Title,
+		Description:  input.Description,
+		ThumbnailURL: input.ThumbnailURL,
+		IsPublic:     input.IsPublic,
+		ClientIP:     c.RealIP(),
+		UserID:       &auth.UserID,
+	})
+	if err != nil {
 		return mapSandboxError(c, err)
 	}
 
-	return c.NoContent(http.StatusCreated)
+	return c.JSON(http.StatusCreated, image)
 }
 
 func mapSandboxError(c echo.Context, err error) error {
