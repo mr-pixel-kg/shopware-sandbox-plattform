@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/go-connections/nat"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 )
 
@@ -24,6 +26,7 @@ type SandboxContainer struct {
 	ID   string
 	Name string
 	URL  string
+	Port int
 }
 
 type Client interface {
@@ -114,14 +117,78 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 		return nil, err
 	}
 
-	// Labels are the contract with Traefik, so the API owns them in one place
-	// instead of spreading routing rules across higher layers.
+	if c.dockerCfg.Mode == config.DockerModePort {
+		return c.createPortContainer(ctx, request)
+	}
+	return c.createTraefikContainer(ctx, request)
+}
+
+func (c *DockerClient) createPortContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error) {
+	hostPort, err := findFreePort()
+	if err != nil {
+		return nil, fmt.Errorf("find free port: %w", err)
+	}
+
+	internalPort := nat.Port(strconv.Itoa(c.sandboxCfg.InternalPort) + "/tcp")
+	shopDomain := fmt.Sprintf("localhost:%d", hostPort)
+
+	containerConfig := &container.Config{
+		Image: request.ImageName,
+		Labels: map[string]string{
+			"sandbox_container": "true",
+		},
+		ExposedPorts: nat.PortSet{
+			internalPort: struct{}{},
+		},
+		Env: []string{
+			"TRUSTED_PROXIES=" + c.dockerCfg.TrustedProxies,
+			"SHOP_DOMAIN=" + shopDomain,
+			"APP_URL=http://" + shopDomain,
+		},
+	}
+
+	hostConfig := &container.HostConfig{
+		PortBindings: nat.PortMap{
+			internalPort: []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: strconv.Itoa(hostPort)},
+			},
+		},
+	}
+
+	resp, err := c.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, request.ContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
+	}
+
+	if err := c.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
+	}
+
+	return &SandboxContainer{
+		ID:   resp.ID,
+		Name: request.ContainerName,
+		URL:  "http://" + shopDomain,
+		Port: hostPort,
+	}, nil
+}
+
+func findFreePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+func (c *DockerClient) createTraefikContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error) {
 	containerConfig := &container.Config{
 		Image:  request.ImageName,
 		Labels: c.buildTraefikLabels(request.ContainerName, request.Hostname),
 		Env: []string{
 			"TRUSTED_PROXIES=" + c.dockerCfg.TrustedProxies,
 			"SHOP_DOMAIN=" + request.Hostname,
+			"APP_URL=https://" + request.Hostname,
 		},
 	}
 

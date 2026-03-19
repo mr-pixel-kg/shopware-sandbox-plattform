@@ -24,6 +24,7 @@ var (
 
 type SandboxService struct {
 	cfg       config.SandboxConfig
+	dockerCfg config.DockerConfig
 	guard     config.GuardConfig
 	repo      *repositories.SandboxRepository
 	imageRepo *repositories.ImageRepository
@@ -35,6 +36,7 @@ type SandboxService struct {
 
 func NewSandboxService(
 	cfg config.SandboxConfig,
+	dockerCfg config.DockerConfig,
 	guard config.GuardConfig,
 	repo *repositories.SandboxRepository,
 	imageRepo *repositories.ImageRepository,
@@ -45,6 +47,7 @@ func NewSandboxService(
 ) *SandboxService {
 	return &SandboxService{
 		cfg:       cfg,
+		dockerCfg: dockerCfg,
 		guard:     guard,
 		repo:      repo,
 		imageRepo: imageRepo,
@@ -100,7 +103,6 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 
 	sandboxID := uuid.New()
 	containerName := fmt.Sprintf("%s%s", s.cfg.URLPrefix, sandboxID.String())
-	hostname := fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	ttl := s.cfg.DefaultTTL
 	if input.TTL != nil {
 		ttl = *input.TTL
@@ -109,6 +111,11 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	// predictable even for authenticated users.
 	if ttl > s.cfg.MaxTTL {
 		ttl = s.cfg.MaxTTL
+	}
+
+	var hostname string
+	if s.dockerCfg.Mode == config.DockerModeTraefik {
+		hostname = fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	}
 
 	container, err := s.docker.CreateContainer(ctx, docker.SandboxCreateRequest{
@@ -129,7 +136,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		Status:          models.SandboxStatusRunning,
 		ContainerID:     container.ID,
 		ContainerName:   container.Name,
-		URL:             "https://" + hostname,
+		URL:             container.URL,
+		Port:            container.Port,
 		ClientIP:        input.ClientIP,
 		ExpiresAt:       &expiresAt,
 	}

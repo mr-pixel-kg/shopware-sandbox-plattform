@@ -56,7 +56,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker)
 	imageService.RecoverStalePulls()
-	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient)
+	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient)
 
 	// Sandbox expiration is handled inside the same process on purpose to keep
 	// deployment simple for the single-service architecture.

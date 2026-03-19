@@ -28,6 +28,7 @@ sandbox:
   internal_port: 80
 
 docker:
+  mode: "port"
   network: "internal"
   traefik_enable: false
 

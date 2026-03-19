@@ -42,6 +42,7 @@ export interface Sandbox extends BaseModel {
   containerId: string
   containerName: string
   url: string
+  port?: number
   clientIp: string
   expiresAt?: string
   lastSeenAt?: string

@@ -25,6 +25,7 @@ const emit = defineEmits<{
 const ttlMinutes = ref('60')
 
 const options = [
+  { value: '5', label: '+5 Min' },
   { value: '30', label: '+30 Min' },
   { value: '60', label: '+1 Std' },
   { value: '120', label: '+2 Std' },

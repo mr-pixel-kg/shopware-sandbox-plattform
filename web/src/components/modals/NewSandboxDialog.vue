@@ -32,6 +32,7 @@ const ttlMinutes = ref('120')
 const submitting = ref(false)
 
 const ttlOptions = [
+  { value: '5', label: '5 Min' },
   { value: '30', label: '30 Min' },
   { value: '120', label: '2 Std' },
   { value: '240', label: '4 Std' },

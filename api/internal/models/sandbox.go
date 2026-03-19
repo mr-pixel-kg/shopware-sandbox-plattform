@@ -26,6 +26,7 @@ type Sandbox struct {
 	ContainerID     string        `gorm:"size:255;not null;uniqueIndex" json:"containerId"`
 	ContainerName   string        `gorm:"size:255;not null;uniqueIndex" json:"containerName"`
 	URL             string        `gorm:"size:1024;not null;uniqueIndex" json:"url"`
+	Port            int           `gorm:"default:0" json:"port,omitempty"`
 	ClientIP        string        `gorm:"size:128;not null;index" json:"clientIp"`
 	ExpiresAt       *time.Time    `gorm:"index" json:"expiresAt,omitempty"`
 	LastSeenAt      *time.Time    `json:"lastSeenAt,omitempty"`
