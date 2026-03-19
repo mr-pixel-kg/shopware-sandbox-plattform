@@ -14,5 +14,5 @@ const layout = computed(() => route.meta.layout === 'auth' ? AuthLayout : Defaul
   <component :is="layout">
     <RouterView />
   </component>
-  <Toaster />
+  <Toaster richColors />
 </template>
