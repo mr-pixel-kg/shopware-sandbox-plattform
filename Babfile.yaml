@@ -1,0 +1,78 @@
+tasks:
+  setup:
+    desc: Copy example configs
+    run:
+      - cmd: |
+          [ -f api/config.yml ] && echo "api/config.yml already exists, skipping." || (cp api/config.example.yml api/config.yml && echo "Created api/config.yml")
+          [ -f .env ] && echo ".env already exists, skipping." || (cp .env.example .env && echo "Created .env")
+          [ -f web/.env ] && echo "web/.env already exists, skipping." || (cp web/.env.example web/.env && echo "Created web/.env")
+          echo ""
+          echo "Setup complete! Edit api/config.yml and .env with your settings."
+
+  dev:
+    desc: Start all dev servers
+    run:
+      - task: docker:infra
+        silent: true
+      - parallel:
+          - task: api:dev
+            label: api
+          - task: web:dev
+            label: web
+        mode: grouped
+
+  api:dev:
+    desc: Start API dev server
+    run:
+      - cmd: |
+          if [ ! -f api/config.yml ]; then
+            cp api/config.example.yml api/config.yml
+            echo "Created api/config.yml from example. Edit it with your settings."
+          fi
+      - cmd: cd api && go run ./cmd/api
+
+  web:dev:
+    desc: Start web dev server
+    run:
+      - cmd: cd web && npm install && npm run dev
+
+  docker:up:
+    desc: Start full stack
+    run:
+      - cmd: docker compose up -d
+
+  docker:infra:
+    desc: Start infrastructure only
+    run:
+      - cmd: docker compose up -d database
+
+  docker:down:
+    desc: Stop containers
+    run:
+      - cmd: docker compose down
+
+  docker:destroy:
+    desc: Stop containers and delete volumes
+    run:
+      - prompt: confirm
+        type: confirm
+        message: "This will stop all services and DELETE all data volumes. Continue?"
+        default: false
+      - cmd: docker compose down -v
+
+  docker:logs:
+    desc: Follow container logs
+    run:
+      - cmd: docker compose logs -f
+        silent: true
+
+  docker:status:
+    desc: Show container status
+    run:
+      - cmd: docker compose ps
+        silent: true
+
+  docker:build:
+    desc: Build images
+    run:
+      - cmd: docker compose build

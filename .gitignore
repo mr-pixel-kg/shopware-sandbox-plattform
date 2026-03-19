@@ -1,1 +1,7 @@
 .idea
+/.env
+node_modules/
+dist/
+.output/
+.nuxt/
+api/config.yml
