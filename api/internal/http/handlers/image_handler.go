@@ -270,6 +270,18 @@ func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// Delete godoc
+// @Summary      Delete an image
+// @Description  Remove a Docker image registration
+// @Tags         Images
+// @Security     BearerAuth
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id} [delete]
 func (h *ImageHandler) Delete(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
