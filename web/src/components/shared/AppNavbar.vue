@@ -42,7 +42,7 @@ function getInitials(email: string): string {
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
+  router.push('/explore')
 }
 </script>
 
