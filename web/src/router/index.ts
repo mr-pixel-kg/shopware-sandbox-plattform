@@ -15,7 +15,7 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/views/auth/RegisterView.vue'),
       meta: { layout: 'auth', guest: true },
-    },
+    },0
     {
       path: '/',
       redirect: '/sandboxes',

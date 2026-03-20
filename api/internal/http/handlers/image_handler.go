@@ -49,6 +49,7 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 // @Security     BearerAuth
 // @Produce      json
 // @Success      200 {array} models.Image
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/images [get]
 func (h *ImageHandler) ListAll(c echo.Context) error {
@@ -71,6 +72,8 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 // @Param        body body dto.CreateImageRequest true "Image details"
 // @Success      201 {object} models.Image
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
 // @Router       /api/images [post]
 func (h *ImageHandler) Create(c echo.Context) error {
 	var input dto.CreateImageRequest
@@ -117,6 +120,8 @@ func (h *ImageHandler) Create(c echo.Context) error {
 // @Param        id path string true "Image ID" format(uuid)
 // @Success      204
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/images/{id} [delete]
 func (h *ImageHandler) Delete(c echo.Context) error {
@@ -142,7 +147,7 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 // @Tags         Images
 // @Produce      text/event-stream
 // @Param        id path string true "Image ID" format(uuid)
-// @Success      200 {string} string "SSE stream"
+// @Success      200 {object} dto.ImagePullProgressEvent "Last emitted SSE event payload"
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/images/{id}/progress [get]

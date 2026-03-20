@@ -20,3 +20,8 @@ type AuthLoginResponse struct {
 type HealthResponse struct {
 	Status string `json:"status" example:"ok"`
 }
+
+type ImagePullProgressEvent struct {
+	Percent int    `json:"percent" example:"75"`
+	Status  string `json:"status" example:"pulling"`
+}

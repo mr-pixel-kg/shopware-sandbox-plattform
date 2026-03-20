@@ -30,6 +30,7 @@ func NewAuthHandler(auth *services.AuthService, audit *services.AuditService) *A
 // @Param        body body dto.RegisterRequest true "Registration credentials"
 // @Success      201 {object} models.User
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
 // @Router       /api/auth/register [post]
 func (h *AuthHandler) Register(c echo.Context) error {
 	var input dto.RegisterRequest
@@ -80,9 +81,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		"token_issued", token != "",
 	)...)
 	_ = h.audit.Log(&user.ID, "auth.logged_in", c.RealIP(), map[string]any{})
-	return c.JSON(200, map[string]any{
-		"token": token,
-		"user":  user,
+	return c.JSON(200, dto.AuthLoginResponse{
+		Token: token,
+		User:  *user,
 	})
 }
 
@@ -91,7 +92,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 // @Description  Invalidate the current session token
 // @Tags         Auth
 // @Security     BearerAuth
+// @Produce      json
 // @Success      204
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/auth/logout [post]
 func (h *AuthHandler) Logout(c echo.Context) error {
@@ -113,6 +116,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 // @Security     BearerAuth
 // @Produce      json
 // @Success      200 {object} models.User
+// @Failure      401 {object} dto.ErrorResponse
 // @Router       /api/me [get]
 func (h *AuthHandler) Me(c echo.Context) error {
 	auth := mw.MustAuth(c)

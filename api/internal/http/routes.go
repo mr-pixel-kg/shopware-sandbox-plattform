@@ -10,6 +10,7 @@ import (
 	echomw "github.com/labstack/echo/v4/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/docker"
+	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/handlers"
 	authmw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
@@ -125,7 +126,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 // @Success      200 {object} dto.HealthResponse
 // @Router       /health [get]
 func healthCheck(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	return c.JSON(http.StatusOK, dto.HealthResponse{Status: "ok"})
 }
 
 func (s *Server) Start() error {

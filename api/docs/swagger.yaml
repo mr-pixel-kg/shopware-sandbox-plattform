@@ -11,16 +11,22 @@ definitions:
   dto.CreateImageRequest:
     properties:
       description:
+        example: Base image for internal sales demos.
         type: string
       isPublic:
+        example: true
         type: boolean
       name:
+        example: dockware/dev
         type: string
       tag:
+        example: 6.6.9.0
         type: string
       thumbnailUrl:
+        example: https://cdn.example.com/images/shopware-demo.png
         type: string
       title:
+        example: Shopware 6.6 Demo
         type: string
     required:
     - name
@@ -33,6 +39,7 @@ definitions:
         format: uuid
         type: string
       ttlMinutes:
+        example: 120
         type: integer
     required:
     - imageId
@@ -40,16 +47,22 @@ definitions:
   dto.CreateSnapshotRequest:
     properties:
       description:
+        example: Base image for internal sales demos.
         type: string
       isPublic:
+        example: true
         type: boolean
       name:
+        example: dockware/dev
         type: string
       tag:
+        example: 6.6.9.0
         type: string
       thumbnailUrl:
+        example: https://cdn.example.com/images/shopware-demo.png
         type: string
       title:
+        example: Shopware 6.6 Demo
         type: string
     required:
     - name
@@ -74,6 +87,7 @@ definitions:
   dto.ExtendTTLRequest:
     properties:
       ttlMinutes:
+        example: 60
         type: integer
     type: object
   dto.HealthResponse:
@@ -82,11 +96,22 @@ definitions:
         example: ok
         type: string
     type: object
+  dto.ImagePullProgressEvent:
+    properties:
+      percent:
+        example: 75
+        type: integer
+      status:
+        example: pulling
+        type: string
+    type: object
   dto.LoginRequest:
     properties:
       email:
+        example: jane.doe@example.com
         type: string
       password:
+        example: Sup3rS3cret!
         type: string
     required:
     - email
@@ -95,8 +120,10 @@ definitions:
   dto.RegisterRequest:
     properties:
       email:
+        example: jane.doe@example.com
         type: string
       password:
+        example: Sup3rS3cret!
         minLength: 8
         type: string
     required:
@@ -106,35 +133,52 @@ definitions:
   models.AuditLog:
     properties:
       action:
+        example: sandbox.created
         type: string
       createdAt:
+        example: "2026-03-20T10:15:00Z"
         type: string
       details:
         type: object
       id:
+        example: 4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf
+        format: uuid
         type: string
       ipAddress:
+        example: 203.0.113.25
         type: string
       userId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
     type: object
   models.Image:
     properties:
       createdAt:
+        example: "2026-03-20T10:15:00Z"
         type: string
       createdByUserId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       description:
+        example: Prepared image for sales demos and internal QA.
         type: string
       errorMessage:
+        example: failed to reach registry
         type: string
       id:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        format: uuid
         type: string
       isPublic:
+        example: true
         type: boolean
       name:
+        example: dockware/dev
         type: string
       pullProgress:
+        example: 100
         type: integer
       status:
         enum:
@@ -144,37 +188,56 @@ definitions:
         example: ready
         type: string
       tag:
+        example: 6.6.9.0
         type: string
       thumbnailUrl:
+        example: https://cdn.example.com/images/shopware-demo.png
         type: string
       title:
+        example: Shopware Demo Image
         type: string
       updatedAt:
+        example: "2026-03-20T10:20:00Z"
         type: string
     type: object
   models.Sandbox:
     properties:
       clientIp:
+        example: 203.0.113.25
         type: string
       containerId:
+        example: 1a2b3c4d5e6f7g8h9i0j
         type: string
       containerName:
+        example: sandbox-0b443c82
         type: string
       createdAt:
+        example: "2026-03-20T10:15:00Z"
         type: string
       createdByUserId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       expiresAt:
+        example: "2026-03-20T12:00:00Z"
         type: string
       guestSessionId:
+        example: db7fcb92-c2ff-4c20-9ac2-5a2504ab6326
+        format: uuid
         type: string
       id:
+        example: 0b443c82-d8a3-49a7-b59a-26ce327c7341
+        format: uuid
         type: string
       imageId:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        format: uuid
         type: string
       lastSeenAt:
+        example: "2026-03-20T10:45:00Z"
         type: string
       port:
+        example: 8080
         type: integer
       status:
         allOf:
@@ -188,8 +251,10 @@ definitions:
         - failed
         example: running
       updatedAt:
+        example: "2026-03-20T10:20:00Z"
         type: string
       url:
+        example: https://sandbox-0b443c82.demo.shopshredder.de
         type: string
     type: object
   models.SandboxStatus:
@@ -211,12 +276,17 @@ definitions:
   models.User:
     properties:
       createdAt:
+        example: "2026-03-20T10:15:00Z"
         type: string
       email:
+        example: jane.doe@example.com
         type: string
       id:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       updatedAt:
+        example: "2026-03-20T10:20:00Z"
         type: string
     type: object
 host: localhost:8080
@@ -231,7 +301,10 @@ paths:
       description: Returns recent audit log entries, optionally limited
       parameters:
       - description: Max entries (1-200, default 50)
+        example: 50
         in: query
+        maximum: 200
+        minimum: 1
         name: limit
         type: integer
       produces:
@@ -243,6 +316,10 @@ paths:
             items:
               $ref: '#/definitions/models.AuditLog'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -285,9 +362,15 @@ paths:
   /api/auth/logout:
     post:
       description: Invalidate the current session token
+      produces:
+      - application/json
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -320,6 +403,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Register a new user
       tags:
       - Auth
@@ -335,6 +422,10 @@ paths:
             items:
               $ref: '#/definitions/models.Image'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -367,6 +458,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create an image
@@ -387,6 +486,14 @@ paths:
           description: No Content
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "500":
@@ -413,9 +520,9 @@ paths:
       - text/event-stream
       responses:
         "200":
-          description: SSE stream
+          description: Last emitted SSE event payload
           schema:
-            type: string
+            $ref: '#/definitions/dto.ImagePullProgressEvent'
         "400":
           description: Bad Request
           schema:
@@ -437,6 +544,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get current user
@@ -454,6 +565,10 @@ paths:
             items:
               $ref: '#/definitions/models.Sandbox'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -484,6 +599,10 @@ paths:
             $ref: '#/definitions/models.Sandbox'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "409":
@@ -579,6 +698,10 @@ paths:
             items:
               $ref: '#/definitions/models.Sandbox'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -610,6 +733,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -638,6 +769,10 @@ paths:
           description: No Content
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "403":
@@ -677,6 +812,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -713,6 +852,10 @@ paths:
             $ref: '#/definitions/models.Image'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "404":
@@ -755,6 +898,10 @@ paths:
             $ref: '#/definitions/models.Sandbox'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "403":

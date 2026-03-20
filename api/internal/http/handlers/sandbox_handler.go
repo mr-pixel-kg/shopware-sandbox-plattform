@@ -29,6 +29,7 @@ func NewSandboxHandler(sandboxes *services.SandboxService) *SandboxHandler {
 // @Security     BearerAuth
 // @Produce      json
 // @Success      200 {array} models.Sandbox
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes [get]
 func (h *SandboxHandler) List(c echo.Context) error {
@@ -48,6 +49,7 @@ func (h *SandboxHandler) List(c echo.Context) error {
 // @Security     BearerAuth
 // @Produce      json
 // @Success      200 {array} models.Sandbox
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/me/sandboxes [get]
 func (h *SandboxHandler) ListMine(c echo.Context) error {
@@ -87,6 +89,7 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 // @Param        id path string true "Sandbox ID" format(uuid)
 // @Success      200 {object} models.Sandbox
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id} [get]
 func (h *SandboxHandler) Get(c echo.Context) error {
@@ -113,6 +116,7 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 // @Success      201 {object} models.Sandbox
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      409 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/public/demos [post]
 func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
@@ -159,7 +163,9 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 // @Param        body body dto.CreateSandboxRequest true "Sandbox configuration"
 // @Success      201 {object} models.Sandbox
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      409 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes [post]
 func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
@@ -215,6 +221,7 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 // @Param        body body dto.ExtendTTLRequest true "TTL extension"
 // @Success      200 {object} models.Sandbox
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      403 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/ttl [patch]
@@ -259,6 +266,7 @@ func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
 // @Param        id path string true "Sandbox ID" format(uuid)
 // @Success      204
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      403 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
@@ -317,6 +325,7 @@ func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
 // @Param        body body dto.CreateSnapshotRequest true "Snapshot metadata"
 // @Success      201 {object} models.Image
 // @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/snapshot [post]

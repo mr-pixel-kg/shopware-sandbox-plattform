@@ -32,7 +32,10 @@ const docTemplate = `{
                 "summary": "List audit logs",
                 "parameters": [
                     {
+                        "maximum": 200,
+                        "minimum": 1,
                         "type": "integer",
+                        "example": 50,
                         "description": "Max entries (1-200, default 50)",
                         "name": "limit",
                         "in": "query"
@@ -46,6 +49,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/models.AuditLog"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
@@ -111,6 +120,9 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Invalidate the current session token",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Auth"
                 ],
@@ -118,6 +130,12 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error",
@@ -164,6 +182,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -191,6 +215,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/models.Image"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
@@ -241,6 +271,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -277,6 +319,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -308,9 +362,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "SSE stream",
+                        "description": "Last emitted SSE event payload",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/dto.ImagePullProgressEvent"
                         }
                     },
                     "400": {
@@ -349,6 +403,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/models.User"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -376,6 +436,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/models.Sandbox"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
@@ -420,6 +486,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -570,6 +642,12 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -615,6 +693,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -672,6 +762,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -707,6 +803,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -782,6 +884,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -847,6 +955,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
@@ -904,22 +1018,28 @@ const docTemplate = `{
             ],
             "properties": {
                 "description": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Base image for internal sales demos."
                 },
                 "isPublic": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "dockware/dev"
                 },
                 "tag": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "6.6.9.0"
                 },
                 "thumbnailUrl": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://cdn.example.com/images/shopware-demo.png"
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Shopware 6.6 Demo"
                 }
             }
         },
@@ -935,7 +1055,8 @@ const docTemplate = `{
                     "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
                 },
                 "ttlMinutes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 120
                 }
             }
         },
@@ -947,22 +1068,28 @@ const docTemplate = `{
             ],
             "properties": {
                 "description": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Base image for internal sales demos."
                 },
                 "isPublic": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "dockware/dev"
                 },
                 "tag": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "6.6.9.0"
                 },
                 "thumbnailUrl": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://cdn.example.com/images/shopware-demo.png"
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Shopware 6.6 Demo"
                 }
             }
         },
@@ -994,7 +1121,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "ttlMinutes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 60
                 }
             }
         },
@@ -1007,6 +1135,19 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ImagePullProgressEvent": {
+            "type": "object",
+            "properties": {
+                "percent": {
+                    "type": "integer",
+                    "example": 75
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pulling"
+                }
+            }
+        },
         "dto.LoginRequest": {
             "type": "object",
             "required": [
@@ -1015,10 +1156,12 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "jane.doe@example.com"
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sup3rS3cret!"
                 }
             }
         },
@@ -1030,11 +1173,13 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "jane.doe@example.com"
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 8
+                    "minLength": 8,
+                    "example": "Sup3rS3cret!"
                 }
             }
         },
@@ -1042,22 +1187,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "action": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "sandbox.created"
                 },
                 "createdAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
                 },
                 "details": {
                     "type": "object"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"
                 },
                 "ipAddress": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "203.0.113.25"
                 },
                 "userId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 }
             }
         },
@@ -1065,28 +1217,38 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "createdAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
                 },
                 "createdByUserId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "description": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Prepared image for sales demos and internal QA."
                 },
                 "errorMessage": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "failed to reach registry"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
                 },
                 "isPublic": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "dockware/dev"
                 },
                 "pullProgress": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 100
                 },
                 "status": {
                     "type": "string",
@@ -1098,16 +1260,20 @@ const docTemplate = `{
                     "example": "ready"
                 },
                 "tag": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "6.6.9.0"
                 },
                 "thumbnailUrl": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://cdn.example.com/images/shopware-demo.png"
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Shopware Demo Image"
                 },
                 "updatedAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:20:00Z"
                 }
             }
         },
@@ -1115,37 +1281,52 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "clientIp": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "203.0.113.25"
                 },
                 "containerId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "1a2b3c4d5e6f7g8h9i0j"
                 },
                 "containerName": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "sandbox-0b443c82"
                 },
                 "createdAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
                 },
                 "createdByUserId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "expiresAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T12:00:00Z"
                 },
                 "guestSessionId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "0b443c82-d8a3-49a7-b59a-26ce327c7341"
                 },
                 "imageId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
                 },
                 "lastSeenAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:45:00Z"
                 },
                 "port": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 8080
                 },
                 "status": {
                     "enum": [
@@ -1164,10 +1345,12 @@ const docTemplate = `{
                     "example": "running"
                 },
                 "updatedAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:20:00Z"
                 },
                 "url": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://sandbox-0b443c82.demo.shopshredder.de"
                 }
             }
         },
@@ -1194,16 +1377,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "createdAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
                 },
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "jane.doe@example.com"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "updatedAt": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-03-20T10:20:00Z"
                 }
             }
         }
