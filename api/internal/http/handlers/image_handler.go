@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -133,18 +133,21 @@ func (h *ImageHandler) Create(c echo.Context) error {
 	return c.JSON(201, image)
 }
 
-// Delete godoc
-// @Summary      Delete an image
-// @Description  Remove a Docker image registration
+// Update godoc
+// @Summary      Update an image
+// @Description  Update image metadata and visibility
 // @Tags         Images
 // @Security     BearerAuth
+// @Accept       json
+// @Produce      json
 // @Param        id path string true "Image ID" format(uuid)
-// @Success      204
+// @Param        body body dto.UpdateImageRequest true "Updated image fields"
+// @Success      200 {object} models.Image
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id} [delete]
+// @Router       /api/images/{id} [put]
 func (h *ImageHandler) Update(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -177,6 +180,21 @@ func (h *ImageHandler) Update(c echo.Context) error {
 	return c.JSON(http.StatusOK, image)
 }
 
+// UploadThumbnail godoc
+// @Summary      Upload an image thumbnail
+// @Description  Upload or replace the thumbnail for an image
+// @Tags         Images
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        id path string true "Image ID" format(uuid)
+// @Param        thumbnail formData file true "Thumbnail file"
+// @Success      200 {object} models.Image
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/thumbnail [post]
 func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -218,6 +236,18 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	return c.JSON(http.StatusOK, image)
 }
 
+// DeleteThumbnail godoc
+// @Summary      Delete an image thumbnail
+// @Description  Remove the thumbnail associated with an image
+// @Tags         Images
+// @Security     BearerAuth
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/thumbnail [delete]
 func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))

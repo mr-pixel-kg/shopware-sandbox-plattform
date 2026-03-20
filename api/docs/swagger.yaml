@@ -22,9 +22,6 @@ definitions:
       tag:
         example: 6.6.9.0
         type: string
-      thumbnailUrl:
-        example: https://cdn.example.com/images/shopware-demo.png
-        type: string
       title:
         example: Shopware 6.6 Demo
         type: string
@@ -57,9 +54,6 @@ definitions:
         type: string
       tag:
         example: 6.6.9.0
-        type: string
-      thumbnailUrl:
-        example: https://cdn.example.com/images/shopware-demo.png
         type: string
       title:
         example: Shopware 6.6 Demo
@@ -117,6 +111,27 @@ definitions:
     - email
     - password
     type: object
+  dto.PendingPullResponse:
+    properties:
+      id:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        type: string
+      name:
+        example: dockware/shopware
+        type: string
+      percent:
+        example: 42
+        type: integer
+      status:
+        example: pulling
+        type: string
+      tag:
+        example: 6.6.9.0
+        type: string
+      title:
+        example: Shopware Demo Image
+        type: string
+    type: object
   dto.RegisterRequest:
     properties:
       email:
@@ -129,6 +144,15 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.UpdateImageRequest:
+    properties:
+      description:
+        type: string
+      isPublic:
+        type: boolean
+      title:
+        type: string
     type: object
   models.AuditLog:
     properties:
@@ -164,9 +188,6 @@ definitions:
       description:
         example: Prepared image for sales demos and internal QA.
         type: string
-      errorMessage:
-        example: failed to reach registry
-        type: string
       id:
         example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
         format: uuid
@@ -176,16 +197,6 @@ definitions:
         type: boolean
       name:
         example: dockware/dev
-        type: string
-      pullProgress:
-        example: 100
-        type: integer
-      status:
-        enum:
-        - ready
-        - pulling
-        - failed
-        example: ready
         type: string
       tag:
         example: 6.6.9.0
@@ -454,6 +465,10 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/models.Image'
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/dto.PendingPullResponse'
         "400":
           description: Bad Request
           schema:
@@ -462,18 +477,16 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create an image
       tags:
       - Images
   /api/images/{id}:
-    delete:
-      description: Remove a Docker image registration
+    put:
+      consumes:
+      - application/json
+      description: Update image metadata and visibility
       parameters:
       - description: Image ID
         format: uuid
@@ -481,9 +494,19 @@ paths:
         name: id
         required: true
         type: string
+      - description: Updated image fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateImageRequest'
+      produces:
+      - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Image'
         "400":
           description: Bad Request
           schema:
@@ -502,7 +525,7 @@ paths:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete an image
+      summary: Update an image
       tags:
       - Images
   /api/images/{id}/progress:
@@ -532,6 +555,106 @@ paths:
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       summary: Stream image pull progress
+      tags:
+      - Images
+  /api/images/{id}/thumbnail:
+    delete:
+      description: Remove the thumbnail associated with an image
+      parameters:
+      - description: Image ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an image thumbnail
+      tags:
+      - Images
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload or replace the thumbnail for an image
+      parameters:
+      - description: Image ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thumbnail file
+        in: formData
+        name: thumbnail
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Image'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload an image thumbnail
+      tags:
+      - Images
+  /api/images/pulls:
+    get:
+      description: Returns all images currently being pulled (in-memory only, not
+        persisted)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.PendingPullResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List ongoing image pulls
       tags:
       - Images
   /api/me:

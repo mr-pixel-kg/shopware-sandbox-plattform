@@ -266,6 +266,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.Image"
                         }
                     },
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PendingPullResponse"
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -277,9 +283,37 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/api/images/pulls": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all images currently being pulled (in-memory only, not persisted)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Images"
+                ],
+                "summary": "List ongoing image pulls",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PendingPullResponse"
+                            }
+                        }
                     },
-                    "409": {
-                        "description": "Conflict",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -288,17 +322,23 @@ const docTemplate = `{
             }
         },
         "/api/images/{id}": {
-            "delete": {
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Remove a Docker image registration",
+                "description": "Update image metadata and visibility",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Images"
                 ],
-                "summary": "Delete an image",
+                "summary": "Update an image",
                 "parameters": [
                     {
                         "type": "string",
@@ -307,11 +347,23 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Updated image fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateImageRequest"
+                        }
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Image"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -375,6 +427,126 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/images/{id}/thumbnail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload or replace the thumbnail for an image",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Images"
+                ],
+                "summary": "Upload an image thumbnail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Image ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Thumbnail file",
+                        "name": "thumbnail",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Image"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove the thumbnail associated with an image",
+                "tags": [
+                    "Images"
+                ],
+                "summary": "Delete an image thumbnail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Image ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1033,10 +1205,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "6.6.9.0"
                 },
-                "thumbnailUrl": {
-                    "type": "string",
-                    "example": "https://cdn.example.com/images/shopware-demo.png"
-                },
                 "title": {
                     "type": "string",
                     "example": "Shopware 6.6 Demo"
@@ -1082,10 +1250,6 @@ const docTemplate = `{
                 "tag": {
                     "type": "string",
                     "example": "6.6.9.0"
-                },
-                "thumbnailUrl": {
-                    "type": "string",
-                    "example": "https://cdn.example.com/images/shopware-demo.png"
                 },
                 "title": {
                     "type": "string",
@@ -1165,6 +1329,35 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.PendingPullResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "dockware/shopware"
+                },
+                "percent": {
+                    "type": "integer",
+                    "example": 42
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pulling"
+                },
+                "tag": {
+                    "type": "string",
+                    "example": "6.6.9.0"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Shopware Demo Image"
+                }
+            }
+        },
         "dto.RegisterRequest": {
             "type": "object",
             "required": [
@@ -1180,6 +1373,20 @@ const docTemplate = `{
                     "type": "string",
                     "minLength": 8,
                     "example": "Sup3rS3cret!"
+                }
+            }
+        },
+        "dto.UpdateImageRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "isPublic": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -1229,10 +1436,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Prepared image for sales demos and internal QA."
                 },
-                "errorMessage": {
-                    "type": "string",
-                    "example": "failed to reach registry"
-                },
                 "id": {
                     "type": "string",
                     "format": "uuid",
@@ -1245,19 +1448,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "dockware/dev"
-                },
-                "pullProgress": {
-                    "type": "integer",
-                    "example": 100
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "ready",
-                        "pulling",
-                        "failed"
-                    ],
-                    "example": "ready"
                 },
                 "tag": {
                     "type": "string",
