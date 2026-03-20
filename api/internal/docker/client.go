@@ -26,7 +26,7 @@ type SandboxContainer struct {
 	ID   string
 	Name string
 	URL  string
-	Port int
+	Port *int
 }
 
 type Client interface {
@@ -168,7 +168,7 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request SandboxC
 		ID:   resp.ID,
 		Name: request.ContainerName,
 		URL:  "http://" + shopDomain,
-		Port: hostPort,
+		Port: &hostPort,
 	}, nil
 }
 
