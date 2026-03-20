@@ -22,7 +22,7 @@ type Sandbox struct {
 	ImageID         uuid.UUID     `gorm:"type:uuid;not null;index" json:"imageId"`
 	CreatedByUserID *uuid.UUID    `gorm:"type:uuid;index" json:"createdByUserId,omitempty"`
 	GuestSessionID  *uuid.UUID    `gorm:"type:uuid;index" json:"guestSessionId,omitempty"`
-	Status          SandboxStatus `gorm:"size:32;not null;index" json:"status"`
+	Status          SandboxStatus `gorm:"size:32;not null;index" json:"status" enums:"starting,running,stopped,expired,deleted,failed" example:"running"`
 	ContainerID     string        `gorm:"size:255;not null;uniqueIndex" json:"containerId"`
 	ContainerName   string        `gorm:"size:255;not null;uniqueIndex" json:"containerName"`
 	URL             string        `gorm:"size:1024;not null;uniqueIndex" json:"url"`

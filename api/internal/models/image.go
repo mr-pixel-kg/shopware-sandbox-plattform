@@ -10,7 +10,7 @@ type Image struct {
 	Description     *string    `gorm:"type:text" json:"description,omitempty"`
 	ThumbnailURL    *string    `gorm:"size:1024" json:"thumbnailUrl,omitempty"`
 	IsPublic        bool       `gorm:"not null;default:false" json:"isPublic"`
-	Status          string     `gorm:"size:32;not null;default:'ready'" json:"status"`
+	Status          string     `gorm:"size:32;not null;default:'ready'" json:"status" enums:"ready,pulling,failed" example:"ready"`
 	ErrorMessage    *string    `gorm:"type:text" json:"errorMessage,omitempty"`
 	PullProgress    *int       `gorm:"-" json:"pullProgress,omitempty"`
 	CreatedByUserID *uuid.UUID `gorm:"type:uuid" json:"createdByUserId,omitempty"`

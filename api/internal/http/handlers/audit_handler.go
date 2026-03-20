@@ -20,6 +20,16 @@ func NewAuditHandler(audit *services.AuditService) *AuditHandler {
 	return &AuditHandler{audit: audit}
 }
 
+// List godoc
+// @Summary      List audit logs
+// @Description  Returns recent audit log entries, optionally limited
+// @Tags         AuditLogs
+// @Security     BearerAuth
+// @Produce      json
+// @Param        limit query int false "Max entries (1-200, default 50)"
+// @Success      200 {array} models.AuditLog
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/audit-logs [get]
 func (h *AuditHandler) List(c echo.Context) error {
 	limit := 50
 	if value := c.QueryParam("limit"); value != "" {

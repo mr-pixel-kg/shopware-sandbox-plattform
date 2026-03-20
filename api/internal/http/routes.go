@@ -15,6 +15,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"gorm.io/gorm"
 )
 
@@ -67,9 +68,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	sandboxHandler := handlers.NewSandboxHandler(sandboxService)
 	auditHandler := handlers.NewAuditHandler(auditService)
 
-	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-	})
+	e.GET("/health", healthCheck)
 
 	api := e.Group("/api")
 	public := api.Group("/public")
@@ -103,24 +102,10 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	private.POST("/sandboxes/:id/snapshot", sandboxHandler.Snapshot)
 	private.GET("/audit-logs", auditHandler.List)
 
-	e.File("/swagger/openapi.yaml", "docs/openapi.yaml")
-	e.GET("/swagger", func(c echo.Context) error {
-		return c.HTML(http.StatusOK, `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Swagger UI</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-</head>
-<body>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    window.ui = SwaggerUIBundle({ url: '/swagger/openapi.yaml', dom_id: '#swagger-ui' });
-  </script>
-</body>
-</html>`)
+	e.GET("/docs", func(c echo.Context) error {
+		return c.Redirect(http.StatusMovedPermanently, "/docs/index.html")
 	})
+	e.GET("/docs/*", echoSwagger.WrapHandler)
 
 	slog.Info("http routes registered",
 		"public_routes", 4,
@@ -130,6 +115,17 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	)
 
 	return &Server{echo: e, cfg: cfg}, nil
+}
+
+// healthCheck godoc
+// @Summary      Health check
+// @Description  Returns service health status
+// @Tags         System
+// @Produce      json
+// @Success      200 {object} dto.HealthResponse
+// @Router       /health [get]
+func healthCheck(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) Start() error {

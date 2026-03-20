@@ -24,6 +24,14 @@ func NewImageHandler(images *services.ImageService, audit *services.AuditService
 	return &ImageHandler{images: images, audit: audit}
 }
 
+// ListPublic godoc
+// @Summary      List public images
+// @Description  Returns all images marked as public
+// @Tags         Images
+// @Produce      json
+// @Success      200 {array} models.Image
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/public/images [get]
 func (h *ImageHandler) ListPublic(c echo.Context) error {
 
 	images, err := h.images.ListPublic()
@@ -34,6 +42,15 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 	return c.JSON(200, images)
 }
 
+// ListAll godoc
+// @Summary      List all images
+// @Description  Returns all images including private ones
+// @Tags         Images
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {array} models.Image
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images [get]
 func (h *ImageHandler) ListAll(c echo.Context) error {
 
 	images, err := h.images.ListAll()
@@ -44,6 +61,17 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 	return c.JSON(200, images)
 }
 
+// Create godoc
+// @Summary      Create an image
+// @Description  Register a new Docker image. If not available locally, a background pull is started.
+// @Tags         Images
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.CreateImageRequest true "Image details"
+// @Success      201 {object} models.Image
+// @Failure      400 {object} dto.ErrorResponse
+// @Router       /api/images [post]
 func (h *ImageHandler) Create(c echo.Context) error {
 	var input dto.CreateImageRequest
 	if err := c.Bind(&input); err != nil {
@@ -81,6 +109,16 @@ func (h *ImageHandler) Create(c echo.Context) error {
 	return c.JSON(201, image)
 }
 
+// Delete godoc
+// @Summary      Delete an image
+// @Description  Remove a Docker image registration
+// @Tags         Images
+// @Security     BearerAuth
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id} [delete]
 func (h *ImageHandler) Delete(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -98,6 +136,16 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 	return c.NoContent(204)
 }
 
+// PullProgress godoc
+// @Summary      Stream image pull progress
+// @Description  SSE endpoint streaming pull progress events. Each event is JSON with "percent" (int) and "status" (string) fields.
+// @Tags         Images
+// @Produce      text/event-stream
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      200 {string} string "SSE stream"
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/progress [get]
 func (h *ImageHandler) PullProgress(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

@@ -1,0 +1,792 @@
+basePath: /
+definitions:
+  dto.AuthLoginResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  dto.CreateImageRequest:
+    properties:
+      description:
+        type: string
+      isPublic:
+        type: boolean
+      name:
+        type: string
+      tag:
+        type: string
+      thumbnailUrl:
+        type: string
+      title:
+        type: string
+    required:
+    - name
+    - tag
+    type: object
+  dto.CreateSandboxRequest:
+    properties:
+      imageId:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        format: uuid
+        type: string
+      ttlMinutes:
+        type: integer
+    required:
+    - imageId
+    type: object
+  dto.CreateSnapshotRequest:
+    properties:
+      description:
+        type: string
+      isPublic:
+        type: boolean
+      name:
+        type: string
+      tag:
+        type: string
+      thumbnailUrl:
+        type: string
+      title:
+        type: string
+    required:
+    - name
+    - tag
+    type: object
+  dto.ErrorDetail:
+    properties:
+      code:
+        example: VALIDATION_ERROR
+        type: string
+      details:
+        type: object
+      message:
+        example: Invalid request body
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/dto.ErrorDetail'
+    type: object
+  dto.ExtendTTLRequest:
+    properties:
+      ttlMinutes:
+        type: integer
+    type: object
+  dto.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.AuditLog:
+    properties:
+      action:
+        type: string
+      createdAt:
+        type: string
+      details:
+        type: object
+      id:
+        type: string
+      ipAddress:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.Image:
+    properties:
+      createdAt:
+        type: string
+      createdByUserId:
+        type: string
+      description:
+        type: string
+      errorMessage:
+        type: string
+      id:
+        type: string
+      isPublic:
+        type: boolean
+      name:
+        type: string
+      pullProgress:
+        type: integer
+      status:
+        enum:
+        - ready
+        - pulling
+        - failed
+        example: ready
+        type: string
+      tag:
+        type: string
+      thumbnailUrl:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Sandbox:
+    properties:
+      clientIp:
+        type: string
+      containerId:
+        type: string
+      containerName:
+        type: string
+      createdAt:
+        type: string
+      createdByUserId:
+        type: string
+      expiresAt:
+        type: string
+      guestSessionId:
+        type: string
+      id:
+        type: string
+      imageId:
+        type: string
+      lastSeenAt:
+        type: string
+      port:
+        type: integer
+      status:
+        allOf:
+        - $ref: '#/definitions/models.SandboxStatus'
+        enum:
+        - starting
+        - running
+        - stopped
+        - expired
+        - deleted
+        - failed
+        example: running
+      updatedAt:
+        type: string
+      url:
+        type: string
+    type: object
+  models.SandboxStatus:
+    enum:
+    - starting
+    - running
+    - stopped
+    - expired
+    - deleted
+    - failed
+    type: string
+    x-enum-varnames:
+    - SandboxStatusStarting
+    - SandboxStatusRunning
+    - SandboxStatusStopped
+    - SandboxStatusExpired
+    - SandboxStatusDeleted
+    - SandboxStatusFailed
+  models.User:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API for managing public demo sandboxes and internal employee sandboxes.
+  title: Shopshredder Sandbox API
+  version: 1.0.0
+paths:
+  /api/audit-logs:
+    get:
+      description: Returns recent audit log entries, optionally limited
+      parameters:
+      - description: Max entries (1-200, default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AuditLog'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit logs
+      tags:
+      - AuditLogs
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password, receive a JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuthLoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Log in
+      tags:
+      - Auth
+  /api/auth/logout:
+    post:
+      description: Invalidate the current session token
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Log out
+      tags:
+      - Auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with email and password
+      parameters:
+      - description: Registration credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - Auth
+  /api/images:
+    get:
+      description: Returns all images including private ones
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Image'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all images
+      tags:
+      - Images
+    post:
+      consumes:
+      - application/json
+      description: Register a new Docker image. If not available locally, a background
+        pull is started.
+      parameters:
+      - description: Image details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateImageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Image'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create an image
+      tags:
+      - Images
+  /api/images/{id}:
+    delete:
+      description: Remove a Docker image registration
+      parameters:
+      - description: Image ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an image
+      tags:
+      - Images
+  /api/images/{id}/progress:
+    get:
+      description: SSE endpoint streaming pull progress events. Each event is JSON
+        with "percent" (int) and "status" (string) fields.
+      parameters:
+      - description: Image ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Stream image pull progress
+      tags:
+      - Images
+  /api/me:
+    get:
+      description: Return the authenticated user's profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Auth
+  /api/me/sandboxes:
+    get:
+      description: Returns sandboxes owned by the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Sandbox'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my sandboxes
+      tags:
+      - Sandboxes
+  /api/public/demos:
+    post:
+      consumes:
+      - application/json
+      description: Spin up a new sandbox for a guest visitor
+      parameters:
+      - description: Sandbox configuration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSandboxRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Sandbox'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Create a public demo sandbox
+      tags:
+      - Public
+  /api/public/images:
+    get:
+      description: Returns all images marked as public
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Image'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List public images
+      tags:
+      - Images
+  /api/public/sandboxes:
+    get:
+      description: Returns sandboxes for the current guest session (cookie-based)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Sandbox'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List guest sandboxes
+      tags:
+      - Public
+  /api/public/sandboxes/{id}:
+    delete:
+      description: Stop and remove a guest session's sandbox
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Delete a guest sandbox
+      tags:
+      - Public
+  /api/sandboxes:
+    get:
+      description: Returns all sandboxes that are currently active (admin view)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Sandbox'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all active sandboxes
+      tags:
+      - Sandboxes
+    post:
+      consumes:
+      - application/json
+      description: Spin up a new sandbox for an authenticated user
+      parameters:
+      - description: Sandbox configuration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSandboxRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Sandbox'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a private sandbox
+      tags:
+      - Sandboxes
+  /api/sandboxes/{id}:
+    delete:
+      description: Stop and remove an authenticated user's sandbox
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a sandbox
+      tags:
+      - Sandboxes
+    get:
+      description: Returns a single sandbox by its UUID
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Sandbox'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get sandbox by ID
+      tags:
+      - Sandboxes
+  /api/sandboxes/{id}/snapshot:
+    post:
+      consumes:
+      - application/json
+      description: Commit the current state of a running sandbox as a new Docker image
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Snapshot metadata
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSnapshotRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Image'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a snapshot image from a sandbox
+      tags:
+      - Sandboxes
+  /api/sandboxes/{id}/ttl:
+    patch:
+      consumes:
+      - application/json
+      description: Add additional time to a sandbox's expiration
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: TTL extension
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ExtendTTLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Sandbox'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Extend sandbox TTL
+      tags:
+      - Sandboxes
+  /health:
+    get:
+      description: Returns service health status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.HealthResponse'
+      summary: Health check
+      tags:
+      - System
+securityDefinitions:
+  BearerAuth:
+    description: Enter "Bearer {token}"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

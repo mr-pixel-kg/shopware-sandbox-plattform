@@ -119,6 +119,11 @@ tasks:
             ORDER BY tablename;
           "
 
+  api:swagger:
+    desc: Generate Swagger/OpenAPI docs from code annotations
+    run:
+      - cmd: cd api && go generate ./cmd/api
+
   docker:purge-dockware:
     desc: Fully purge all dockware images, containers, build cache, and layers
     run:
