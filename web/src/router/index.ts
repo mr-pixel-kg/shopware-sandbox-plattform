@@ -18,7 +18,7 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/sandboxes',
+      redirect: '/explore',
     },
     {
       path: '/sandboxes',
@@ -57,7 +57,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/sandboxes',
+      redirect: '/explore',
     },
   ],
 })

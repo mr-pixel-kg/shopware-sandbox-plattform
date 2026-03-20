@@ -1,75 +1,172 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useImages } from '@/composables/useImages'
-import { useSandboxesStore } from '@/stores/sandboxes.store'
+import { useSandboxes } from '@/composables/useSandboxes'
 import { useAuthStore } from '@/stores/auth.store'
 import { getApiErrorMessage } from '@/utils/error'
 import { toast } from 'vue-sonner'
+import { ExternalLink, Play, Square } from 'lucide-vue-next'
+import type { Image, Sandbox } from '@/types'
+import type { CardAction } from '@/components/explore/ActionButton.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
-import FilterBar from '@/components/explore/FilterBar.vue'
 import PresetGrid from '@/components/explore/PresetGrid.vue'
 import CardGridSkeleton from '@/components/shared/CardGridSkeleton.vue'
-import NewSandboxDialog from '@/components/modals/NewSandboxDialog.vue'
+import SandboxCard from '@/components/explore/SandboxCard.vue'
+import type { MetadataGroup } from '@/components/explore/SandboxCard.vue'
 
-const { images, loading } = useImages()
-const sandboxesStore = useSandboxesStore()
+const { images, loading: imagesLoading } = useImages()
+const {
+  activeSandboxes,
+  loading: sandboxesLoading,
+  createPublicDemo,
+  createSandbox,
+  deleteSandbox,
+  refresh: refreshSandboxes,
+} = useSandboxes()
 const authStore = useAuthStore()
 
-const filter = ref('all')
-const showNewSandbox = ref(false)
-const preselectedImageId = ref<string | undefined>()
+const creatingImageId = ref<string>()
+const stoppingSandboxId = ref<string>()
 
-const filteredImages = computed(() => {
-  if (filter.value === 'all') return images.value
-  if (filter.value === 'public') return images.value.filter((i) => i.isPublic)
-  if (filter.value === 'private') return images.value.filter((i) => !i.isPublic)
-  return images.value
-})
+const hasActiveSandboxes = computed(() => activeSandboxes.value.length > 0)
 
-function handleStart(imageId: string) {
-  preselectedImageId.value = imageId
-  showNewSandbox.value = true
+function getImageTitle(sandbox: Sandbox): string {
+  const image = images.value.find((i) => i.id === sandbox.imageId)
+  return image?.title || image?.name || sandbox.containerName
 }
 
-async function handleCreateSandbox(
-  payload: { imageId: string; ttlMinutes: number },
-  done: (success: boolean) => void,
-) {
+// TODO: Replace with dynamic schema from API
+const sandboxActionsMap = computed(() => {
+  const map: Record<string, CardAction[]> = {}
+  for (const sandbox of activeSandboxes.value) {
+    const actions: CardAction[] = []
+    if (sandbox.url && sandbox.status === 'running') {
+      actions.push({
+        label: 'Öffnen',
+        href: sandbox.url,
+        variant: 'default',
+        icon: ExternalLink,
+      })
+    }
+    if (sandbox.status === 'running' || sandbox.status === 'starting') {
+      actions.push({
+        label: 'Stoppen',
+        variant: 'destructive',
+        icon: Square,
+        loading: stoppingSandboxId.value === sandbox.id,
+        disabled: !!stoppingSandboxId.value && stoppingSandboxId.value !== sandbox.id,
+        onClick: () => handleStopSandbox(sandbox),
+      })
+    }
+    map[sandbox.id] = actions
+  }
+  return map
+})
+
+// TODO: Replace with dynamic schema from API
+const sandboxMetadataMap = computed(() => {
+  const map: Record<string, MetadataGroup[]> = {}
+  for (const sandbox of activeSandboxes.value) {
+    map[sandbox.id] = [
+      {
+        title: 'Zugangsdaten',
+        fields: [
+          { label: 'Benutzername', value: 'admin' },
+          { label: 'Passwort', value: 'shopware', secret: true },
+        ],
+      },
+    ]
+  }
+  return map
+})
+
+// TODO: Replace with dynamic schema from API
+function getPresetActions(image: Image): CardAction[] {
+  return [
+    {
+      label: 'Demo starten',
+      variant: 'default',
+      icon: Play,
+      loading: creatingImageId.value === image.id,
+      disabled: !!creatingImageId.value && creatingImageId.value !== image.id,
+      onClick: () => handleDemo(image.id),
+    },
+  ]
+}
+
+async function handleStopSandbox(sandbox: Sandbox) {
+  if (stoppingSandboxId.value) return
+  stoppingSandboxId.value = sandbox.id
   try {
     if (authStore.isAuthenticated) {
-      await sandboxesStore.createSandbox(payload)
+      await deleteSandbox(sandbox.id)
     } else {
-      await sandboxesStore.createPublicDemo(payload)
+      const { sandboxesApi } = await import('@/api')
+      await sandboxesApi.removeGuest(sandbox.id)
+      refreshSandboxes()
     }
-    toast.success('Sandbox wird gestartet')
-    done(true)
+    toast.success('Sandbox wird gestoppt')
   } catch (e) {
-    toast.error(getApiErrorMessage(e, 'Fehler beim Starten der Sandbox'))
-    done(false)
+    toast.error(getApiErrorMessage(e, 'Fehler beim Stoppen'))
+  } finally {
+    stoppingSandboxId.value = undefined
+  }
+}
+
+async function handleDemo(imageId: string) {
+  if (creatingImageId.value) return
+  creatingImageId.value = imageId
+  try {
+    if (authStore.isAuthenticated) {
+      await createSandbox({ imageId })
+    } else {
+      await createPublicDemo({ imageId })
+    }
+    toast.success('Demo wird gestartet')
+    refreshSandboxes()
+  } catch (e) {
+    toast.error(getApiErrorMessage(e, 'Fehler beim Starten der Demo'))
+  } finally {
+    creatingImageId.value = undefined
   }
 }
 </script>
 
 <template>
   <div>
-    <PageHeader title="Entdecken" subtitle="Starte eine Sandbox aus einer verfügbaren Vorlage." />
-
-    <div class="space-y-6">
-      <FilterBar v-model="filter" />
-
-      <CardGridSkeleton v-if="loading" :count="6" />
-      <PresetGrid
-        v-else
-        :images="filteredImages"
-        @start="handleStart"
-      />
-    </div>
-
-    <NewSandboxDialog
-      v-model:open="showNewSandbox"
-      :images="images"
-      :preselected-image-id="preselectedImageId"
-      @submit="handleCreateSandbox"
+    <PageHeader
+      title="Entdecken"
+      subtitle="Starte eine Demo aus einer verfügbaren Vorlage — kein Account nötig."
     />
+
+    <div class="space-y-8">
+      <section v-if="hasActiveSandboxes || sandboxesLoading">
+        <h3 class="text-sm font-medium text-muted-foreground mb-3">Meine Sandboxes</h3>
+        <CardGridSkeleton v-if="sandboxesLoading" :count="2" />
+        <div
+          v-else-if="hasActiveSandboxes"
+          class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4"
+        >
+          <SandboxCard
+            v-for="sandbox in activeSandboxes"
+            :key="sandbox.id"
+            :sandbox="sandbox"
+            :title="getImageTitle(sandbox)"
+            :actions="sandboxActionsMap[sandbox.id]"
+            :metadata="sandboxMetadataMap[sandbox.id]"
+          />
+        </div>
+      </section>
+
+      <section>
+        <h3 class="text-sm font-medium text-muted-foreground mb-3">Vorlagen</h3>
+        <CardGridSkeleton v-if="imagesLoading" :count="6" />
+        <PresetGrid
+          v-else
+          :images="images"
+          :get-actions="getPresetActions"
+        />
+      </section>
+    </div>
   </div>
 </template>

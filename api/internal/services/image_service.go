@@ -39,11 +39,12 @@ const (
 var ErrUnsupportedThumbnailFormat = errors.New("unsupported thumbnail format")
 
 type ImageService struct {
-	repo         *repositories.ImageRepository
-	sandboxRepo  *repositories.SandboxRepository
-	docker       docker.Client
-	tracker      *docker.PullTracker
-	thumbnailDir string
+	repo          *repositories.ImageRepository
+	sandboxRepo   *repositories.SandboxRepository
+	docker        docker.Client
+	tracker       *docker.PullTracker
+	thumbnailDir  string
+	publicBaseURL string
 
 	mu           sync.RWMutex
 	pullCancels  map[string]context.CancelFunc
@@ -55,16 +56,18 @@ func NewImageService(
 	sandboxRepo *repositories.SandboxRepository,
 	dockerClient docker.Client,
 	tracker *docker.PullTracker,
+	publicBaseURL string,
 	thumbnailDir string,
 ) *ImageService {
 	service := &ImageService{
-		repo:         repo,
-		sandboxRepo:  sandboxRepo,
-		docker:       dockerClient,
-		tracker:      tracker,
-		thumbnailDir: thumbnailDir,
-		pullCancels:  make(map[string]context.CancelFunc),
-		pendingPulls: make(map[string]*PendingPull),
+		repo:          repo,
+		sandboxRepo:   sandboxRepo,
+		docker:        dockerClient,
+		tracker:       tracker,
+		thumbnailDir:  thumbnailDir,
+		publicBaseURL: strings.TrimRight(publicBaseURL, "/"),
+		pullCancels:   make(map[string]context.CancelFunc),
+		pendingPulls:  make(map[string]*PendingPull),
 	}
 
 	if err := os.MkdirAll(service.thumbnailDir, 0o755); err != nil {

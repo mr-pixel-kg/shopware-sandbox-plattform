@@ -1,39 +1,50 @@
 <script setup lang="ts">
 import type { Image } from '@/types'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Play } from 'lucide-vue-next'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Package } from 'lucide-vue-next'
+import ActionButton from './ActionButton.vue'
+import type { CardAction } from './ActionButton.vue'
 
 defineProps<{
   image: Image
-}>()
-
-const emit = defineEmits<{
-  start: [imageId: string]
+  actions: CardAction[]
 }>()
 </script>
 
 <template>
-  <Card class="flex flex-col h-[200px]">
-    <CardHeader class="pb-3">
-      <div class="flex items-start justify-between">
-        <CardTitle class="text-sm font-medium">{{ image.title || image.name }}</CardTitle>
+  <Card class="overflow-hidden pt-0">
+    <div class="relative h-36 bg-muted flex items-center justify-center">
+      <img
+        v-if="image.thumbnailUrl"
+        :src="image.thumbnailUrl"
+        :alt="image.title || image.name"
+        class="h-full w-full object-cover"
+      />
+      <Package v-else class="h-10 w-10 text-muted-foreground/40" />
+    </div>
+    <CardHeader class="flex-1">
+      <div>
+        <CardTitle class="text-sm">{{ image.title || image.name }}</CardTitle>
+        <p class="text-xs text-muted-foreground font-mono mt-0.5">{{ image.name }}:{{ image.tag }}</p>
       </div>
-      <Badge variant="secondary" class="w-fit text-xs">
-        {{ image.name }}:{{ image.tag }}
-      </Badge>
-    </CardHeader>
-    <CardContent class="flex-1 pb-3">
-      <p v-if="image.description" class="text-sm text-muted-foreground line-clamp-2">
+      <CardDescription v-if="image.description" class="line-clamp-2">
         {{ image.description }}
-      </p>
-    </CardContent>
-    <CardFooter>
-      <Button size="sm" class="w-full" @click="emit('start', image.id)">
-        <Play class="h-4 w-4 mr-1" />
-        Starten
-      </Button>
+      </CardDescription>
+    </CardHeader>
+    <!-- TODO: Replace with dynamic schema from API -->
+    <CardFooter class="flex gap-2 mt-auto">
+      <ActionButton
+        v-for="action in actions"
+        :key="action.label"
+        :action="action"
+      />
     </CardFooter>
   </Card>
 </template>

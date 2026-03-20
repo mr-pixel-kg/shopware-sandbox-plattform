@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import type { Image } from '@/types'
+import type { CardAction } from './ActionButton.vue'
 import PresetCard from './PresetCard.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
 
 defineProps<{
   images: Image[]
-}>()
-
-const emit = defineEmits<{
-  start: [imageId: string]
+  getActions: (image: Image) => CardAction[]
 }>()
 </script>
 
@@ -21,12 +19,12 @@ const emit = defineEmits<{
       v-for="image in images"
       :key="image.id"
       :image="image"
-      @start="emit('start', $event)"
+      :actions="getActions(image)"
     />
   </div>
   <EmptyState
     v-else
     title="Keine Vorlagen gefunden"
-    description="Es sind keine Vorlagen für diesen Filter verfügbar."
+    description="Es sind keine Vorlagen verfügbar."
   />
 </template>

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut } from 'lucide-vue-next'
+import logo from '@/assets/logo.png'
 
 const authStore = useAuthStore()
 const { user, isAuthenticated, isAdmin } = storeToRefs(authStore)
@@ -41,15 +42,16 @@ function getInitials(email: string): string {
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
+  router.push('/explore')
 }
 </script>
 
 <template>
   <header class="sticky top-0 z-50 border-b bg-background">
     <div class="mx-auto w-full max-w-6xl flex h-14 items-center gap-4 px-6">
-      <RouterLink to="/" class="text-sm font-semibold">
-        Sandbox Environment
+      <RouterLink to="/" class="flex items-center gap-2 text-sm font-semibold">
+        <img :src="logo" class="h-7" alt="Shopshredder.de Logo" />
+        Shopshredder.de
       </RouterLink>
 
       <nav v-if="isAuthenticated" class="flex items-center gap-1 ml-4">
