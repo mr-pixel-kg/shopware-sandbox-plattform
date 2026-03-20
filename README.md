@@ -2,137 +2,217 @@
 
 This application allows you to create demo shops in a docker environment.
 
+## Quick Start
 
-Start application with docker compose:
-```
-docker-compose up --build
+### 1. Setup configuration
+
+```bash
+cp .env.example .env                      # edit docker socket path and db credentials
+cp api/config.example.yml api/config.yml  # edit with your API settings
 ```
 
+Or using [bab](https://bab.sh):
+
+```bash
+bab setup
+```
+
+### 2. Start development
+
+```bash
+bab dev
+```
+
+This starts the database via Docker, then runs the API and web frontend dev servers in parallel.
+
+### 3. Access
+
+- **Web Frontend:** http://localhost:5173
+- **API:** http://localhost:8080
+
+## Architecture
+
+| Component | Directory | Stack                                |
+|-----------|-----------|--------------------------------------|
+| Api       | `/api/`   | Go, Echo, GORM, PostgreSQL, JWT Auth |
+| Web       | `/web/`   | Vue 3, Shadcn-vue, TypeScript, pnpm  |
 
 ## Configuration Guide
 
-This document provides an overview of the configuration settings for the application.  
-The configuration is loaded from a `config.yml` file and can be overridden using environment variables.
+### Configuration File (`api/config.yml`)
 
-### Configuration File (`config.yml`)
-
-The application configuration is structured as follows:
+Copy `api/config.example.yml` to `api/config.yml` and edit with your settings.
+The example is pre-configured for local development (localhost database, dev JWT secret, Traefik disabled).
 
 ```yaml
 server:
   port: 8080
+  app_url: "http://localhost:8080"
   allowed_origins:
     - "http://localhost:5173"
-    - "https://www.shopshredder.de"
     - "http://localhost:8000"
-    - "http://localhost:80"
-  app_url: "http://localhost"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "mrpix_sandbox"
+  password: "sandXbox_mrpix2025"
+  name: "mrpix_sandbox"
+  sslmode: "disable"
+
+auth:
+  jwt_secret: "local-dev-secret"
+  jwt_ttl_minutes: 480
+  guest_jwt_ttl_minutes: 43200
+  guest_cookie_name: "shopshredder_guest"
 
 sandbox:
   url_prefix: "sandbox-"
-  url_suffix: ".shopshredder.de"
+  url_suffix: ".localhost"
   default_lifetime: 60
+  max_lifetime: 1440
+  cleanup_interval_seconds: 60
+  internal_port: 80
 
-auth:
-  username: "admin"
-  password: "password"
+docker:
+  mode: "port"
+  network: "internal"
+  traefik_enable: false
+  traefik_entrypoints: "websecure"
+  traefik_certresolver: "production"
+  traefik_middlewares: "sandbox-middleware@file,https-redirect@file"
+  snapshot_author: "shopshredder-api"
+  snapshot_comment: "Sandbox snapshot created by Shopshredder API"
 
 guard:
   max_total_sandboxes: 32
   max_sandboxes_per_ip: 5
-  max_sandbox_lifetime: 60
-
-#database:
-#  host: "localhost"
-#  port: 5432
-#  user: "postgres"
-#  password: "password"
-#  name: "appdb"
+  max_sandboxes_per_user: 10
 ```
-
 
 ### Configuration Overview
 
-| Section   | 	Key                  | 	Type    | 	Default            | 	Description                                            |
-|-----------|-----------------------|----------|---------------------|---------------------------------------------------------|
-| server    | 	port                 | 	int	    | 8080                | 	The port on which the server runs.                     |
-|           | allowed_origins       | 	array   | 	[]                 | 	List of allowed CORS origins.                          |
-|           | app_url               | 	string  | 	"http://localhost" | 	The base URL of the application.                       |
-| sandbox   | 	url_prefix           | 	string  | 	"sandbox-"         | 	Prefix for sandbox URLs.                               |
-|           | url_suffix            | 	string  | 	".shopshredder.de" | 	Suffix for sandbox URLs.                               |
-|           | default_lifetime      | 	int	    | 60                  | 	Default sandbox lifetime in minutes.                   |
-| auth      | 	username             | 	string  | 	"admin"            | 	Username for basic authentication.                     |
-|           | password              | 	string	 | "password"          | 	Password for basic authentication.                     |
-| guard     | 	max_total_sandboxes  | 	int	    | 32                  | 	Maximum number of sandboxes allowed in total.          |
-|           | max_sandboxes_per_ip  | 	int	    | 5                   | 	Maximum number of concurrent sandboxes per IP address. |
-|           | max_sandbox_lifetime	 | int	     | 60                  | 	Maximum sandbox lifetime in minutes.                   |
-| database* | 	host                 | 	string  | 	"localhost"        | 	Database host address.                                 |
-|           | port                  | 	int     | 	5432               | 	Database port.                                         |
-|           | user                  | 	string  | 	"postgres"         | 	Database username.                                     |
-|           | password              | 	string  | 	"password"         | 	Database password.                                     |
-|           | name                  | 	string  | 	"appdb"            | 	Database name.                                         |
-| sentry**  | dsn                   | 	string  | 	                   | 	Sentry DSN.                                            |
-
-*Database configuration is currently disabled. Uncomment it in config.yml to enable.
-If no database is specified a SQLite database is used automatically.
-**Sentry configuration is currently disabled. Uncomment it in config.yml to enable.
+| Section  | Key                      | Type   | Default                 | Description                                            |
+|----------|--------------------------|--------|-------------------------|--------------------------------------------------------|
+| server   | port                     | int    | 8080                    | The port on which the server runs.                     |
+|          | app_url                  | string | "http://localhost:8080" | The base URL of the application.                       |
+|          | allowed_origins          | array  | []                      | List of allowed CORS origins.                          |
+| database | host                     | string | "localhost"             | Database host address.                                 |
+|          | port                     | int    | 5432                    | Database port.                                         |
+|          | user                     | string | "mrpix_sandbox"         | Database username.                                     |
+|          | password                 | string | "sandXbox_mrpix2025"    | Database password.                                     |
+|          | name                     | string | "mrpix_sandbox"         | Database name.                                         |
+|          | sslmode                  | string | "disable"               | PostgreSQL SSL mode.                                   |
+| auth     | jwt_secret               | string | "local-dev-secret"      | JWT signing secret.                                    |
+|          | jwt_ttl_minutes          | int    | 480                     | JWT token TTL in minutes.                              |
+|          | guest_jwt_ttl_minutes    | int    | 43200                   | Guest JWT token TTL in minutes.                        |
+|          | guest_cookie_name        | string | "shopshredder_guest"    | Cookie name for guest tokens.                          |
+| sandbox  | url_prefix               | string | "sandbox-"              | Prefix for sandbox URLs.                               |
+|          | url_suffix               | string | ".localhost"            | Suffix for sandbox URLs.                               |
+|          | default_lifetime         | int    | 60                      | Default sandbox lifetime in minutes.                   |
+|          | max_lifetime             | int    | 1440                    | Maximum sandbox lifetime in minutes.                   |
+|          | cleanup_interval_seconds | int    | 60                      | Interval between cleanup runs in seconds.              |
+|          | internal_port            | int    | 80                      | Internal container port.                               |
+| docker   | mode                     | string | "port"                  | Docker mode ("port" or "traefik").                     |
+|          | network                  | string | "internal"              | Docker network name.                                   |
+|          | traefik_enable           | bool   | false                   | Enable Traefik integration.                            |
+|          | traefik_entrypoints      | string | "websecure"             | Traefik entrypoints.                                   |
+|          | traefik_certresolver     | string | "production"            | Traefik certificate resolver.                          |
+|          | traefik_middlewares      | string | ""                      | Traefik middlewares (comma-separated).                 |
+|          | snapshot_author          | string | "shopshredder-api"      | Author for container snapshots.                        |
+|          | snapshot_comment         | string | ""                      | Comment for container snapshots.                       |
+| guard    | max_total_sandboxes      | int    | 32                      | Maximum number of sandboxes allowed in total.          |
+|          | max_sandboxes_per_ip     | int    | 5                       | Maximum number of concurrent sandboxes per IP address. |
+|          | max_sandboxes_per_user   | int    | 10                      | Maximum number of concurrent sandboxes per user.       |
 
 ### Overriding Configuration with Environment Variables
+
 The application supports environment variables to override configuration values.
-Here is a list of environment variables and their corresponding settings:
 
-| Environment Variable        | Corresponding Config Key   |
-|-----------------------------|----------------------------|
-| SERVER_PORT	                | server.port                |
-| SANDBOX_URL_PREFIX          | sandbox.url_prefix         |
-| SANDBOX_URL_SUFFIX          | sandbox.url_suffix         |
-| SANDBOX_DEFAULT_LIFETIME    | sandbox.default_lifetime   |
-| AUTH_USERNAME               | auth.username              |
-| AUTH_PASSWORD               | auth.password              |
-| GUARD_MAX_TOTAL_SANDBOXES   | guard.max_total_sandboxes  |
-| GUARD_MAX_SANDBOXES_PER_IP	 | guard.max_sandboxes_per_ip |
-| GUARD_MAX_SANDBOX_LIFETIME	 | guard.max_sandbox_lifetime |
-| SENTRY_DSN                  | sentry.dsn                 |
+| Environment Variable         | Corresponding Config Key     |
+|------------------------------|------------------------------|
+| SERVER_PORT                  | server.port                  |
+| SERVER_APP_URL               | server.app_url               |
+| DATABASE_HOST                | database.host                |
+| DATABASE_PORT                | database.port                |
+| DATABASE_USER                | database.user                |
+| DATABASE_PASSWORD            | database.password            |
+| DATABASE_NAME                | database.name                |
+| DATABASE_SSLMODE             | database.sslmode             |
+| AUTH_JWT_SECRET              | auth.jwt_secret              |
+| AUTH_JWT_TTL_MINUTES         | auth.jwt_ttl_minutes         |
+| SANDBOX_URL_PREFIX           | sandbox.url_prefix           |
+| SANDBOX_URL_SUFFIX           | sandbox.url_suffix           |
+| SANDBOX_DEFAULT_LIFETIME     | sandbox.default_lifetime     |
+| SANDBOX_MAX_LIFETIME         | sandbox.max_lifetime         |
+| DOCKER_MODE                  | docker.mode                  |
+| DOCKER_NETWORK               | docker.network               |
+| DOCKER_TRAEFIK_ENABLE        | docker.traefik_enable        |
+| GUARD_MAX_TOTAL_SANDBOXES    | guard.max_total_sandboxes    |
+| GUARD_MAX_SANDBOXES_PER_IP   | guard.max_sandboxes_per_ip   |
+| GUARD_MAX_SANDBOXES_PER_USER | guard.max_sandboxes_per_user |
 
+### Docker Compose Environment (`.env`)
+
+Copied from `.env.example`. Controls Docker and database settings:
+
+| Variable             | Description                                    | Default                 |
+|----------------------|------------------------------------------------|-------------------------|
+| `DOCKER_SOCKET_PATH` | Path to Docker socket (differs macOS vs Linux) | `/var/run/docker.sock`  |
+| `POSTGRES_USER`      | PostgreSQL username                            | `mrpix_sandbox`         |
+| `POSTGRES_PASSWORD`  | PostgreSQL password                            | /                       |
+| `POSTGRES_DB`        | PostgreSQL database name                       | `mrpix_sandbox`         |
+| `WEB_API_URL`        | API URL for web frontend                       | `http://localhost:8080` |
 
 ## Development
 
 This project uses automated CI/CD pipeline and pushes production ready images to Github Packages.
-The configuration and build options can be found at ./github/workflows/release.yml
+The configuration and build options can be found at [.github/workflows/release.yml](.github/workflows/release.yml)
 
-### Backend
+### API (`/api/`)
 
-#### Change Docker Host
-If you have multiple users on your system, you maybe have to specify your docker host and run the application as root:
-```
-DOCKER_HOST=unix:///Users/<username>/.docker/run/docker.sock
+```bash
+bab api:dev
 ```
 
+Or manually:
 
-#### Swagger Docs
-Command to compile swagger documentation page under http://localhost:8080/swagger/index.html
-```
-swag init
-```
-
-
-### Frontend
-Start development server
-```
-yarn dev
+```bash
+cd api && go run ./cmd/api
 ```
 
-The `VITE_BACKEND_URL` can be set in the .env files. For production use, the pipeline will set the correct value by using docker build arguments.
+#### Docker Host (macOS)
+
+If using Docker Desktop on macOS, set your socket path in `.env`:
+
+```
+DOCKER_SOCKET_PATH=/Users/<username>/.docker/run/docker.sock
+```
+
+### Web Frontend (`/web/`)
+
+```bash
+bab web:dev
+```
+
+Or manually:
+
+```bash
+cp web/.env.example web/.env  # set WEB_API_URL
+cd web && pnpm install && pnpm dev
+```
 
 ### Custom Shopware Image Build
 
-In order to provide a Shopware sandbox image, you can not use the default dockware image because it has missing configuration options behind proxies.
-To avoid getting Mixed-Content and HSTS problems in your browser, you have to extend the dockware image and build a custom sandbox image.
+In order to provide a Shopware sandbox image, you can not use the default dockware image because it has missing
+configuration options behind proxies.
+To avoid getting Mixed-Content and HSTS problems in your browser, you have to extend the dockware image and build a
+custom sandbox image.
 Edit the Dockerfile in docker/images/.../Dockerfile and change the Shopware version in the FROM statement.
 In addition you can add your custom configuration files to the image by copying them into the image.
 
-
 Then, you can build your new image.
+
 ```bash
 docker build . -t mr-pixel/sw-sandbox:6.7.0.0-rc1
 ```
@@ -142,10 +222,28 @@ Now we have a plain shopware image that can be used for demo and testing purpose
 
 #### Custom Configuration
 
-However, in order to create demonstration images with custom configurations, you have to first start a new sandbox and choose your base image.
-Then you can open your sandbox in the browser and install plugins, custom themes and configure the entire store as you like.
+However, in order to create demonstration images with custom configurations, you have to first start a new sandbox and
+choose your base image.
+Then you can open your sandbox in the browser and install plugins, custom themes and configure the entire store as you
+like.
 
 After that you can create a new snapshot of the running sandbox container. Enter your image name and tag.
 Congrats, you have created a custom Shopware demo sandbox image. Don't forget to stop the running sandbox container.
 
+## Bab Tasks
 
+This project uses [bab](https://bab.sh) as a task runner. Available tasks:
+
+| Command              | Description                                  |
+|----------------------|----------------------------------------------|
+| `bab setup`          | Copy example configs for initial setup       |
+| `bab dev`            | Start infrastructure + API + web dev servers |
+| `bab api:dev`        | Run API locally                              |
+| `bab web:dev`        | Run web frontend dev server                  |
+| `bab docker:up`      | Start full stack                             |
+| `bab docker:infra`   | Start infrastructure only (database)         |
+| `bab docker:down`    | Stop all docker services                     |
+| `bab docker:destroy` | Stop services and remove volumes             |
+| `bab docker:logs`    | Follow logs from all services                |
+| `bab docker:status`  | Show running services                        |
+| `bab docker:build`   | Build all docker images                      |

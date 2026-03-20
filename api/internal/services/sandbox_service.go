@@ -24,6 +24,7 @@ var (
 
 type SandboxService struct {
 	cfg       config.SandboxConfig
+	dockerCfg config.DockerConfig
 	guard     config.GuardConfig
 	repo      *repositories.SandboxRepository
 	imageRepo *repositories.ImageRepository
@@ -35,6 +36,7 @@ type SandboxService struct {
 
 func NewSandboxService(
 	cfg config.SandboxConfig,
+	dockerCfg config.DockerConfig,
 	guard config.GuardConfig,
 	repo *repositories.SandboxRepository,
 	imageRepo *repositories.ImageRepository,
@@ -45,6 +47,7 @@ func NewSandboxService(
 ) *SandboxService {
 	return &SandboxService{
 		cfg:       cfg,
+		dockerCfg: dockerCfg,
 		guard:     guard,
 		repo:      repo,
 		imageRepo: imageRepo,
@@ -68,11 +71,11 @@ func (s *SandboxService) ListActive() ([]models.Sandbox, error) {
 }
 
 func (s *SandboxService) ListByUser(userID uuid.UUID) ([]models.Sandbox, error) {
-	return s.repo.ListActiveByUser(userID)
+	return s.repo.ListAllByUser(userID)
 }
 
 func (s *SandboxService) ListByGuestSession(sessionID uuid.UUID) ([]models.Sandbox, error) {
-	return s.repo.ListActiveByGuestSession(sessionID)
+	return s.repo.ListAllByGuestSession(sessionID)
 }
 
 func (s *SandboxService) FindByID(id uuid.UUID) (*models.Sandbox, error) {
@@ -100,7 +103,6 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 
 	sandboxID := uuid.New()
 	containerName := fmt.Sprintf("%s%s", s.cfg.URLPrefix, sandboxID.String())
-	hostname := fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	ttl := s.cfg.DefaultTTL
 	if input.TTL != nil {
 		ttl = *input.TTL
@@ -109,6 +111,11 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	// predictable even for authenticated users.
 	if ttl > s.cfg.MaxTTL {
 		ttl = s.cfg.MaxTTL
+	}
+
+	var hostname string
+	if s.dockerCfg.Mode == config.DockerModeTraefik {
+		hostname = fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	}
 
 	container, err := s.docker.CreateContainer(ctx, docker.SandboxCreateRequest{
@@ -129,7 +136,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		Status:          models.SandboxStatusRunning,
 		ContainerID:     container.ID,
 		ContainerName:   container.Name,
-		URL:             "https://" + hostname,
+		URL:             container.URL,
+		Port:            container.Port,
 		ClientIP:        input.ClientIP,
 		ExpiresAt:       &expiresAt,
 	}
@@ -156,25 +164,73 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	return sandbox, nil
 }
 
+func (s *SandboxService) ExtendTTL(id uuid.UUID, additionalMinutes int, clientIP string, userID *uuid.UUID) (*models.Sandbox, error) {
+	sandbox, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrSandboxNotFound
+	}
+
+	if sandbox.Status != models.SandboxStatusRunning && sandbox.Status != models.SandboxStatusStarting {
+		return nil, ErrSandboxNotFound
+	}
+
+	if sandbox.ExpiresAt == nil {
+		return nil, ErrSandboxNotFound
+	}
+
+	additional := time.Duration(additionalMinutes) * time.Minute
+	newExpiry := sandbox.ExpiresAt.Add(additional)
+
+	maxExpiry := time.Now().UTC().Add(s.cfg.MaxTTL)
+	if newExpiry.After(maxExpiry) {
+		newExpiry = maxExpiry
+	}
+
+	sandbox.ExpiresAt = &newExpiry
+	if err := s.repo.Update(sandbox); err != nil {
+		return nil, err
+	}
+
+	_ = s.addEvent(sandbox.ID, "extended", map[string]any{
+		"additionalMinutes": additionalMinutes,
+		"newExpiresAt":      newExpiry.Format(time.RFC3339),
+	})
+
+	_ = s.audit.Log(userID, "sandbox.extended", clientIP, map[string]any{
+		"sandboxId":         sandbox.ID.String(),
+		"additionalMinutes": additionalMinutes,
+	})
+
+	return sandbox, nil
+}
+
 func (s *SandboxService) Delete(ctx context.Context, id uuid.UUID, clientIP string, userID *uuid.UUID) error {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {
 		return ErrSandboxNotFound
 	}
 
-	if err := s.docker.DeleteContainer(ctx, sandbox.ContainerID); err != nil {
-		return err
-	}
+	isActive := sandbox.Status == models.SandboxStatusRunning || sandbox.Status == models.SandboxStatusStarting
 
-	now := time.Now().UTC()
-	sandbox.Status = models.SandboxStatusDeleted
-	sandbox.DeletedAt = &now
-	if err := s.repo.Update(sandbox); err != nil {
-		return err
-	}
+	if isActive {
+		// Soft delete: stop container, mark as deleted, keep in history.
+		if err := s.docker.DeleteContainer(ctx, sandbox.ContainerID); err != nil {
+			return err
+		}
 
-	if err := s.addEvent(sandbox.ID, "deleted", map[string]any{}); err != nil {
-		return err
+		sandbox.Status = models.SandboxStatusDeleted
+		if err := s.repo.Update(sandbox); err != nil {
+			return err
+		}
+
+		if err := s.addEvent(sandbox.ID, "deleted", map[string]any{}); err != nil {
+			return err
+		}
+	} else {
+		// Hard delete: permanently remove from history.
+		if err := s.repo.DeleteByID(sandbox.ID); err != nil {
+			return err
+		}
 	}
 
 	_ = s.audit.Log(userID, "sandbox.deleted", clientIP, map[string]any{
@@ -222,7 +278,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, err
 	}
 
-	image, err := s.images.CreateForUser(
+	image, _, err := s.images.CreateForUser(
 		ctx,
 		input.UserID,
 		input.Name,

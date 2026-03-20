@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/go-connections/nat"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 )
 
@@ -24,10 +26,13 @@ type SandboxContainer struct {
 	ID   string
 	Name string
 	URL  string
+	Port *int
 }
 
 type Client interface {
+	ImageExists(ctx context.Context, imageName string) bool
 	EnsureImage(ctx context.Context, imageName string) error
+	PullImage(ctx context.Context, imageName string) (io.ReadCloser, error)
 	RemoveImage(ctx context.Context, imageName string) error
 	CreateContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error)
 	DeleteContainer(ctx context.Context, containerID string) error
@@ -57,6 +62,11 @@ func NewClient(sandboxCfg config.SandboxConfig, dockerCfg config.DockerConfig) (
 	}, nil
 }
 
+func (c *DockerClient) ImageExists(ctx context.Context, imageName string) bool {
+	_, _, err := c.client.ImageInspectWithRaw(ctx, imageName)
+	return err == nil
+}
+
 func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error {
 	if imageName == "" {
 		return fmt.Errorf("invalid image reference")
@@ -70,7 +80,7 @@ func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error 
 
 	// Pulling here keeps image creation and sandbox creation idempotent from the
 	// caller's point of view.
-	reader, err := c.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	reader, err := c.client.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("pull image %s: %w", imageName, err)
 	}
@@ -83,12 +93,19 @@ func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error 
 	return nil
 }
 
+func (c *DockerClient) PullImage(ctx context.Context, imageName string) (io.ReadCloser, error) {
+	if imageName == "" {
+		return nil, fmt.Errorf("invalid image reference")
+	}
+	return c.client.ImagePull(ctx, imageName, image.PullOptions{})
+}
+
 func (c *DockerClient) RemoveImage(ctx context.Context, imageName string) error {
 	if imageName == "" {
 		return fmt.Errorf("invalid image reference")
 	}
 
-	if _, err := c.client.ImageRemove(ctx, imageName, types.ImageRemoveOptions{Force: false, PruneChildren: false}); err != nil {
+	if _, err := c.client.ImageRemove(ctx, imageName, image.RemoveOptions{Force: false, PruneChildren: false}); err != nil {
 		return fmt.Errorf("remove image %s: %w", imageName, err)
 	}
 
@@ -100,14 +117,78 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 		return nil, err
 	}
 
-	// Labels are the contract with Traefik, so the API owns them in one place
-	// instead of spreading routing rules across higher layers.
+	if c.dockerCfg.Mode == config.DockerModePort {
+		return c.createPortContainer(ctx, request)
+	}
+	return c.createTraefikContainer(ctx, request)
+}
+
+func (c *DockerClient) createPortContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error) {
+	hostPort, err := findFreePort()
+	if err != nil {
+		return nil, fmt.Errorf("find free port: %w", err)
+	}
+
+	internalPort := nat.Port(strconv.Itoa(c.sandboxCfg.InternalPort) + "/tcp")
+	shopDomain := fmt.Sprintf("localhost:%d", hostPort)
+
+	containerConfig := &container.Config{
+		Image: request.ImageName,
+		Labels: map[string]string{
+			"sandbox_container": "true",
+		},
+		ExposedPorts: nat.PortSet{
+			internalPort: struct{}{},
+		},
+		Env: []string{
+			"TRUSTED_PROXIES=" + c.dockerCfg.TrustedProxies,
+			"SHOP_DOMAIN=" + shopDomain,
+			"APP_URL=http://" + shopDomain,
+		},
+	}
+
+	hostConfig := &container.HostConfig{
+		PortBindings: nat.PortMap{
+			internalPort: []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: strconv.Itoa(hostPort)},
+			},
+		},
+	}
+
+	resp, err := c.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, request.ContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
+	}
+
+	if err := c.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
+	}
+
+	return &SandboxContainer{
+		ID:   resp.ID,
+		Name: request.ContainerName,
+		URL:  "http://" + shopDomain,
+		Port: &hostPort,
+	}, nil
+}
+
+func findFreePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+func (c *DockerClient) createTraefikContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error) {
 	containerConfig := &container.Config{
 		Image:  request.ImageName,
 		Labels: c.buildTraefikLabels(request.ContainerName, request.Hostname),
 		Env: []string{
 			"TRUSTED_PROXIES=" + c.dockerCfg.TrustedProxies,
 			"SHOP_DOMAIN=" + request.Hostname,
+			"APP_URL=https://" + request.Hostname,
 		},
 	}
 
@@ -127,7 +208,7 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
 	}
 
-	if err := c.client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := c.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
 	}
 
@@ -146,7 +227,7 @@ func (c *DockerClient) DeleteContainer(ctx context.Context, containerID string) 
 		return fmt.Errorf("stop container %s: %w", containerID, err)
 	}
 
-	if err := c.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !errdefs.IsNotFound(err) {
+	if err := c.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("remove container %s: %w", containerID, err)
 	}
 
@@ -158,7 +239,7 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		return fmt.Errorf("invalid target image reference")
 	}
 
-	if _, err := c.client.ContainerCommit(ctx, containerID, types.ContainerCommitOptions{
+	if _, err := c.client.ContainerCommit(ctx, containerID, container.CommitOptions{
 		Reference: targetImage,
 		Author:    c.dockerCfg.SnapshotAuthor,
 		Comment:   c.dockerCfg.SnapshotComment,

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -25,6 +27,14 @@ func NewImageHandler(images *services.ImageService, audit *services.AuditService
 	return &ImageHandler{images: images, audit: audit}
 }
 
+// ListPublic godoc
+// @Summary      List public images
+// @Description  Returns all images marked as public
+// @Tags         Images
+// @Produce      json
+// @Success      200 {array} models.Image
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/public/images [get]
 func (h *ImageHandler) ListPublic(c echo.Context) error {
 	images, err := h.images.ListPublic()
 	if err != nil {
@@ -34,6 +44,16 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 	return c.JSON(200, images)
 }
 
+// ListAll godoc
+// @Summary      List all images
+// @Description  Returns all images including private ones
+// @Tags         Images
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {array} models.Image
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images [get]
 func (h *ImageHandler) ListAll(c echo.Context) error {
 	images, err := h.images.ListAll()
 	if err != nil {
@@ -43,6 +63,19 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 	return c.JSON(200, images)
 }
 
+// Create godoc
+// @Summary      Create an image
+// @Description  Register a new Docker image. If not available locally, a background pull is started.
+// @Tags         Images
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.CreateImageRequest true "Image details"
+// @Success      201 {object} models.Image
+// @Success      202 {object} dto.PendingPullResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Router       /api/images [post]
 func (h *ImageHandler) Create(c echo.Context) error {
 	var input dto.CreateImageRequest
 	if err := c.Bind(&input); err != nil {
@@ -56,7 +89,8 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		"tag", input.Tag,
 		"is_public", input.IsPublic,
 	)...)
-	image, err := h.images.CreateForUser(
+
+	image, pending, err := h.images.CreateForUser(
 		c.Request().Context(),
 		&auth.UserID,
 		input.Name,
@@ -69,16 +103,51 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		return responses.FromAppError(c, apperror.BadRequest("IMAGE_CREATE_FAILED", err.Error()).WithCause(err))
 	}
 
-	slog.Info("image created successfully", logging.RequestFields(c,
+	_ = h.audit.Log(&auth.UserID, "image.created", c.RealIP(), map[string]any{
+		"name": input.Name,
+		"tag":  input.Tag,
+	})
+
+	// todo: think about it
+	if pending != nil {
+		slog.Info("image pull started", logging.RequestFields(c,
+			"user_id", auth.UserID.String(),
+			"image_id", pending.ID.String(),
+			"image", input.Name+":"+input.Tag,
+		)...)
+		return c.JSON(202, dto.PendingPullResponse{
+			ID:      pending.ID.String(),
+			Name:    pending.Name,
+			Tag:     pending.Tag,
+			Title:   pending.Title,
+			Percent: 0,
+			Status:  "pulling",
+		})
+	}
+
+	slog.Info("image created", logging.RequestFields(c,
 		"user_id", auth.UserID.String(),
 		"image_id", image.ID.String(),
 		"image", image.FullName(),
-		"is_public", image.IsPublic,
 	)...)
-	_ = h.audit.Log(&auth.UserID, "image.created", c.RealIP(), map[string]any{"imageId": image.ID.String()})
 	return c.JSON(201, image)
 }
 
+// Update godoc
+// @Summary      Update an image
+// @Description  Update image metadata and visibility
+// @Tags         Images
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Image ID" format(uuid)
+// @Param        body body dto.UpdateImageRequest true "Updated image fields"
+// @Success      200 {object} models.Image
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id} [put]
 func (h *ImageHandler) Update(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -111,6 +180,21 @@ func (h *ImageHandler) Update(c echo.Context) error {
 	return c.JSON(http.StatusOK, image)
 }
 
+// UploadThumbnail godoc
+// @Summary      Upload an image thumbnail
+// @Description  Upload or replace the thumbnail for an image
+// @Tags         Images
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        id path string true "Image ID" format(uuid)
+// @Param        thumbnail formData file true "Thumbnail file"
+// @Success      200 {object} models.Image
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/thumbnail [post]
 func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -152,6 +236,18 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	return c.JSON(http.StatusOK, image)
 }
 
+// DeleteThumbnail godoc
+// @Summary      Delete an image thumbnail
+// @Description  Remove the thumbnail associated with an image
+// @Tags         Images
+// @Security     BearerAuth
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/thumbnail [delete]
 func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -189,6 +285,91 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 	slog.Info("image deleted successfully", logging.RequestFields(c, "user_id", auth.UserID.String(), "image_id", id.String())...)
 	_ = h.audit.Log(&auth.UserID, "image.deleted", c.RealIP(), map[string]any{"imageId": id.String()})
 	return c.NoContent(204)
+}
+
+// ListPulls godoc
+// @Summary      List ongoing image pulls
+// @Description  Returns all images currently being pulled (in-memory only, not persisted)
+// @Tags         Images
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {array} dto.PendingPullResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Router       /api/images/pulls [get]
+func (h *ImageHandler) ListPulls(c echo.Context) error {
+	pending := h.images.ListPendingPulls()
+
+	out := make([]dto.PendingPullResponse, len(pending))
+	for i, p := range pending {
+		out[i] = dto.PendingPullResponse{
+			ID:      p.ID.String(),
+			Name:    p.Name,
+			Tag:     p.Tag,
+			Title:   p.Title,
+			Percent: p.Percent,
+			Status:  p.Status,
+		}
+	}
+	return c.JSON(200, out)
+}
+
+// PullProgress godoc
+// @Summary      Stream image pull progress
+// @Description  SSE endpoint streaming pull progress events. Each event is JSON with "percent" (int) and "status" (string) fields.
+// @Tags         Images
+// @Produce      text/event-stream
+// @Param        id path string true "Image ID" format(uuid)
+// @Success      200 {object} dto.ImagePullProgressEvent "Last emitted SSE event payload"
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/images/{id}/progress [get]
+func (h *ImageHandler) PullProgress(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+	}
+
+	idStr := id.String()
+
+	// If the image already exists in the db, its done and return ready
+	if _, dbErr := h.images.FindByID(id); dbErr == nil {
+		c.Response().Header().Set("Content-Type", "text/event-stream")
+		c.Response().Header().Set("Cache-Control", "no-cache")
+		c.Response().Header().Set("Connection", "keep-alive")
+		c.Response().WriteHeader(200)
+		data, _ := json.Marshal(map[string]any{"percent": 100, "status": "ready"})
+		fmt.Fprintf(c.Response(), "data: %s\n\n", data)
+		c.Response().Flush()
+		return nil
+	}
+
+	// if its not a pending pull too, return 404.
+	if !h.images.IsPulling(idStr) {
+		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+	}
+
+	c.Response().Header().Set("Content-Type", "text/event-stream")
+	c.Response().Header().Set("Cache-Control", "no-cache")
+	c.Response().Header().Set("Connection", "keep-alive")
+	c.Response().WriteHeader(200)
+
+	ch, cancel := h.images.WatchPullProgress(idStr)
+	defer cancel()
+
+	ctx := c.Request().Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case progress, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			data, _ := json.Marshal(progress)
+			fmt.Fprintf(c.Response(), "data: %s\n\n", data)
+			c.Response().Flush()
+		}
+	}
 }
 
 func mapImageError(c echo.Context, code, message string, err error) error {

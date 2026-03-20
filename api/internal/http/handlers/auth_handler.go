@@ -21,6 +21,17 @@ func NewAuthHandler(auth *services.AuthService, audit *services.AuditService) *A
 	return &AuthHandler{auth: auth, audit: audit}
 }
 
+// Register godoc
+// @Summary      Register a new user
+// @Description  Create a new user account with email and password
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.RegisterRequest true "Registration credentials"
+// @Success      201 {object} models.User
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Router       /api/auth/register [post]
 func (h *AuthHandler) Register(c echo.Context) error {
 	var input dto.RegisterRequest
 	if err := c.Bind(&input); err != nil {
@@ -41,6 +52,17 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	return c.JSON(201, user)
 }
 
+// Login godoc
+// @Summary      Log in
+// @Description  Authenticate with email and password, receive a JWT token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.LoginRequest true "Login credentials"
+// @Success      200 {object} dto.AuthLoginResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Router       /api/auth/login [post]
 func (h *AuthHandler) Login(c echo.Context) error {
 	var input dto.LoginRequest
 	if err := c.Bind(&input); err != nil {
@@ -59,12 +81,22 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		"token_issued", token != "",
 	)...)
 	_ = h.audit.Log(&user.ID, "auth.logged_in", c.RealIP(), map[string]any{})
-	return c.JSON(200, map[string]any{
-		"token": token,
-		"user":  user,
+	return c.JSON(200, dto.AuthLoginResponse{
+		Token: token,
+		User:  *user,
 	})
 }
 
+// Logout godoc
+// @Summary      Log out
+// @Description  Invalidate the current session token
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      204
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/auth/logout [post]
 func (h *AuthHandler) Logout(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	slog.Info("logout request received", logging.RequestFields(c, "user_id", auth.UserID.String(), "token_id", auth.TokenID)...)
@@ -77,6 +109,15 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	return c.NoContent(204)
 }
 
+// Me godoc
+// @Summary      Get current user
+// @Description  Return the authenticated user's profile
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {object} models.User
+// @Failure      401 {object} dto.ErrorResponse
+// @Router       /api/me [get]
 func (h *AuthHandler) Me(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	slog.Info("current user requested profile", logging.RequestFields(c, "user_id", auth.UserID.String())...)

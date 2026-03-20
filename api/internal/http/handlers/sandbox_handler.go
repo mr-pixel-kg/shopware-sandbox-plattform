@@ -22,6 +22,16 @@ func NewSandboxHandler(sandboxes *services.SandboxService) *SandboxHandler {
 	return &SandboxHandler{sandboxes: sandboxes}
 }
 
+// List godoc
+// @Summary      List all active sandboxes
+// @Description  Returns all sandboxes that are currently active (admin view)
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {array} models.Sandbox
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/sandboxes [get]
 func (h *SandboxHandler) List(c echo.Context) error {
 	sandboxes, err := h.sandboxes.ListActive()
 	if err != nil {
@@ -32,6 +42,16 @@ func (h *SandboxHandler) List(c echo.Context) error {
 	return c.JSON(200, sandboxes)
 }
 
+// ListMine godoc
+// @Summary      List my sandboxes
+// @Description  Returns sandboxes owned by the authenticated user
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {array} models.Sandbox
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/me/sandboxes [get]
 func (h *SandboxHandler) ListMine(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	sandboxes, err := h.sandboxes.ListByUser(auth.UserID)
@@ -42,6 +62,14 @@ func (h *SandboxHandler) ListMine(c echo.Context) error {
 	return c.JSON(200, sandboxes)
 }
 
+// ListGuest godoc
+// @Summary      List guest sandboxes
+// @Description  Returns sandboxes for the current guest session (cookie-based)
+// @Tags         Public
+// @Produce      json
+// @Success      200 {array} models.Sandbox
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/public/sandboxes [get]
 func (h *SandboxHandler) ListGuest(c echo.Context) error {
 	guest := mw.MustGuest(c)
 	sandboxes, err := h.sandboxes.ListByGuestSession(guest.SessionID)
@@ -52,6 +80,18 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 	return c.JSON(200, sandboxes)
 }
 
+// Get godoc
+// @Summary      Get sandbox by ID
+// @Description  Returns a single sandbox by its UUID
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Success      200 {object} models.Sandbox
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id} [get]
 func (h *SandboxHandler) Get(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -66,6 +106,19 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 	return c.JSON(200, sandbox)
 }
 
+// CreatePublicDemo godoc
+// @Summary      Create a public demo sandbox
+// @Description  Spin up a new sandbox for a guest visitor
+// @Tags         Public
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.CreateSandboxRequest true "Sandbox configuration"
+// @Success      201 {object} models.Sandbox
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/public/demos [post]
 func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 	var input dto.CreateSandboxRequest
 	if err := c.Bind(&input); err != nil {
@@ -100,6 +153,21 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 	return c.JSON(201, sandbox)
 }
 
+// CreatePrivateSandbox godoc
+// @Summary      Create a private sandbox
+// @Description  Spin up a new sandbox for an authenticated user
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.CreateSandboxRequest true "Sandbox configuration"
+// @Success      201 {object} models.Sandbox
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/sandboxes [post]
 func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 	var input dto.CreateSandboxRequest
 	if err := c.Bind(&input); err != nil {
@@ -142,6 +210,67 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 	return c.JSON(201, sandbox)
 }
 
+// ExtendTTL godoc
+// @Summary      Extend sandbox TTL
+// @Description  Add additional time to a sandbox's expiration
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Param        body body dto.ExtendTTLRequest true "TTL extension"
+// @Success      200 {object} models.Sandbox
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id}/ttl [patch]
+func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+	}
+
+	var input dto.ExtendTTLRequest
+	if err := c.Bind(&input); err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	}
+	if input.TTLMinutes <= 0 {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "ttlMinutes must be greater than 0"))
+	}
+
+	auth := mw.MustAuth(c)
+	slog.Info("sandbox TTL extension requested", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"sandbox_id", id.String(),
+		"ttl_minutes", input.TTLMinutes,
+	)...)
+	sandbox, err := h.sandboxes.ExtendTTL(id, input.TTLMinutes, c.RealIP(), &auth.UserID)
+	if err != nil {
+		return mapSandboxError(c, err)
+	}
+
+	slog.Info("sandbox TTL extended", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"sandbox_id", id.String(),
+		"new_expires_at", sandbox.ExpiresAt,
+	)...)
+	return c.JSON(200, sandbox)
+}
+
+// Delete godoc
+// @Summary      Delete a sandbox
+// @Description  Stop and remove an authenticated user's sandbox
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id} [delete]
 func (h *SandboxHandler) Delete(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -158,6 +287,17 @@ func (h *SandboxHandler) Delete(c echo.Context) error {
 	return c.NoContent(204)
 }
 
+// DeleteGuest godoc
+// @Summary      Delete a guest sandbox
+// @Description  Stop and remove a guest session's sandbox
+// @Tags         Public
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/public/sandboxes/{id} [delete]
 func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -174,6 +314,21 @@ func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
 	return c.NoContent(204)
 }
 
+// Snapshot godoc
+// @Summary      Create a snapshot image from a sandbox
+// @Description  Commit the current state of a running sandbox as a new Docker image
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Param        body body dto.CreateSnapshotRequest true "Snapshot metadata"
+// @Success      201 {object} models.Image
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id}/snapshot [post]
 func (h *SandboxHandler) Snapshot(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

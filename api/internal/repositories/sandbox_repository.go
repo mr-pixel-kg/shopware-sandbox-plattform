@@ -51,11 +51,29 @@ func (r *SandboxRepository) ListActiveByUser(userID uuid.UUID) ([]models.Sandbox
 	return sandboxes, err
 }
 
+func (r *SandboxRepository) ListAllByUser(userID uuid.UUID) ([]models.Sandbox, error) {
+	var sandboxes []models.Sandbox
+	err := r.db.
+		Where("created_by_user_id = ?", userID).
+		Order("created_at desc").
+		Find(&sandboxes).Error
+	return sandboxes, err
+}
+
 func (r *SandboxRepository) ListActiveByGuestSession(sessionID uuid.UUID) ([]models.Sandbox, error) {
 	var sandboxes []models.Sandbox
 	err := r.db.
 		Where("guest_session_id = ?", sessionID).
 		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
+		Order("created_at desc").
+		Find(&sandboxes).Error
+	return sandboxes, err
+}
+
+func (r *SandboxRepository) ListAllByGuestSession(sessionID uuid.UUID) ([]models.Sandbox, error) {
+	var sandboxes []models.Sandbox
+	err := r.db.
+		Where("guest_session_id = ?", sessionID).
 		Order("created_at desc").
 		Find(&sandboxes).Error
 	return sandboxes, err
@@ -86,6 +104,16 @@ func (r *SandboxRepository) CountActiveTotal() (int64, error) {
 		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
 		Count(&count).Error
 	return count, err
+}
+
+func (r *SandboxRepository) ListByImageID(imageID uuid.UUID) ([]models.Sandbox, error) {
+	var sandboxes []models.Sandbox
+	err := r.db.Where("image_id = ?", imageID).Find(&sandboxes).Error
+	return sandboxes, err
+}
+
+func (r *SandboxRepository) DeleteByID(id uuid.UUID) error {
+	return r.db.Unscoped().Delete(&models.Sandbox{}, "id = ?", id).Error
 }
 
 func (r *SandboxRepository) FindExpired(now time.Time) ([]models.Sandbox, error) {

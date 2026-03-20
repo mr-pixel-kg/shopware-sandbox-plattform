@@ -19,14 +19,14 @@ func Auth(authService *services.AuthService) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			// Employee routes rely on a bearer token, while guest routes use a cookie
 			// handled by the dedicated guest middleware.
-			authHeader := c.Request().Header.Get("Authorization")
+			authHeader := strings.TrimSpace(c.Request().Header.Get(echo.HeaderAuthorization))
 			if authHeader == "" {
 				slog.Warn("missing authorization header", logging.RequestFields(c)...)
 				return responses.FromAppError(c, apperror.Unauthorized("Missing bearer token"))
 			}
 
-			token := strings.TrimPrefix(authHeader, "Bearer ")
-			if token == authHeader {
+			token, ok := parseAuthorizationHeader(authHeader)
+			if !ok {
 				slog.Warn("invalid authorization header format", logging.RequestFields(c)...)
 				return responses.FromAppError(c, apperror.Unauthorized("Invalid authorization header"))
 			}
@@ -49,4 +49,20 @@ func Auth(authService *services.AuthService) echo.MiddlewareFunc {
 
 func MustAuth(c echo.Context) types.AuthContext {
 	return c.Get(authContextKey).(types.AuthContext)
+}
+
+func parseAuthorizationHeader(authHeader string) (string, bool) {
+	parts := strings.Fields(authHeader)
+	switch len(parts) {
+	case 1:
+		// Swagger UI users often paste only the JWT value into the auth dialog.
+		return parts[0], parts[0] != ""
+	case 2:
+		if !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
+			return "", false
+		}
+		return parts[1], true
+	default:
+		return "", false
+	}
 }

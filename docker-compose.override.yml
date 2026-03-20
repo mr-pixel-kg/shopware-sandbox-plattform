@@ -1,0 +1,17 @@
+services:
+  proxy:
+    ports:
+      - "80:80"
+      - "9000:8080"
+
+  backend:
+    ports:
+      - "8080:8080"
+
+  frontend:
+    ports:
+      - "8000:80"
+
+  database:
+    ports:
+      - "5432:5432"

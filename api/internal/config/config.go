@@ -49,7 +49,15 @@ type SandboxConfig struct {
 	InternalPort    int
 }
 
+type DockerMode string
+
+const (
+	DockerModePort DockerMode = "port"
+	DockerModeTraefik DockerMode = "traefik"
+)
+
 type DockerConfig struct {
+	Mode                DockerMode
 	Network             string
 	TrustedProxies      string
 	TraefikEnable       bool
@@ -111,6 +119,7 @@ func MustLoad() Config {
 			InternalPort:    v.GetInt("sandbox.internal_port"),
 		},
 		Docker: DockerConfig{
+			Mode:                DockerMode(v.GetString("docker.mode")),
 			Network:             v.GetString("docker.network"),
 			TrustedProxies:      v.GetString("docker.trusted_proxies"),
 			TraefikEnable:       v.GetBool("docker.traefik_enable"),
@@ -162,6 +171,12 @@ func MustLoad() Config {
 	}
 	if cfg.Sandbox.InternalPort == 0 {
 		cfg.Sandbox.InternalPort = 80
+	}
+	if cfg.Docker.Mode == "" {
+		cfg.Docker.Mode = DockerModePort
+	}
+	if cfg.Docker.Mode != DockerModePort && cfg.Docker.Mode != DockerModeTraefik {
+		panic(fmt.Sprintf("invalid docker.mode %q: must be \"port\" or \"traefik\"", cfg.Docker.Mode))
 	}
 	if cfg.Docker.Network == "" {
 		cfg.Docker.Network = "internal"
