@@ -36,6 +36,7 @@ func main() {
 		"allowed_origins", cfg.Server.AllowedOrigins,
 		"sandbox_default_ttl", cfg.Sandbox.DefaultTTL.String(),
 		"sandbox_cleanup_interval", cfg.Sandbox.CleanupInterval.String(),
+		"thumbnail_dir", cfg.Storage.ThumbnailDir,
 	)
 
 	// Open the shared database connection used by repositories and services.

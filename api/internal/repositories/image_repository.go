@@ -38,6 +38,10 @@ func (r *ImageRepository) Create(image *models.Image) error {
 	return r.db.Create(image).Error
 }
 
+func (r *ImageRepository) Update(image *models.Image) error {
+	return r.db.Save(image).Error
+}
+
 func (r *ImageRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&models.Image{}, "id = ?", id).Error
 }

@@ -3,7 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"errors"
 	"log/slog"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -13,6 +15,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"gorm.io/gorm"
 )
 
 type ImageHandler struct {
@@ -33,7 +36,6 @@ func NewImageHandler(images *services.ImageService, audit *services.AuditService
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/public/images [get]
 func (h *ImageHandler) ListPublic(c echo.Context) error {
-
 	images, err := h.images.ListPublic()
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load public images").WithCause(err))
@@ -53,7 +55,6 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/images [get]
 func (h *ImageHandler) ListAll(c echo.Context) error {
-
 	images, err := h.images.ListAll()
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load images").WithCause(err))
@@ -96,7 +97,6 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		input.Tag,
 		input.Title,
 		input.Description,
-		input.ThumbnailURL,
 		input.IsPublic,
 	)
 	if err != nil {
@@ -108,6 +108,7 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		"tag":  input.Tag,
 	})
 
+	// todo: think about it
 	if pending != nil {
 		slog.Info("image pull started", logging.RequestFields(c,
 			"user_id", auth.UserID.String(),
@@ -144,6 +145,101 @@ func (h *ImageHandler) Create(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/images/{id} [delete]
+func (h *ImageHandler) Update(c echo.Context) error {
+	auth := mw.MustAuth(c)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+	}
+
+	var input dto.UpdateImageRequest
+	if err := c.Bind(&input); err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	}
+
+	slog.Info("image update requested", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"image_id", id.String(),
+		"is_public", input.IsPublic,
+	)...)
+	image, err := h.images.Update(id, input.Title, input.Description, input.IsPublic)
+	if err != nil {
+		return mapImageError(c, "IMAGE_UPDATE_FAILED", "Could not update image", err)
+	}
+
+	slog.Info("image updated successfully", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"image_id", image.ID.String(),
+		"is_public", image.IsPublic,
+		"has_thumbnail", image.ThumbnailURL != nil,
+	)...)
+	_ = h.audit.Log(&auth.UserID, "image.updated", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	return c.JSON(http.StatusOK, image)
+}
+
+func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
+	auth := mw.MustAuth(c)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+	}
+
+	fileHeader, err := c.FormFile("thumbnail")
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Missing thumbnail upload"))
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return responses.FromAppError(c, apperror.Internal("THUMBNAIL_UPLOAD_FAILED", "Could not open thumbnail upload").WithCause(err))
+	}
+	defer file.Close()
+
+	slog.Info("thumbnail upload requested", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"image_id", id.String(),
+		"filename", fileHeader.Filename,
+		"size", fileHeader.Size,
+	)...)
+	image, err := h.images.SaveThumbnail(id, file, fileHeader.Filename, fileHeader.Header.Get(echo.HeaderContentType))
+	if err != nil {
+		if errors.Is(err, services.ErrUnsupportedThumbnailFormat) {
+			return responses.FromAppError(c, apperror.BadRequest("THUMBNAIL_FORMAT_UNSUPPORTED", "Unsupported thumbnail format").WithCause(err))
+		}
+		return mapImageError(c, "THUMBNAIL_UPLOAD_FAILED", "Could not store thumbnail", err)
+	}
+
+	slog.Info("thumbnail uploaded successfully", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"image_id", image.ID.String(),
+		"thumbnail_url", image.ThumbnailURL,
+	)...)
+	_ = h.audit.Log(&auth.UserID, "image.thumbnail_uploaded", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	return c.JSON(http.StatusOK, image)
+}
+
+func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
+	auth := mw.MustAuth(c)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+	}
+
+	slog.Info("thumbnail deletion requested", logging.RequestFields(c, "user_id", auth.UserID.String(), "image_id", id.String())...)
+	image, err := h.images.DeleteThumbnail(id)
+	if err != nil {
+		return mapImageError(c, "THUMBNAIL_DELETE_FAILED", "Could not delete thumbnail", err)
+	}
+
+	slog.Info("thumbnail deleted successfully", logging.RequestFields(c,
+		"user_id", auth.UserID.String(),
+		"image_id", image.ID.String(),
+		"has_thumbnail", image.ThumbnailURL != nil,
+	)...)
+	_ = h.audit.Log(&auth.UserID, "image.thumbnail_deleted", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *ImageHandler) Delete(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -244,4 +340,12 @@ func (h *ImageHandler) PullProgress(c echo.Context) error {
 			c.Response().Flush()
 		}
 	}
+}
+
+func mapImageError(c echo.Context, code, message string, err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found").WithCause(err))
+	}
+
+	return responses.FromAppError(c, apperror.Internal(code, message).WithCause(err))
 }

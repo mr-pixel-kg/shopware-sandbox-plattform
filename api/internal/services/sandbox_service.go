@@ -254,15 +254,14 @@ func (s *SandboxService) DeleteForGuest(ctx context.Context, id uuid.UUID, guest
 }
 
 type CreateSnapshotInput struct {
-	SandboxID    uuid.UUID
-	Name         string
-	Tag          string
-	Title        *string
-	Description  *string
-	ThumbnailURL *string
-	IsPublic     bool
-	ClientIP     string
-	UserID       *uuid.UUID
+	SandboxID   uuid.UUID
+	Name        string
+	Tag         string
+	Title       *string
+	Description *string
+	IsPublic    bool
+	ClientIP    string
+	UserID      *uuid.UUID
 }
 
 func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapshotInput) (*models.Image, error) {
@@ -286,7 +285,6 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		input.Tag,
 		input.Title,
 		input.Description,
-		input.ThumbnailURL,
 		input.IsPublic,
 	)
 	if err != nil {

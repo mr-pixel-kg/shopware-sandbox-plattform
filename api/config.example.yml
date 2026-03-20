@@ -36,6 +36,9 @@ docker:
 # traefik_certresolver: "production"
 # traefik_middlewares: "sandbox-middleware@file,https-redirect@file"
 
+storage:
+  thumbnail_dir: "storage/thumbnails"
+
 guard:
   max_total_sandboxes: 32
   max_sandboxes_per_ip: 5

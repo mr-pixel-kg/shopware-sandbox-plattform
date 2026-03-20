@@ -349,15 +349,14 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		"is_public", input.IsPublic,
 	)...)
 	image, err := h.sandboxes.CreateSnapshot(c.Request().Context(), services.CreateSnapshotInput{
-		SandboxID:    id,
-		Name:         input.Name,
-		Tag:          input.Tag,
-		Title:        input.Title,
-		Description:  input.Description,
-		ThumbnailURL: input.ThumbnailURL,
-		IsPublic:     input.IsPublic,
-		ClientIP:     c.RealIP(),
-		UserID:       &auth.UserID,
+		SandboxID:   id,
+		Name:        input.Name,
+		Tag:         input.Tag,
+		Title:       input.Title,
+		Description: input.Description,
+		IsPublic:    input.IsPublic,
+		ClientIP:    c.RealIP(),
+		UserID:      &auth.UserID,
 	})
 	if err != nil {
 		return mapSandboxError(c, err)

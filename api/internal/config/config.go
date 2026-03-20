@@ -14,6 +14,7 @@ type Config struct {
 	Auth     AuthConfig
 	Sandbox  SandboxConfig
 	Docker   DockerConfig
+	Storage  StorageConfig
 	Guard    GuardConfig
 }
 
@@ -65,6 +66,10 @@ type DockerConfig struct {
 	TraefikMiddlewares  string
 	SnapshotAuthor      string
 	SnapshotComment     string
+}
+
+type StorageConfig struct {
+	ThumbnailDir string
 }
 
 type GuardConfig struct {
@@ -123,6 +128,9 @@ func MustLoad() Config {
 			TraefikMiddlewares:  v.GetString("docker.traefik_middlewares"),
 			SnapshotAuthor:      v.GetString("docker.snapshot_author"),
 			SnapshotComment:     v.GetString("docker.snapshot_comment"),
+		},
+		Storage: StorageConfig{
+			ThumbnailDir: v.GetString("storage.thumbnail_dir"),
 		},
 		Guard: GuardConfig{
 			MaxActiveTotal:      v.GetInt("guard.max_total_sandboxes"),
@@ -190,6 +198,9 @@ func MustLoad() Config {
 	}
 	if cfg.Docker.SnapshotComment == "" {
 		cfg.Docker.SnapshotComment = "Sandbox snapshot created by Shopshredder API"
+	}
+	if cfg.Storage.ThumbnailDir == "" {
+		cfg.Storage.ThumbnailDir = "storage/thumbnails"
 	}
 
 	// Defaults are applied after reading YAML so partially filled config files

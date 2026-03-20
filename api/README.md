@@ -24,3 +24,6 @@ go run ./cmd/api
 - Limits greifen global, pro IP fuer Gaeste und pro User fuer eingeloggte Mitarbeiter.
 - Swagger/OpenAPI ist unter `/swagger` und `/swagger/openapi.yaml` verfuegbar.
 - Fuer Traefik sollten `docker.network`, `docker.traefik_*` und `sandbox.internal_port` passend zur Laufzeitumgebung gesetzt werden.
+
+## Notizen
+- ThumbnailUrl in Image-Model in Datenbank kann entfernt werden, weil Pfad dynamisch generiert wird.

@@ -1,7 +1,7 @@
 server:
   port: 8080
   allowed_origins:
-    - "http://localhost:5173"
+    - "http://localhost:5175"
     - "https://www.shopshredder.de"
     - "http://localhost:8000"
     - "http://localhost:80"
@@ -18,7 +18,7 @@ auth:
 
 guard:
   max_total_sandboxes: 32
-  max_sandboxes_per_ip: 5
+  max_sandboxes_per_ip: 2
   max_sandbox_lifetime: 60
 
 #database:
@@ -30,4 +30,3 @@ guard:
 
 #sentry:
 #  dsn: "https://b578c482893c9c27e211e738deca9889@sentry.mr-pixel.de/15"
-#  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0"
