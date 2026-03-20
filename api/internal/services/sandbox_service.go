@@ -137,7 +137,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		ContainerID:     container.ID,
 		ContainerName:   container.Name,
 		URL:             container.URL,
-		Port:            &container.Port,
+		Port:            container.Port,
 		ClientIP:        input.ClientIP,
 		ExpiresAt:       &expiresAt,
 	}
@@ -279,7 +279,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, err
 	}
 
-	image, err := s.images.CreateForUser(
+	image, _, err := s.images.CreateForUser(
 		ctx,
 		input.UserID,
 		input.Name,

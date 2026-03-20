@@ -16,7 +16,7 @@ func NewImageRepository(db *gorm.DB) *ImageRepository {
 
 func (r *ImageRepository) ListPublic() ([]models.Image, error) {
 	var images []models.Image
-	err := r.db.Where("is_public = ? AND status = ?", true, "ready").Order("created_at desc").Find(&images).Error
+	err := r.db.Where("is_public = ?", true).Order("created_at desc").Find(&images).Error
 	return images, err
 }
 
@@ -42,15 +42,3 @@ func (r *ImageRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&models.Image{}, "id = ?", id).Error
 }
 
-func (r *ImageRepository) UpdateStatus(id uuid.UUID, status string, errorMessage *string) error {
-	return r.db.Model(&models.Image{}).Where("id = ?", id).Updates(map[string]any{
-		"status":        status,
-		"error_message": errorMessage,
-	}).Error
-}
-
-func (r *ImageRepository) ResetStalePulls(fromStatus, toStatus string, errorMessage *string) error {
-	return r.db.Model(&models.Image{}).
-		Where("status = ?", fromStatus).
-		Updates(map[string]any{"status": toStatus, "error_message": errorMessage}).Error
-}

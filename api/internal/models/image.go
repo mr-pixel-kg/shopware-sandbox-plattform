@@ -10,9 +10,6 @@ type Image struct {
 	Description     *string    `gorm:"type:text" json:"description,omitempty" example:"Prepared image for sales demos and internal QA."`
 	ThumbnailURL    *string    `gorm:"size:1024" json:"thumbnailUrl,omitempty" example:"https://cdn.example.com/images/shopware-demo.png"`
 	IsPublic        bool       `gorm:"not null;default:false" json:"isPublic" example:"true"`
-	Status          string     `gorm:"size:32;not null;default:'ready'" json:"status" enums:"ready,pulling,failed" example:"ready"`
-	ErrorMessage    *string    `gorm:"type:text" json:"errorMessage,omitempty" example:"failed to reach registry"`
-	PullProgress    *int       `gorm:"-" json:"pullProgress,omitempty" example:"100"`
 	CreatedByUserID *uuid.UUID `gorm:"type:uuid" json:"createdByUserId,omitempty" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
 	BaseModel
 }

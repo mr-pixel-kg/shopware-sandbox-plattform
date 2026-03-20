@@ -57,7 +57,6 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	}
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker)
-	imageService.RecoverStalePulls()
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient)
 
 	// Sandbox expiration is handled inside the same process on purpose to keep
@@ -81,6 +80,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 
 	api.GET("/images/:id/progress", imageHandler.PullProgress)
 
+	private.GET("/images/pulls", imageHandler.ListPulls)
 	public.GET("/images", imageHandler.ListPublic)
 	public.GET("/sandboxes", sandboxHandler.ListGuest)
 	public.POST("/demos", sandboxHandler.CreatePublicDemo)
@@ -112,7 +112,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	slog.Info("http routes registered",
 		"public_routes", 4,
 		"auth_routes", 2,
-		"private_routes", 9,
+		"private_routes", 10,
 		"guest_cookie_name", cfg.Auth.GuestCookieName,
 	)
 
