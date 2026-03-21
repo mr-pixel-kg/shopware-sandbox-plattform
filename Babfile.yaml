@@ -19,7 +19,7 @@ tasks:
             label: api
           - task: web:dev
             label: web
-        mode: grouped
+        mode: tabs
 
   api:dev:
     desc: Start API dev server
