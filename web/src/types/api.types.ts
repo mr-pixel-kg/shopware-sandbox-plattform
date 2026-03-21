@@ -9,6 +9,8 @@ export interface User extends BaseModel {
   email: string
 }
 
+export type ImageStatus = 'pulling' | 'ready' | 'failed'
+
 export interface Image extends BaseModel {
   id: string
   name: string
@@ -17,6 +19,8 @@ export interface Image extends BaseModel {
   description?: string
   thumbnailUrl?: string
   isPublic: boolean
+  status: ImageStatus
+  error?: string
   createdByUserId?: string
 }
 
@@ -27,11 +31,6 @@ export interface PendingPull {
   title?: string
   percent: number
   status: string
-}
-
-export interface CreateImageResult {
-  image?: Image
-  pendingPull?: PendingPull
 }
 
 export type SandboxStatus =

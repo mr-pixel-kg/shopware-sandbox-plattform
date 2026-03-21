@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { imagesApi } from '@/api'
-import type { Image, CreateImageRequest, CreateImageResult, PendingPull } from '@/types'
+import type { Image, CreateImageRequest, PendingPull } from '@/types'
 
 export type FetchMode = 'public' | 'all'
 
@@ -30,32 +30,41 @@ export const useImagesStore = defineStore('images', () => {
     }
   }
 
-  function subscribePull(pull: PendingPull) {
-    if (sseConnections.has(pull.id)) return
+  function subscribePull(id: string) {
+    if (sseConnections.has(id)) return
 
     const baseURL = import.meta.env.WEB_API_URL || ''
-    const es = new EventSource(`${baseURL}/api/images/${pull.id}/progress`)
-    sseConnections.set(pull.id, es)
+    const es = new EventSource(`${baseURL}/api/images/${id}/progress`)
+    sseConnections.set(id, es)
 
     es.onmessage = (event) => {
-      // TODO i hate empty catch blocks its not a nice pattern please refactor me
       try {
-        const data = JSON.parse(event.data) as { percent?: number; status?: string }
-        const pending = pendingPulls.value.find((p) => p.id === pull.id)
+        const data = JSON.parse(event.data) as { percent?: number; status?: string; error?: string }
 
         if (data.status === 'ready' || data.status === 'complete') {
-          removePendingPull(pull.id)
-          closeSse(pull.id)
+          closeSse(id)
+          removePendingPull(id)
+          const img = images.value.find((i) => i.id === id)
+          if (img) {
+            img.status = 'ready'
+            img.error = undefined
+          }
           fetchImages()
           return
         }
 
         if (data.status === 'failed') {
-          removePendingPull(pull.id)
-          closeSse(pull.id)
+          closeSse(id)
+          removePendingPull(id)
+          const img = images.value.find((i) => i.id === id)
+          if (img) {
+            img.status = 'failed'
+            img.error = data.error
+          }
           return
         }
 
+        const pending = pendingPulls.value.find((p) => p.id === id)
         if (pending && data.percent !== undefined) {
           pending.percent = Math.max(pending.percent, data.percent)
         }
@@ -65,8 +74,8 @@ export const useImagesStore = defineStore('images', () => {
     }
 
     es.onerror = () => {
-      closeSse(pull.id)
-      removePendingPull(pull.id)
+      closeSse(id)
+      removePendingPull(id)
     }
   }
 
@@ -88,29 +97,35 @@ export const useImagesStore = defineStore('images', () => {
   function removePendingPull(id: string) {
     pendingPulls.value = pendingPulls.value.filter((p) => p.id !== id)
   }
-  // TODO i hate empty catch blocks its not a nice pattern please refactor me
   async function initPendingPulls() {
     try {
       const pulls = await imagesApi.listPulls()
       pendingPulls.value = pulls
       for (const pull of pulls) {
-        subscribePull(pull)
+        subscribePull(pull.id)
       }
     } catch {
       // silently ignore
     }
   }
 
-  async function createImage(req: CreateImageRequest): Promise<CreateImageResult> {
-    const result = await imagesApi.create(req)
-    if (result.image) {
-      images.value.unshift(result.image)
+  async function createImage(req: CreateImageRequest): Promise<Image> {
+    const image = await imagesApi.create(req)
+    images.value.unshift(image)
+
+    if (image.status === 'pulling') {
+      pendingPulls.value.unshift({
+        id: image.id,
+        name: image.name,
+        tag: image.tag,
+        title: image.title,
+        percent: 0,
+        status: 'pulling',
+      })
+      subscribePull(image.id)
     }
-    if (result.pendingPull) {
-      pendingPulls.value.unshift(result.pendingPull)
-      subscribePull(result.pendingPull)
-    }
-    return result
+
+    return image
   }
 
   async function deleteImage(id: string) {

@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, Trash2, CircleCheck } from 'lucide-vue-next'
+import { Plus, Trash2, CircleCheck, CircleX, Loader2 } from 'lucide-vue-next'
 import { DonutProgress } from '@/components/ui/donut-progress'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -39,8 +39,8 @@ async function handleCreateImage(
   done: (success: boolean) => void,
 ) {
   try {
-    const result = await createImage(payload)
-    if (result.image) {
+    const image = await createImage(payload)
+    if (image.status === 'ready') {
       toast.success('Vorlage wurde hinzugefügt')
     } else {
       toast.success('Image wird heruntergeladen...')
@@ -129,9 +129,26 @@ function handleToggleVisibility() {
               <Badge variant="secondary">{{ image.name }}:{{ image.tag }}</Badge>
             </TableCell>
             <TableCell>
-              <div class="flex items-center gap-1.5 text-emerald-600">
+              <div v-if="image.status === 'ready'" class="flex items-center gap-1.5 text-emerald-600">
                 <CircleCheck class="h-4 w-4" />
                 <span class="text-sm">Bereit</span>
+              </div>
+              <div v-else-if="image.status === 'pulling'" class="flex items-center gap-1.5 text-blue-600">
+                <Loader2 class="h-4 w-4 animate-spin" />
+                <span class="text-sm">Wird geladen</span>
+              </div>
+              <div v-else-if="image.status === 'failed'" class="flex items-center gap-1.5 text-destructive">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <div class="flex items-center gap-1.5">
+                        <CircleX class="h-4 w-4" />
+                        <span class="text-sm">Fehlgeschlagen</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent v-if="image.error">{{ image.error }}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </TableCell>
             <TableCell>
