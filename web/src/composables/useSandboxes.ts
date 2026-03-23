@@ -1,12 +1,13 @@
-import { onMounted, onUnmounted } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useSandboxesStore } from '@/stores/sandboxes.store'
-import { useAuthStore } from '@/stores/auth.store'
+import {storeToRefs} from 'pinia'
+import {onMounted, onUnmounted} from 'vue'
+
+import {useAuthStore} from '@/stores/auth.store'
+import {useSandboxesStore} from '@/stores/sandboxes.store'
 
 export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
   const store = useSandboxesStore()
   const authStore = useAuthStore()
-  const { sandboxes, activeSandboxes, recentSandboxes, loading, error } = storeToRefs(store)
+  const {sandboxes, activeSandboxes, recentSandboxes, loading, error} = storeToRefs(store)
 
   let pollInterval: ReturnType<typeof setInterval> | null = null
 
@@ -41,5 +42,6 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
     createPublicDemo: store.createPublicDemo,
     extendTTL: store.extendTTL,
     deleteSandbox: store.deleteSandbox,
+    snapshotSandbox: store.snapshotSandbox,
   }
 }
