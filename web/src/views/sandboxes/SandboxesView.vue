@@ -34,7 +34,6 @@ const {
   recentSandboxes,
   loading,
   createSandbox,
-  extendTTL,
   deleteSandbox,
   refresh,
 } = useSandboxes()

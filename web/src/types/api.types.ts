@@ -83,7 +83,7 @@ export interface CreateImageRequest {
   isPublic: boolean
 }
 
-export interface CreateSnapshotRequest extends CreateImageRequest {}
+export type CreateSnapshotRequest = CreateImageRequest
 
 export interface LoginResponse {
   token: string

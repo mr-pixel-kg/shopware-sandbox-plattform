@@ -3,7 +3,6 @@ import { Package } from 'lucide-vue-next'
 
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
