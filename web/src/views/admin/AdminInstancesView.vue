@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import {Clock, Square} from 'lucide-vue-next'
-import {computed, ref} from 'vue'
-import {toast} from 'vue-sonner'
+import { Clock, Square } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
 
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
 import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import {Button} from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {Skeleton} from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -25,16 +25,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
-import {useImages} from '@/composables/useImages'
-import {useSandboxes} from '@/composables/useSandboxes'
-import {getApiErrorMessage} from '@/utils/error'
-import {formatDateTime} from '@/utils/formatters'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useImages } from '@/composables/useImages'
+import { useSandboxes } from '@/composables/useSandboxes'
+import { getApiErrorMessage } from '@/utils/error'
+import { formatDateTime } from '@/utils/formatters'
 
-import type {Sandbox, SandboxStatus} from '@/types'
+import type { Sandbox, SandboxStatus } from '@/types'
 
-const {sandboxes, deleteSandbox, loading} = useSandboxes('all')
-const {images} = useImages('all')
+const { sandboxes, deleteSandbox, loading } = useSandboxes('all')
+const { images } = useImages('all')
 
 const statusFilter = ref<string>('all')
 
@@ -81,12 +81,12 @@ async function handleConfirmDelete() {
 
 <template>
   <div>
-    <PageHeader title="Instanzen" subtitle="Alle Sandbox-Instanzen verwalten."/>
+    <PageHeader title="Instanzen" subtitle="Alle Sandbox-Instanzen verwalten." />
 
     <div class="mb-4 flex items-center gap-3">
       <Select v-model="statusFilter">
         <SelectTrigger class="w-40">
-          <SelectValue placeholder="Alle Status"/>
+          <SelectValue placeholder="Alle Status" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Alle Status</SelectItem>
@@ -111,21 +111,21 @@ async function handleConfirmDelete() {
           <template v-if="loading">
             <TableRow v-for="i in 3" :key="i" class="h-13">
               <TableCell>
-                <Skeleton class="h-5 w-16 rounded-full"/>
+                <Skeleton class="h-5 w-16 rounded-full" />
               </TableCell>
               <TableCell>
-                <Skeleton class="h-4 w-28"/>
+                <Skeleton class="h-4 w-28" />
               </TableCell>
               <TableCell>
-                <Skeleton class="h-4 w-24"/>
+                <Skeleton class="h-4 w-24" />
               </TableCell>
               <TableCell>
-                <Skeleton class="h-4 w-24"/>
+                <Skeleton class="h-4 w-24" />
               </TableCell>
               <TableCell class="text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <Skeleton class="h-7 w-7"/>
-                  <Skeleton class="h-7 w-7"/>
+                  <Skeleton class="h-7 w-7" />
+                  <Skeleton class="h-7 w-7" />
                 </div>
               </TableCell>
             </TableRow>
@@ -135,7 +135,7 @@ async function handleConfirmDelete() {
           </TableEmpty>
           <TableRow v-for="sandbox in filteredSandboxes" :key="sandbox.id" class="h-13">
             <TableCell>
-              <StatusBadge :status="sandbox.status"/>
+              <StatusBadge :status="sandbox.status" />
             </TableCell>
             <TableCell class="font-medium">{{ getImageName(sandbox.imageId) }}</TableCell>
             <TableCell class="text-muted-foreground">{{
@@ -150,7 +150,7 @@ async function handleConfirmDelete() {
                   <Tooltip v-if="sandbox.status === 'running' || sandbox.status === 'starting'">
                     <TooltipTrigger as-child>
                       <Button variant="ghost" size="icon-sm" @click="handleExtend(sandbox)">
-                        <Clock class="h-4 w-4"/>
+                        <Clock class="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Verlängern</TooltipContent>
@@ -158,12 +158,12 @@ async function handleConfirmDelete() {
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          class="text-destructive hover:text-destructive"
-                          @click="handleDelete(sandbox)"
+                        variant="ghost"
+                        size="icon-sm"
+                        class="text-destructive hover:text-destructive"
+                        @click="handleDelete(sandbox)"
                       >
-                        <Square class="h-4 w-4"/>
+                        <Square class="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Beenden</TooltipContent>
@@ -177,17 +177,17 @@ async function handleConfirmDelete() {
     </div>
 
     <ExtendTtlDialog
-        v-model:open="showExtend"
-        :sandbox-id="selectedSandbox?.id ?? ''"
-        :sandbox-name="selectedSandbox?.containerName ?? ''"
+      v-model:open="showExtend"
+      :sandbox-id="selectedSandbox?.id ?? ''"
+      :sandbox-name="selectedSandbox?.containerName ?? ''"
     />
 
     <ConfirmDialog
-        v-model:open="showConfirmDelete"
-        title="Sandbox beenden"
-        :description="`Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} beenden möchtest? Diese Aktion kann nicht rückgängig gemacht werden.`"
-        confirm-label="Beenden"
-        @confirm="handleConfirmDelete"
+      v-model:open="showConfirmDelete"
+      title="Sandbox beenden"
+      :description="`Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} beenden möchtest? Diese Aktion kann nicht rückgängig gemacht werden.`"
+      confirm-label="Beenden"
+      @confirm="handleConfirmDelete"
     />
   </div>
 </template>

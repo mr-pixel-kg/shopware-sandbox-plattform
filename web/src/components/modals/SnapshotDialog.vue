@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import {Loader2, Trash2, Upload} from 'lucide-vue-next'
-import {ref, watch} from 'vue'
+import { Loader2, Trash2, Upload } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
 
-import {Button} from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,10 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {Input} from '@/components/ui/input'
-import {Label} from '@/components/ui/label'
-import {Switch} from '@/components/ui/switch'
-import {Textarea} from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 
 const props = defineProps<{
   open: boolean
@@ -66,10 +66,10 @@ function resetState() {
 }
 
 watch(
-    () => props.open,
-    (open) => {
-      if (open) resetState()
-    },
+  () => props.open,
+  (open) => {
+    if (open) resetState()
+  },
 )
 
 function handleFileChange(event: Event) {
@@ -92,21 +92,21 @@ function handleSubmit() {
   if (!name.value || !tag.value) return
   busy.value = true
   emit(
-      'submit',
-      {
-        name: name.value,
-        tag: tag.value,
-        title: title.value,
-        description: description.value,
-        isPublic: isPublic.value,
-        thumbnailFile: thumbnailFile.value ?? undefined,
-      },
-      (success: boolean) => {
-        busy.value = false
-        if (success) {
-          emit('update:open', false)
-        }
-      },
+    'submit',
+    {
+      name: name.value,
+      tag: tag.value,
+      title: title.value,
+      description: description.value,
+      isPublic: isPublic.value,
+      thumbnailFile: thumbnailFile.value ?? undefined,
+    },
+    (success: boolean) => {
+      busy.value = false
+      if (success) {
+        emit('update:open', false)
+      }
+    },
   )
 }
 </script>
@@ -123,68 +123,87 @@ function handleSubmit() {
       <form class="grid gap-4 py-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="snapshot-name">Image Name</Label>
-          <Input id="snapshot-name" v-model="name" placeholder="my-shop-snapshot" required :disabled="busy"/>
+          <Input
+            id="snapshot-name"
+            v-model="name"
+            placeholder="my-shop-snapshot"
+            required
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="snapshot-tag">Tag</Label>
-          <Input id="snapshot-tag" v-model="tag" placeholder="v1.0" required :disabled="busy"/>
+          <Input id="snapshot-tag" v-model="tag" placeholder="v1.0" required :disabled="busy" />
         </div>
         <div class="grid gap-2">
           <Label for="snapshot-title">Titel</Label>
-          <Input id="snapshot-title" v-model="title" placeholder="Mein Shop Snapshot" :disabled="busy"/>
+          <Input
+            id="snapshot-title"
+            v-model="title"
+            placeholder="Mein Shop Snapshot"
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="snapshot-description">Beschreibung</Label>
           <Textarea
-id="snapshot-description" v-model="description" placeholder="Beschreibung des Snapshots..."
-                    :disabled="busy"/>
+            id="snapshot-description"
+            v-model="description"
+            placeholder="Beschreibung des Snapshots..."
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label>Thumbnail</Label>
           <div v-if="thumbnailPreview" class="relative">
             <img
-                :src="thumbnailPreview"
-                alt="Thumbnail"
-                class="h-32 w-full rounded-md border object-cover"
+              :src="thumbnailPreview"
+              alt="Thumbnail"
+              class="h-32 w-full rounded-md border object-cover"
             />
             <Button
-                type="button"
-                variant="destructive"
-                size="icon-sm"
-                class="absolute top-2 right-2"
-                :disabled="busy"
-                @click="handleRemoveThumbnail"
+              type="button"
+              variant="destructive"
+              size="icon-sm"
+              class="absolute top-2 right-2"
+              :disabled="busy"
+              @click="handleRemoveThumbnail"
             >
-              <Trash2 class="h-3.5 w-3.5"/>
+              <Trash2 class="h-3.5 w-3.5" />
             </Button>
           </div>
           <Label
-              for="snapshot-thumbnail"
-              class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
-              :class="{ 'pointer-events-none opacity-50': busy }"
+            for="snapshot-thumbnail"
+            class="text-muted-foreground hover:border-primary hover:text-foreground flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm transition-colors"
+            :class="{ 'pointer-events-none opacity-50': busy }"
           >
-            <Upload class="h-4 w-4"/>
+            <Upload class="h-4 w-4" />
             {{ thumbnailPreview ? 'Thumbnail ersetzen' : 'Thumbnail hochladen' }}
           </Label>
           <input
-              id="snapshot-thumbnail"
-              ref="fileInputRef"
-              type="file"
-              accept="image/*"
-              class="hidden"
-              :disabled="busy"
-              @change="handleFileChange"
+            id="snapshot-thumbnail"
+            ref="fileInputRef"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            :disabled="busy"
+            @change="handleFileChange"
           />
         </div>
         <div class="flex items-center justify-between">
           <Label for="snapshot-public">Öffentlich sichtbar</Label>
-          <Switch id="snapshot-public" v-model="isPublic" :disabled="busy"/>
+          <Switch id="snapshot-public" v-model="isPublic" :disabled="busy" />
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" :disabled="busy" @click="emit('update:open', false)">Abbrechen
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="busy"
+            @click="emit('update:open', false)"
+            >Abbrechen
           </Button>
           <Button type="submit" :disabled="!name || !tag || busy">
-            <Loader2 v-if="busy" class="h-4 w-4 animate-spin mr-1"/>
+            <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
             {{ busy ? 'Wird erstellt...' : 'Snapshot erstellen' }}
           </Button>
         </DialogFooter>

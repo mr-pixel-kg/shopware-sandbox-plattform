@@ -1,9 +1,9 @@
-import {defineStore} from 'pinia'
-import {computed, ref} from 'vue'
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 
-import {sandboxesApi} from '@/api'
+import { sandboxesApi } from '@/api'
 
-import type {CreateSandboxRequest, CreateSnapshotRequest, Image, Sandbox} from '@/types'
+import type { CreateSandboxRequest, CreateSnapshotRequest, Image, Sandbox } from '@/types'
 
 export const useSandboxesStore = defineStore('sandboxes', () => {
   const sandboxes = ref<Sandbox[]>([])

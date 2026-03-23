@@ -279,7 +279,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, ErrSandboxNotFound
 	}
 
-	// use a seperate context so that when docker clinet disconnects because of a timeout it doesnt cancels the potentially long image commit
+	// use a separate context so that when docker clinet disconnects because of a timeout it doesnt cancels the potentially long image commit
 	commitCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
