@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/stores/auth.store'
 
 const authStore = useAuthStore()
@@ -22,13 +21,11 @@ const { user, isAuthenticated, isAdmin } = storeToRefs(authStore)
 const router = useRouter()
 
 const userTabs = [
-  { name: 'Sandboxes', to: '/sandboxes' },
-  { name: 'Entdecken', to: '/explore' },
+  { name: 'Sandboxen', to: '/sandboxes' },
+  { name: 'Vorlagen', to: '/images' },
 ]
 
 const adminTabs = [
-  { name: 'Instanzen', to: '/admin/instances' },
-  { name: 'Vorlagen', to: '/admin/images' },
   { name: 'Benutzer', to: '/admin/users' },
   { name: 'Protokoll', to: '/admin/audit' },
 ]
@@ -43,7 +40,7 @@ function getInitials(email: string): string {
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/explore')
+  router.push('/')
 }
 </script>
 
@@ -65,19 +62,7 @@ async function handleLogout() {
         >
           {{ tab.name }}
         </RouterLink>
-      </nav>
-      <RouterLink
-        v-else
-        to="/explore"
-        class="hover:bg-accent ml-4 rounded-md px-3 py-1.5 text-sm transition-colors"
-        active-class="bg-accent"
-      >
-        Entdecken
-      </RouterLink>
-
-      <template v-if="isAdmin">
-        <Separator orientation="vertical" class="h-6" />
-        <nav class="flex items-center gap-1">
+        <template v-if="isAdmin">
           <RouterLink
             v-for="tab in adminTabs"
             :key="tab.to"
@@ -87,8 +72,8 @@ async function handleLogout() {
           >
             {{ tab.name }}
           </RouterLink>
-        </nav>
-      </template>
+        </template>
+      </nav>
 
       <div class="ml-auto flex items-center gap-3">
         <template v-if="isAuthenticated && user">

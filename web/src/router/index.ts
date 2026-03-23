@@ -19,7 +19,8 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/explore',
+      name: 'home',
+      component: () => import('@/views/explore/ExploreView.vue'),
     },
     {
       path: '/sandboxes',
@@ -28,21 +29,10 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/explore',
-      name: 'explore',
-      component: () => import('@/views/explore/ExploreView.vue'),
-    },
-    {
-      path: '/admin/instances',
-      name: 'admin-instances',
-      component: () => import('@/views/admin/AdminInstancesView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true },
-    },
-    {
-      path: '/admin/images',
-      name: 'admin-images',
+      path: '/images',
+      name: 'images',
       component: () => import('@/views/admin/AdminImagesView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true },
     },
     {
       path: '/admin/users',
@@ -58,7 +48,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/explore',
+      redirect: '/',
     },
   ],
 })
