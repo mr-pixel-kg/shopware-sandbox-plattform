@@ -1,7 +1,8 @@
-import { onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useImagesStore, type FetchMode } from '@/stores/images.store'
+import { onMounted, onUnmounted } from 'vue'
+
 import { useAuthStore } from '@/stores/auth.store'
+import { type FetchMode, useImagesStore } from '@/stores/images.store'
 
 export function useImages(mode: FetchMode = 'public') {
   const store = useImagesStore()

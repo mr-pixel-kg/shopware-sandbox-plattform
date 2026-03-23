@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useTtlCountdown } from '@/composables/useTtlCountdown'
 import { Progress } from '@/components/ui/progress'
+import { useTtlCountdown } from '@/composables/useTtlCountdown'
 
 const props = defineProps<{
   expiresAt?: string
@@ -14,10 +14,10 @@ const { remainingFormatted, progressPercent, isExpired, isWarning } = useTtlCoun
 </script>
 
 <template>
-  <div v-if="expiresAt" class="flex items-center gap-2 min-w-[140px]">
-    <div class="flex flex-col gap-1 flex-1">
+  <div v-if="expiresAt" class="flex min-w-[140px] items-center gap-2">
+    <div class="flex flex-1 flex-col gap-1">
       <span
-        class="text-xs font-mono"
+        class="font-mono text-xs"
         :class="{
           'text-muted-foreground': isExpired,
           'text-yellow-600': isWarning && !isExpired,
@@ -26,10 +26,7 @@ const { remainingFormatted, progressPercent, isExpired, isWarning } = useTtlCoun
       >
         {{ isExpired ? 'abgelaufen' : remainingFormatted }}
       </span>
-      <Progress
-        :model-value="isExpired ? 0 : progressPercent"
-        class="h-1"
-      />
+      <Progress :model-value="isExpired ? 0 : progressPercent" class="h-1" />
     </div>
   </div>
 </template>

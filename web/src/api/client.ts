@@ -1,6 +1,8 @@
 import axios from 'axios'
-import type { AxiosInstance } from 'axios'
+
 import { getToken } from '@/utils/storage'
+
+import type { AxiosInstance } from 'axios'
 
 const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/public/']
 

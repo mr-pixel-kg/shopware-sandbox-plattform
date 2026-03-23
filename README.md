@@ -193,6 +193,35 @@ Or manually:
 cd api && go run ./cmd/api
 ```
 
+### Database Migrations
+
+Database schema changes are managed with [Goose](https://github.com/pressly/goose) using the SQL files in `api/internal/database/migrations`.
+
+Use Bab to work with migrations:
+
+```bash
+bab db:migrate
+bab db:migrate:status
+bab db:migrate:create
+bab db:migrate:fresh
+```
+
+Notes:
+
+- `bab db:migrate` applies only pending migrations and records them in Goose's `goose_db_version` table.
+- `bab db:migrate:create` creates a new sequential SQL migration with Goose annotations.
+- `bab db:migrate:fresh` is destructive and intended for local development only.
+- For deployment, run `bab db:migrate` before starting the new API version.
+
+You can also run the project-local migration CLI directly:
+
+```bash
+cd api
+go run ./cmd/migrate up
+go run ./cmd/migrate status
+go run ./cmd/migrate create add_user_index
+```
+
 #### Docker Host (macOS)
 
 If using Docker Desktop on macOS, set your socket path in `.env`:

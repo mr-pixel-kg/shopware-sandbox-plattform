@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth.store'
-import { getApiErrorMessage } from '@/utils/error'
 import { toast } from 'vue-sonner'
+
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth.store'
+import { getApiErrorMessage } from '@/utils/error'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -41,7 +42,7 @@ async function handleSubmit() {
       <CardDescription>Erstelle ein Konto, um loszulegen.</CardDescription>
     </CardHeader>
     <CardContent>
-      <form @submit.prevent="handleSubmit" class="grid gap-4">
+      <form class="grid gap-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="email">E-Mail</Label>
           <Input
@@ -76,9 +77,9 @@ async function handleSubmit() {
         <Button type="submit" class="w-full" :disabled="submitting">
           {{ submitting ? 'Wird registriert...' : 'Registrieren' }}
         </Button>
-        <p class="text-center text-sm text-muted-foreground">
+        <p class="text-muted-foreground text-center text-sm">
           Bereits ein Konto?
-          <RouterLink to="/login" class="underline underline-offset-4 hover:text-primary">
+          <RouterLink to="/login" class="hover:text-primary underline underline-offset-4">
             Anmelden
           </RouterLink>
         </p>

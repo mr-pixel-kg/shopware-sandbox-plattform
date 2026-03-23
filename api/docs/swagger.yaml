@@ -188,6 +188,9 @@ definitions:
       description:
         example: Prepared image for sales demos and internal QA.
         type: string
+      error:
+        example: pull access denied
+        type: string
       id:
         example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
         format: uuid
@@ -197,6 +200,9 @@ definitions:
         type: boolean
       name:
         example: dockware/dev
+        type: string
+      status:
+        example: ready
         type: string
       tag:
         example: 6.6.9.0
@@ -465,10 +471,6 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/models.Image'
-        "202":
-          description: Accepted
-          schema:
-            $ref: '#/definitions/dto.PendingPullResponse'
         "400":
           description: Bad Request
           schema:
@@ -670,8 +672,7 @@ paths:
       - Images
   /api/images/pulls:
     get:
-      description: Returns all images currently being pulled (in-memory only, not
-        persisted)
+      description: Returns all images currently being pulled, with progress percentage
       produces:
       - application/json
       responses:

@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useSandboxes } from '@/composables/useSandboxes'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
+import { Clock, Square } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { formatDateTime } from '@/utils/formatters'
-import type { Sandbox, SandboxStatus } from '@/types'
+
+import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
-import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -17,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -26,10 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Clock, Square } from 'lucide-vue-next'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useImages } from '@/composables/useImages'
+import { useSandboxes } from '@/composables/useSandboxes'
+import { getApiErrorMessage } from '@/utils/error'
+import { formatDateTime } from '@/utils/formatters'
+
+import type { Sandbox, SandboxStatus } from '@/types'
 
 const { sandboxes, deleteSandbox, loading } = useSandboxes('all')
 const { images } = useImages('all')
@@ -40,8 +42,10 @@ const filteredSandboxes = computed(() => {
   if (statusFilter.value === 'all') return sandboxes.value
   const activeStatuses: SandboxStatus[] = ['running', 'starting']
   const inactiveStatuses: SandboxStatus[] = ['stopped', 'expired', 'deleted', 'failed']
-  if (statusFilter.value === 'active') return sandboxes.value.filter((s) => activeStatuses.includes(s.status))
-  if (statusFilter.value === 'inactive') return sandboxes.value.filter((s) => inactiveStatuses.includes(s.status))
+  if (statusFilter.value === 'active')
+    return sandboxes.value.filter((s) => activeStatuses.includes(s.status))
+  if (statusFilter.value === 'inactive')
+    return sandboxes.value.filter((s) => inactiveStatuses.includes(s.status))
   return sandboxes.value
 })
 
@@ -79,7 +83,7 @@ async function handleConfirmDelete() {
   <div>
     <PageHeader title="Instanzen" subtitle="Alle Sandbox-Instanzen verwalten." />
 
-    <div class="flex items-center gap-3 mb-4">
+    <div class="mb-4 flex items-center gap-3">
       <Select v-model="statusFilter">
         <SelectTrigger class="w-[160px]">
           <SelectValue placeholder="Alle Status" />
@@ -126,7 +130,9 @@ async function handleConfirmDelete() {
               <StatusBadge :status="sandbox.status" />
             </TableCell>
             <TableCell class="font-medium">{{ getImageName(sandbox.imageId) }}</TableCell>
-            <TableCell class="text-muted-foreground">{{ formatDateTime(sandbox.createdAt) }}</TableCell>
+            <TableCell class="text-muted-foreground">{{
+              formatDateTime(sandbox.createdAt)
+            }}</TableCell>
             <TableCell class="text-muted-foreground">
               {{ sandbox.expiresAt ? formatDateTime(sandbox.expiresAt) : '—' }}
             </TableCell>
@@ -164,6 +170,7 @@ async function handleConfirmDelete() {
 
     <ExtendTtlDialog
       v-model:open="showExtend"
+      :sandbox-id="selectedSandbox?.id ?? ''"
       :sandbox-name="selectedSandbox?.containerName ?? ''"
     />
 

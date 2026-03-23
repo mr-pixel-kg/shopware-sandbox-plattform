@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
-import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-vue-next'
+
+import { Button } from '@/components/ui/button'
+
+import type { Component } from 'vue'
 
 // TODO: Replace with dynamic schema from API
 export interface CardAction {
@@ -30,8 +32,8 @@ defineProps<{
     :href="action.href"
     target="_blank"
   >
-    <Loader2 v-if="action.loading" class="h-4 w-4 animate-spin mr-1" />
-    <component :is="action.icon" v-else-if="action.icon" class="h-4 w-4 mr-1" />
+    <Loader2 v-if="action.loading" class="mr-1 h-4 w-4 animate-spin" />
+    <component :is="action.icon" v-else-if="action.icon" class="mr-1 h-4 w-4" />
     {{ action.label }}
   </Button>
   <Button
@@ -42,8 +44,8 @@ defineProps<{
     :disabled="action.loading || action.disabled"
     @click="action.onClick?.()"
   >
-    <Loader2 v-if="action.loading" class="h-4 w-4 animate-spin mr-1" />
-    <component :is="action.icon" v-else-if="action.icon" class="h-4 w-4 mr-1" />
+    <Loader2 v-if="action.loading" class="mr-1 h-4 w-4 animate-spin" />
+    <component :is="action.icon" v-else-if="action.icon" class="mr-1 h-4 w-4" />
     {{ action.label }}
   </Button>
 </template>

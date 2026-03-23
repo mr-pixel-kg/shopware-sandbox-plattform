@@ -58,4 +58,3 @@ func (r *ImageRepository) UpdateStatus(id uuid.UUID, status string, errMsg *stri
 		"error":  errMsg,
 	}).Error
 }
-

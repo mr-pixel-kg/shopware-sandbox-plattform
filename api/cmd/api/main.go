@@ -63,24 +63,31 @@ func main() {
 	slog.Info("http server initialized", "base_url", cfg.Server.BaseURL, "port", cfg.Server.Port)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	serverErrCh := make(chan error, 1)
 
 	// Start serving the API only after the full dependency graph is ready.
 	go func() {
 		if err := server.Start(); err != nil && err != http.ErrServerClosed {
-			slog.Error("http server error", "error", err)
-			os.Exit(1)
+			serverErrCh <- err
 		}
 	}()
 
-	<-ctx.Done()
-	slog.Info("shutdown signal received, draining connections")
+	select {
+	case err := <-serverErrCh:
+		stop()
+		slog.Error("http server error", "error", err)
+		os.Exit(1)
+	case <-ctx.Done():
+		stop()
+		slog.Info("shutdown signal received, draining connections")
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
+		cancel()
 		slog.Error("graceful shutdown failed", "error", err)
 		os.Exit(1)
 	}
+	cancel()
 	slog.Info("server stopped gracefully")
 }

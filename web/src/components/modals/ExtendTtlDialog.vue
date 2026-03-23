@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { useSandboxesStore } from '@/stores/sandboxes.store'
-import { getApiErrorMessage } from '@/utils/error'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,9 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useSandboxesStore } from '@/stores/sandboxes.store'
+import { getApiErrorMessage } from '@/utils/error'
 
 const props = defineProps<{
   open: boolean
@@ -58,17 +59,14 @@ async function handleSubmit() {
       <DialogHeader>
         <DialogTitle>Laufzeit verlängern</DialogTitle>
         <DialogDescription>
-          Verlängere die Laufzeit von <strong>{{ sandboxName }}</strong>.
+          Verlängere die Laufzeit von <strong>{{ sandboxName }}</strong
+          >.
         </DialogDescription>
       </DialogHeader>
-      <div class="py-4 space-y-2">
+      <div class="space-y-2 py-4">
         <Label>Laufzeit</Label>
         <ToggleGroup v-model="ttlMinutes" type="single" variant="outline" class="justify-start">
-          <ToggleGroupItem
-            v-for="opt in options"
-            :key="opt.value"
-            :value="opt.value"
-          >
+          <ToggleGroupItem v-for="opt in options" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </ToggleGroupItem>
         </ToggleGroup>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -55,10 +56,16 @@ function handleSubmit() {
         <DialogTitle>Benutzer einladen</DialogTitle>
         <DialogDescription>Lade einen neuen Benutzer per E-Mail ein.</DialogDescription>
       </DialogHeader>
-      <form @submit.prevent="handleSubmit" class="grid gap-4 py-4">
+      <form class="grid gap-4 py-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="invite-email">E-Mail</Label>
-          <Input id="invite-email" v-model="email" type="email" placeholder="name@example.com" required />
+          <Input
+            id="invite-email"
+            v-model="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+          />
         </div>
         <div class="grid gap-2">
           <Label for="invite-role">Rolle</Label>
@@ -73,7 +80,9 @@ function handleSubmit() {
           </Select>
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" @click="emit('update:open', false)">Abbrechen</Button>
+          <Button type="button" variant="outline" @click="emit('update:open', false)"
+            >Abbrechen</Button
+          >
           <Button type="submit">Einladen</Button>
         </DialogFooter>
       </form>

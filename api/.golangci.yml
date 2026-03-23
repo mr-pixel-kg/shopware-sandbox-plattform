@@ -10,10 +10,14 @@ linters:
     - ineffassign
     - gocritic
     - misspell
-    - prealloc
     - gosec
 
   settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprintf
     revive:
       rules:
         - name: exported

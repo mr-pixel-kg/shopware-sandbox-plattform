@@ -266,12 +266,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.Image"
                         }
                     },
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "$ref": "#/definitions/dto.PendingPullResponse"
-                        }
-                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -294,7 +288,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all images currently being pulled (in-memory only, not persisted)",
+                "description": "Returns all images currently being pulled, with progress percentage",
                 "produces": [
                     "application/json"
                 ],
@@ -1487,6 +1481,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Prepared image for sales demos and internal QA."
                 },
+                "error": {
+                    "type": "string",
+                    "example": "pull access denied"
+                },
                 "id": {
                     "type": "string",
                     "format": "uuid",
@@ -1499,6 +1497,10 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "dockware/dev"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ready"
                 },
                 "tag": {
                     "type": "string",

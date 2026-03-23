@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { Image } from '@/types'
-import type { CardAction } from './ActionButton.vue'
-import PresetCard from './PresetCard.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+
+import PresetCard from './PresetCard.vue'
+
+import type { CardAction } from './ActionButton.vue'
+import type { Image } from '@/types'
 
 defineProps<{
   images: Image[]
@@ -11,10 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <div
-    v-if="images.length > 0"
-    class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4"
-  >
+  <div v-if="images.length > 0" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
     <PresetCard
       v-for="image in images"
       :key="image.id"

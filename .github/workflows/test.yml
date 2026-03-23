@@ -1,17 +1,80 @@
-name: Test
+name: CI
 
 on:
   push:
-    branches: [ "master", "development" ]
+    branches: ["master", "development"]
   pull_request:
-    branches: [ "master", "development" ]
+    branches: ["master", "development"]
 
 jobs:
-  build:
+  api-quality:
     runs-on: ubuntu-latest
-    defaults:
-      run:
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Check formatting
         working-directory: api
+        run: test -z "$(go tool gofumpt -l .)"
+
+      - name: Lint
+        working-directory: api
+        run: go tool golangci-lint run ./...
+
+      - name: Vet
+        working-directory: api
+        run: go vet ./...
+
+      - name: Build
+        working-directory: api
+        run: go build -v ./...
+
+  web-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        working-directory: web
+        run: pnpm format:check
+
+      - name: Lint
+        working-directory: web
+        run: pnpm lint
+
+      - name: Typecheck
+        working-directory: web
+        run: pnpm typecheck
+
+      - name: Build
+        working-directory: web
+        run: pnpm build
+
+  api-unit-tests:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v6
@@ -22,8 +85,60 @@ jobs:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
 
-      - name: Build
-        run: go build -v ./...
-
-      - name: Test
+      - name: Run unit tests
+        working-directory: api
         run: go test -v ./...
+
+  api-integration-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shopware_testenv_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shopware_testenv_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_DSN: host=127.0.0.1 port=5432 dbname=shopware_testenv_platform user=postgres password=postgres sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Run integration tests
+        working-directory: api
+        run: go test -v -tags=integration ./internal/http ./internal/repositories/...
+
+  api-swagger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Regenerate Swagger docs
+        working-directory: api
+        run: go generate ./cmd/api
+
+      - name: Check generated docs are committed
+        working-directory: api
+        run: git diff --exit-code -- docs/

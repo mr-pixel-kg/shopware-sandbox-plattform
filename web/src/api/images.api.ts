@@ -1,5 +1,6 @@
 import { apiClient } from './client'
-import type { CreateImageRequest, UpdateImageRequest, Image, PendingPull } from '@/types'
+
+import type { CreateImageRequest, Image, PendingPull, UpdateImageRequest } from '@/types'
 
 export const imagesApi = {
   async listPublic(): Promise<Image[]> {

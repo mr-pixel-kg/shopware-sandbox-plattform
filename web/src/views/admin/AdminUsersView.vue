@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
-import PageHeader from '@/components/shared/PageHeader.vue'
-import EmptyState from '@/components/shared/EmptyState.vue'
+
 import InviteUserDialog from '@/components/modals/InviteUserDialog.vue'
+import EmptyState from '@/components/shared/EmptyState.vue'
+import PageHeader from '@/components/shared/PageHeader.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { UserPlus } from 'lucide-vue-next'
 
 const showInvite = ref(false)
 </script>
@@ -15,7 +16,7 @@ const showInvite = ref(false)
     <PageHeader title="Benutzer" subtitle="Benutzer und Zugriffsrechte verwalten.">
       <template #actions>
         <Button @click="showInvite = true">
-          <UserPlus class="h-4 w-4 mr-1" />
+          <UserPlus class="mr-1 h-4 w-4" />
           Benutzer einladen
         </Button>
       </template>

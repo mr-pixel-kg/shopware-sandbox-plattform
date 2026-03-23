@@ -1,1 +1,5 @@
+-- +goose Up
 ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS port INTEGER NULL DEFAULT NULL;
+
+-- +goose Down
+ALTER TABLE sandboxes DROP COLUMN IF EXISTS port;

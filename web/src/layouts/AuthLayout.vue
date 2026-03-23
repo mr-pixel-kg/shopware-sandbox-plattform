@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-muted/40">
+  <div class="bg-muted/40 flex min-h-screen items-center justify-center">
     <slot />
   </div>
 </template>

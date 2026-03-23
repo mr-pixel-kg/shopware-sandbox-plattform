@@ -55,7 +55,7 @@ func NewImageService(
 		pullCancels:   make(map[string]context.CancelFunc),
 	}
 
-	if err := os.MkdirAll(service.thumbnailDir, 0o755); err != nil {
+	if err := os.MkdirAll(service.thumbnailDir, 0o750); err != nil {
 		slog.Error("create thumbnail directory failed", "component", "image", "path", service.thumbnailDir, "error", err.Error())
 	}
 
@@ -255,11 +255,14 @@ func (s *ImageService) SaveThumbnail(id uuid.UUID, file multipart.File, original
 	}
 
 	targetPath := filepath.Join(s.thumbnailDir, id.String()+ext)
+	// #nosec G304 -- targetPath is derived from a service-owned directory and a UUID-based filename.
 	dst, err := os.Create(targetPath)
 	if err != nil {
 		return nil, err
 	}
-	defer dst.Close()
+	defer func() {
+		_ = dst.Close()
+	}()
 
 	if _, err := io.Copy(dst, file); err != nil {
 		return nil, err

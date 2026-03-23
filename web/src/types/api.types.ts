@@ -33,13 +33,7 @@ export interface PendingPull {
   status: string
 }
 
-export type SandboxStatus =
-  | 'starting'
-  | 'running'
-  | 'stopped'
-  | 'expired'
-  | 'deleted'
-  | 'failed'
+export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'deleted' | 'failed'
 
 export interface Sandbox extends BaseModel {
   id: string
@@ -94,7 +88,7 @@ export interface UpdateImageRequest {
   isPublic: boolean
 }
 
-export interface CreateSnapshotRequest extends CreateImageRequest {}
+export type CreateSnapshotRequest = CreateImageRequest
 
 export interface LoginResponse {
   token: string

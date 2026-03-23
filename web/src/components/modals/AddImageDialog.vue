@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { Loader2, Trash2, Upload } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -8,12 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Upload, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   open: boolean
@@ -114,12 +114,20 @@ function handleSubmit() {
     <DialogContent class="sm:max-w-[500px]">
       <DialogHeader>
         <DialogTitle>Vorlage hinzufügen</DialogTitle>
-        <DialogDescription>Füge ein neues Docker-Image als Sandbox-Vorlage hinzu.</DialogDescription>
+        <DialogDescription
+          >Füge ein neues Docker-Image als Sandbox-Vorlage hinzu.</DialogDescription
+        >
       </DialogHeader>
-      <form @submit.prevent="handleSubmit" class="grid gap-4 py-4">
+      <form class="grid gap-4 py-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="image-name">Image Name</Label>
-          <Input id="image-name" v-model="name" placeholder="dockware/dev" required :disabled="busy" />
+          <Input
+            id="image-name"
+            v-model="name"
+            placeholder="dockware/dev"
+            required
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="image-tag">Tag</Label>
@@ -127,11 +135,21 @@ function handleSubmit() {
         </div>
         <div class="grid gap-2">
           <Label for="image-title">Titel</Label>
-          <Input id="image-title" v-model="title" placeholder="Leere Installation" :disabled="busy" />
+          <Input
+            id="image-title"
+            v-model="title"
+            placeholder="Leere Installation"
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="image-description">Beschreibung</Label>
-          <Textarea id="image-description" v-model="description" placeholder="Beschreibung der Vorlage..." :disabled="busy" />
+          <Textarea
+            id="image-description"
+            v-model="description"
+            placeholder="Beschreibung der Vorlage..."
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label>Thumbnail</Label>
@@ -154,15 +172,15 @@ function handleSubmit() {
           </div>
           <Label
             for="image-thumbnail"
-            class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+            class="text-muted-foreground hover:border-primary hover:text-foreground flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm transition-colors"
             :class="{ 'pointer-events-none opacity-50': busy }"
           >
             <Upload class="h-4 w-4" />
             {{ thumbnailPreview ? 'Thumbnail ersetzen' : 'Thumbnail hochladen' }}
           </Label>
           <input
-            ref="fileInputRef"
             id="image-thumbnail"
+            ref="fileInputRef"
             type="file"
             accept="image/*"
             class="hidden"
@@ -175,9 +193,15 @@ function handleSubmit() {
           <Switch id="image-public" v-model="isPublic" :disabled="busy" />
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" :disabled="busy" @click="emit('update:open', false)">Abbrechen</Button>
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="busy"
+            @click="emit('update:open', false)"
+            >Abbrechen</Button
+          >
           <Button type="submit" :disabled="!name || !tag || busy">
-            <Loader2 v-if="busy" class="h-4 w-4 animate-spin mr-1" />
+            <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
             {{ busy ? 'Wird hinzugefügt...' : 'Hinzufügen' }}
           </Button>
         </DialogFooter>

@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+
 import type { AuditLog } from '@/types'
 
 export const auditApi = {

@@ -1,14 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+
 import { authApi } from '@/api'
 import { AUTH_LOGOUT_EVENT } from '@/api/client'
 import {
-  getToken,
-  setToken,
   clearToken,
+  getToken,
   isTokenExpired,
+  setToken,
   setupStorageListener,
 } from '@/utils/storage'
+
 import type { User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {

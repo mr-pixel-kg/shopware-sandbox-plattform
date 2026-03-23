@@ -74,7 +74,7 @@ type SandboxConfig struct {
 type DockerMode string
 
 const (
-	DockerModePort DockerMode = "port"
+	DockerModePort    DockerMode = "port"
 	DockerModeTraefik DockerMode = "traefik"
 )
 

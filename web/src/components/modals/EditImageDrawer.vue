@@ -1,5 +1,11 @@
 <script setup lang="ts">
+import { Loader2, Trash2, Upload } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -8,16 +14,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Upload, Trash2 } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { Textarea } from '@/components/ui/textarea'
+import { useImagesStore } from '@/stores/images.store'
 import { getApiErrorMessage } from '@/utils/error'
 import { resolveAssetUrl } from '@/utils/formatters'
-import { useImagesStore } from '@/stores/images.store'
+
 import type { Image } from '@/types'
 
 const props = defineProps<{
@@ -116,10 +118,15 @@ async function handleSubmit() {
         <SheetTitle>Vorlage bearbeiten</SheetTitle>
         <SheetDescription>Bearbeite die Details dieser Vorlage.</SheetDescription>
       </SheetHeader>
-      <form id="edit-image-form" @submit.prevent="handleSubmit" class="grid gap-4 px-4">
+      <form id="edit-image-form" class="grid gap-4 px-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="edit-title">Titel</Label>
-          <Input id="edit-title" v-model="title" placeholder="Leere Installation" :disabled="busy" />
+          <Input
+            id="edit-title"
+            v-model="title"
+            placeholder="Leere Installation"
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="edit-description">Beschreibung</Label>
@@ -151,15 +158,15 @@ async function handleSubmit() {
           </div>
           <Label
             for="edit-thumbnail"
-            class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+            class="text-muted-foreground hover:border-primary hover:text-foreground flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm transition-colors"
             :class="{ 'pointer-events-none opacity-50': busy }"
           >
             <Upload class="h-4 w-4" />
             {{ thumbnailPreview ? 'Thumbnail ersetzen' : 'Thumbnail hochladen' }}
           </Label>
           <input
-            ref="fileInputRef"
             id="edit-thumbnail"
+            ref="fileInputRef"
             type="file"
             accept="image/*"
             class="hidden"
@@ -173,11 +180,16 @@ async function handleSubmit() {
         </div>
       </form>
       <SheetFooter>
-        <Button type="button" variant="outline" :disabled="busy" @click="emit('update:open', false)">
+        <Button
+          type="button"
+          variant="outline"
+          :disabled="busy"
+          @click="emit('update:open', false)"
+        >
           Abbrechen
         </Button>
         <Button type="submit" form="edit-image-form" :disabled="busy">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin mr-1" />
+          <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
           {{ busy ? 'Wird gespeichert...' : 'Speichern' }}
         </Button>
       </SheetFooter>

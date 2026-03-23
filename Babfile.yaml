@@ -79,30 +79,39 @@ tasks:
       - cmd: docker compose build
 
   db:migrate:
-    desc: Run all SQL migrations against the database
+    desc: Apply all pending Goose migrations
     run:
       - cmd: |
-          for f in api/internal/database/migrations/*.sql; do
-            echo "Applying $f ..."
-            docker compose exec -T database psql -U mrpix_sandbox -d mrpix_sandbox -f - < "$f"
-          done
-          echo "Migrations complete."
+          cd api
+          go run ./cmd/migrate up
+
+  db:migrate:status:
+    desc: Show Goose migration status
+    run:
+      - cmd: |
+          cd api
+          go run ./cmd/migrate status
+
+  db:migrate:create:
+    desc: Create a new sequential Goose SQL migration
+    run:
+      - prompt: name
+        type: input
+        message: "Migration name (e.g. add_user_index):"
+      - cmd: |
+          cd api
+          go run ./cmd/migrate create "${name}"
 
   db:migrate:fresh:
-    desc: Drop all tables and re-run migrations
+    desc: Drop the public schema and re-run Goose migrations
     run:
       - prompt: confirm
         type: confirm
         message: "This will DROP all tables and re-run migrations. All data will be lost. Continue?"
         default: false
       - cmd: |
-          docker compose exec -T database psql -U mrpix_sandbox -d mrpix_sandbox -c "
-            DROP SCHEMA public CASCADE;
-            CREATE SCHEMA public;
-            GRANT ALL ON SCHEMA public TO mrpix_sandbox;
-          "
-          echo "Schema reset."
-      - task: db:migrate
+          cd api
+          go run ./cmd/migrate fresh
 
   db:psql:
     desc: Open interactive psql shell

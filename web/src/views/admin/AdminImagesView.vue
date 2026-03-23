@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { CircleCheck, CircleX, Loader2, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
 import { toast } from 'vue-sonner'
-import PageHeader from '@/components/shared/PageHeader.vue'
+
 import AddImageDialog from '@/components/modals/AddImageDialog.vue'
-import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
+import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DonutProgress } from '@/components/ui/donut-progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import {
   Table,
@@ -20,10 +22,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, Pencil, Trash2, CircleCheck, CircleX, Loader2 } from 'lucide-vue-next'
+import { useImages } from '@/composables/useImages'
+import { getApiErrorMessage } from '@/utils/error'
+
 import type { Image } from '@/types'
-import { DonutProgress } from '@/components/ui/donut-progress'
-import { Skeleton } from '@/components/ui/skeleton'
 
 const { images, pendingPulls, loading, createImage, updateImage, uploadThumbnail, deleteImage } =
   useImages('all')
@@ -103,7 +105,7 @@ async function handleToggleVisibility(image: Image) {
     <PageHeader title="Vorlagen" subtitle="Docker-Images als Sandbox-Vorlagen verwalten.">
       <template #actions>
         <Button @click="showAddImage = true">
-          <Plus class="h-4 w-4 mr-1" />
+          <Plus class="mr-1 h-4 w-4" />
           Vorlage hinzufügen
         </Button>
       </template>
@@ -113,14 +115,14 @@ async function handleToggleVisibility(image: Image) {
       <div
         v-for="pull in pendingPulls"
         :key="pull.id"
-        class="flex items-center gap-3 rounded-md border p-3 bg-muted/50"
+        class="bg-muted/50 flex items-center gap-3 rounded-md border p-3"
       >
         <DonutProgress :model-value="pull.percent" class="h-5 w-5" />
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0 flex-1">
           <span class="text-sm font-medium">{{ pull.title || pull.name }}</span>
           <Badge variant="secondary" class="ml-2 text-xs">{{ pull.name }}:{{ pull.tag }}</Badge>
         </div>
-        <span class="text-sm tabular-nums text-muted-foreground">{{ pull.percent }}%</span>
+        <span class="text-muted-foreground text-sm tabular-nums">{{ pull.percent }}%</span>
       </div>
     </div>
 
@@ -142,7 +144,7 @@ async function handleToggleVisibility(image: Image) {
               <TableCell><Skeleton class="h-5 w-28 rounded-full" /></TableCell>
               <TableCell><Skeleton class="h-4 w-16" /></TableCell>
               <TableCell><Skeleton class="h-4 w-8 rounded-full" /></TableCell>
-              <TableCell class="text-right"><Skeleton class="h-7 w-7 ml-auto" /></TableCell>
+              <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
             </TableRow>
           </template>
           <TableEmpty v-else-if="images.length === 0" :colspan="5">
@@ -152,22 +154,33 @@ async function handleToggleVisibility(image: Image) {
             <TableCell>
               <div>
                 <div class="font-medium">{{ image.title || image.name }}</div>
-                <div v-if="image.description" class="text-xs text-muted-foreground">{{ image.description }}</div>
+                <div v-if="image.description" class="text-muted-foreground text-xs">
+                  {{ image.description }}
+                </div>
               </div>
             </TableCell>
             <TableCell>
               <Badge variant="secondary">{{ image.name }}:{{ image.tag }}</Badge>
             </TableCell>
             <TableCell>
-              <div v-if="image.status === 'ready'" class="flex items-center gap-1.5 text-emerald-600">
+              <div
+                v-if="image.status === 'ready'"
+                class="flex items-center gap-1.5 text-emerald-600"
+              >
                 <CircleCheck class="h-4 w-4" />
                 <span class="text-sm">Bereit</span>
               </div>
-              <div v-else-if="image.status === 'pulling'" class="flex items-center gap-1.5 text-blue-600">
+              <div
+                v-else-if="image.status === 'pulling'"
+                class="flex items-center gap-1.5 text-blue-600"
+              >
                 <Loader2 class="h-4 w-4 animate-spin" />
                 <span class="text-sm">Wird geladen</span>
               </div>
-              <div v-else-if="image.status === 'failed'" class="flex items-center gap-1.5 text-destructive">
+              <div
+                v-else-if="image.status === 'failed'"
+                class="text-destructive flex items-center gap-1.5"
+              >
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger as-child>
@@ -182,18 +195,17 @@ async function handleToggleVisibility(image: Image) {
               </div>
             </TableCell>
             <TableCell>
-              <Switch :model-value="image.isPublic" @update:model-value="handleToggleVisibility(image)" />
+              <Switch
+                :model-value="image.isPublic"
+                @update:model-value="handleToggleVisibility(image)"
+              />
             </TableCell>
             <TableCell class="text-right">
               <div class="flex items-center justify-end gap-1">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        @click="requestEdit(image)"
-                      >
+                      <Button variant="ghost" size="icon-sm" @click="requestEdit(image)">
                         <Pencil class="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -222,10 +234,7 @@ async function handleToggleVisibility(image: Image) {
       </Table>
     </div>
 
-    <AddImageDialog
-      v-model:open="showAddImage"
-      @submit="handleCreateImage"
-    />
+    <AddImageDialog v-model:open="showAddImage" @submit="handleCreateImage" />
 
     <EditImageDrawer
       v-model:open="showEditDrawer"

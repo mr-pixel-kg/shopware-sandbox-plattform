@@ -1,21 +1,29 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-WORKDIR /app
+WORKDIR /src
 
-COPY go.mod ./
-COPY go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/api ./cmd/api
+COPY cmd ./cmd
+COPY docs ./docs
+COPY internal ./internal
+
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 FROM alpine:3.20
 
+RUN apk add --no-cache ca-certificates wget
+
 WORKDIR /app
 
-COPY --from=builder /bin/api /usr/local/bin/api
-COPY --from=builder /app/docs /app/docs
+COPY --from=builder /out/api /usr/local/bin/api
+
+RUN mkdir -p /app/storage/thumbnails
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --quiet --output-document=/dev/null http://127.0.0.1:8080/health || exit 1
 
 CMD ["api"]

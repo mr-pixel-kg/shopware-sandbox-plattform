@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+
 import { sandboxesApi } from '@/api'
-import type { Sandbox, CreateSandboxRequest } from '@/types'
+
+import type { CreateSandboxRequest, Sandbox } from '@/types'
 
 export const useSandboxesStore = defineStore('sandboxes', () => {
   const sandboxes = ref<Sandbox[]>([])
@@ -14,7 +16,11 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
 
   const recentSandboxes = computed(() =>
     sandboxes.value.filter(
-      (s) => s.status === 'stopped' || s.status === 'expired' || s.status === 'failed' || s.status === 'deleted',
+      (s) =>
+        s.status === 'stopped' ||
+        s.status === 'expired' ||
+        s.status === 'failed' ||
+        s.status === 'deleted',
     ),
   )
 

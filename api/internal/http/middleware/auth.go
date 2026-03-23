@@ -56,7 +56,10 @@ func parseAuthorizationHeader(authHeader string) (string, bool) {
 	switch len(parts) {
 	case 1:
 		// Swagger UI users often paste only the JWT value into the auth dialog.
-		return parts[0], parts[0] != ""
+		if parts[0] == "" || strings.EqualFold(parts[0], "Bearer") {
+			return "", false
+		}
+		return parts[0], true
 	case 2:
 		if !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
 			return "", false

@@ -1,5 +1,4 @@
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
+-- +goose Up
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -76,3 +75,11 @@ CREATE INDEX IF NOT EXISTS idx_sandbox_events_sandbox_id ON sandbox_events(sandb
 CREATE INDEX IF NOT EXISTS idx_sessions_token_id ON sessions(token_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+
+-- +goose Down
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS sandbox_events;
+DROP TABLE IF EXISTS sandboxes;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS images;
+DROP TABLE IF EXISTS users;

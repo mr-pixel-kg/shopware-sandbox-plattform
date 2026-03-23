@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ExternalLink, Play, Square } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
+
+import PresetGrid from '@/components/explore/PresetGrid.vue'
+import SandboxCard from '@/components/explore/SandboxCard.vue'
+import CardGridSkeleton from '@/components/shared/CardGridSkeleton.vue'
+import PageHeader from '@/components/shared/PageHeader.vue'
 import { useImages } from '@/composables/useImages'
 import { useSandboxes } from '@/composables/useSandboxes'
 import { useAuthStore } from '@/stores/auth.store'
 import { getApiErrorMessage } from '@/utils/error'
-import { toast } from 'vue-sonner'
-import { ExternalLink, Play, Square } from 'lucide-vue-next'
-import type { Image, Sandbox } from '@/types'
+
 import type { CardAction } from '@/components/explore/ActionButton.vue'
-import PageHeader from '@/components/shared/PageHeader.vue'
-import PresetGrid from '@/components/explore/PresetGrid.vue'
-import CardGridSkeleton from '@/components/shared/CardGridSkeleton.vue'
-import SandboxCard from '@/components/explore/SandboxCard.vue'
 import type { MetadataGroup } from '@/components/explore/SandboxCard.vue'
+import type { Image, Sandbox } from '@/types'
 
 const { images, loading: imagesLoading } = useImages()
 const {
@@ -141,7 +143,7 @@ async function handleDemo(imageId: string) {
 
     <div class="space-y-8">
       <section v-if="hasActiveSandboxes || sandboxesLoading">
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Meine Sandboxes</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Meine Sandboxes</h3>
         <CardGridSkeleton v-if="sandboxesLoading" :count="2" />
         <div
           v-else-if="hasActiveSandboxes"
@@ -159,13 +161,9 @@ async function handleDemo(imageId: string) {
       </section>
 
       <section>
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Vorlagen</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Vorlagen</h3>
         <CardGridSkeleton v-if="imagesLoading" :count="6" />
-        <PresetGrid
-          v-else
-          :images="images"
-          :get-actions="getPresetActions"
-        />
+        <PresetGrid v-else :images="images" :get-actions="getPresetActions" />
       </section>
     </div>
   </div>
