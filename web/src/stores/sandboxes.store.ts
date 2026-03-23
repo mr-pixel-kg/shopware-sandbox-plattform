@@ -14,7 +14,11 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
 
   const recentSandboxes = computed(() =>
     sandboxes.value.filter(
-      (s) => s.status === 'stopped' || s.status === 'expired' || s.status === 'failed' || s.status === 'deleted',
+      (s) =>
+        s.status === 'stopped' ||
+        s.status === 'expired' ||
+        s.status === 'failed' ||
+        s.status === 'deleted',
     ),
   )
 

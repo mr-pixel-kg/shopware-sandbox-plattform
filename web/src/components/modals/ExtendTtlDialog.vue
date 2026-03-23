@@ -58,17 +58,14 @@ async function handleSubmit() {
       <DialogHeader>
         <DialogTitle>Laufzeit verlängern</DialogTitle>
         <DialogDescription>
-          Verlängere die Laufzeit von <strong>{{ sandboxName }}</strong>.
+          Verlängere die Laufzeit von <strong>{{ sandboxName }}</strong
+          >.
         </DialogDescription>
       </DialogHeader>
-      <div class="py-4 space-y-2">
+      <div class="space-y-2 py-4">
         <Label>Laufzeit</Label>
         <ToggleGroup v-model="ttlMinutes" type="single" variant="outline" class="justify-start">
-          <ToggleGroupItem
-            v-for="opt in options"
-            :key="opt.value"
-            :value="opt.value"
-          >
+          <ToggleGroupItem v-for="opt in options" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </ToggleGroupItem>
         </ToggleGroup>

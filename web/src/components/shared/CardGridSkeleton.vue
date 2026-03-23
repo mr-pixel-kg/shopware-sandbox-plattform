@@ -16,7 +16,7 @@ withDefaults(
     <div
       v-for="i in count"
       :key="i"
-      class="bg-card flex flex-col justify-between rounded-xl border p-6 shadow-sm h-[200px]"
+      class="bg-card flex h-[200px] flex-col justify-between rounded-xl border p-6 shadow-sm"
     >
       <div class="space-y-3">
         <Skeleton class="h-4 w-24" />

@@ -10,9 +10,17 @@ const props = defineProps<{
 const config = computed(() => {
   switch (props.status) {
     case 'running':
-      return { label: 'Aktiv', variant: 'outline' as const, class: 'bg-green-500/15 text-green-700 border-green-500/25' }
+      return {
+        label: 'Aktiv',
+        variant: 'outline' as const,
+        class: 'bg-green-500/15 text-green-700 border-green-500/25',
+      }
     case 'starting':
-      return { label: 'Startet', variant: 'outline' as const, class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25' }
+      return {
+        label: 'Startet',
+        variant: 'outline' as const,
+        class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+      }
     case 'stopped':
       return { label: 'Gestoppt', variant: 'secondary' as const, class: '' }
     case 'expired':

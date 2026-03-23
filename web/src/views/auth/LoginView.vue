@@ -63,9 +63,9 @@ async function handleSubmit() {
         <Button type="submit" class="w-full" :disabled="submitting">
           {{ submitting ? 'Wird angemeldet...' : 'Anmelden' }}
         </Button>
-        <p class="text-center text-sm text-muted-foreground">
+        <p class="text-muted-foreground text-center text-sm">
           Noch kein Konto?
-          <RouterLink to="/register" class="underline underline-offset-4 hover:text-primary">
+          <RouterLink to="/register" class="hover:text-primary underline underline-offset-4">
             Registrieren
           </RouterLink>
         </p>

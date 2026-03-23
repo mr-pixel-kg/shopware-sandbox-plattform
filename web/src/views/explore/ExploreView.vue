@@ -141,7 +141,7 @@ async function handleDemo(imageId: string) {
 
     <div class="space-y-8">
       <section v-if="hasActiveSandboxes || sandboxesLoading">
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Meine Sandboxes</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Meine Sandboxes</h3>
         <CardGridSkeleton v-if="sandboxesLoading" :count="2" />
         <div
           v-else-if="hasActiveSandboxes"
@@ -159,13 +159,9 @@ async function handleDemo(imageId: string) {
       </section>
 
       <section>
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Vorlagen</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Vorlagen</h3>
         <CardGridSkeleton v-if="imagesLoading" :count="6" />
-        <PresetGrid
-          v-else
-          :images="images"
-          :get-actions="getPresetActions"
-        />
+        <PresetGrid v-else :images="images" :get-actions="getPresetActions" />
       </section>
     </div>
   </div>

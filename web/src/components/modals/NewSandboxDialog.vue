@@ -70,27 +70,29 @@ function handleSubmit() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[680px] p-0 gap-0">
+    <DialogContent class="gap-0 p-0 sm:max-w-[680px]">
       <DialogHeader class="p-6 pb-4">
         <DialogTitle>Neue Sandbox</DialogTitle>
         <DialogDescription>Wähle eine Vorlage und konfiguriere die Laufzeit.</DialogDescription>
       </DialogHeader>
 
-      <div class="flex border-t min-h-[340px]">
+      <div class="flex min-h-[340px] border-t">
         <div class="w-[220px] border-r">
           <ScrollArea class="h-[340px]">
             <div class="p-2">
               <button
                 v-for="image in images"
                 :key="image.id"
-                class="w-full flex items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                class="hover:bg-accent flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors"
                 :class="{ 'bg-accent': selectedImageId === image.id }"
                 :disabled="submitting"
                 @click="selectedImageId = image.id"
               >
                 <div class="min-w-0 flex-1">
-                  <div class="font-medium truncate">{{ image.title || image.name }}</div>
-                  <div class="text-xs text-muted-foreground truncate">{{ image.name }}:{{ image.tag }}</div>
+                  <div class="truncate font-medium">{{ image.title || image.name }}</div>
+                  <div class="text-muted-foreground truncate text-xs">
+                    {{ image.name }}:{{ image.tag }}
+                  </div>
                 </div>
               </button>
             </div>
@@ -101,7 +103,7 @@ function handleSubmit() {
           <div v-if="selectedImage" class="space-y-6">
             <div>
               <h3 class="text-sm font-medium">{{ selectedImage.title || selectedImage.name }}</h3>
-              <p v-if="selectedImage.description" class="text-sm text-muted-foreground mt-1">
+              <p v-if="selectedImage.description" class="text-muted-foreground mt-1 text-sm">
                 {{ selectedImage.description }}
               </p>
               <Badge variant="secondary" class="mt-2">
@@ -111,28 +113,32 @@ function handleSubmit() {
 
             <div>
               <Label class="mb-2 block">Laufzeit</Label>
-              <ToggleGroup v-model="ttlMinutes" type="single" variant="outline" class="justify-start" :disabled="submitting">
-                <ToggleGroupItem
-                  v-for="opt in ttlOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
+              <ToggleGroup
+                v-model="ttlMinutes"
+                type="single"
+                variant="outline"
+                class="justify-start"
+                :disabled="submitting"
+              >
+                <ToggleGroupItem v-for="opt in ttlOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
 
-          <div v-else class="flex items-center justify-center h-full text-sm text-muted-foreground">
+          <div v-else class="text-muted-foreground flex h-full items-center justify-center text-sm">
             Wähle eine Vorlage aus der Liste
           </div>
         </div>
       </div>
 
-      <DialogFooter class="p-6 pt-4 border-t">
-        <Button variant="outline" :disabled="submitting" @click="emit('update:open', false)">Abbrechen</Button>
+      <DialogFooter class="border-t p-6 pt-4">
+        <Button variant="outline" :disabled="submitting" @click="emit('update:open', false)"
+          >Abbrechen</Button
+        >
         <Button :disabled="!selectedImageId || submitting" @click="handleSubmit">
-          <Loader2 v-if="submitting" class="h-4 w-4 animate-spin mr-1" />
+          <Loader2 v-if="submitting" class="mr-1 h-4 w-4 animate-spin" />
           {{ submitting ? 'Wird gestartet...' : 'Sandbox starten' }}
         </Button>
       </DialogFooter>

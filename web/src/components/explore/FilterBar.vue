@@ -22,7 +22,7 @@ const filters = [
       type="single"
       variant="outline"
       :model-value="modelValue"
-      @update:model-value="emit('update:modelValue', $event as string || 'all')"
+      @update:model-value="emit('update:modelValue', ($event as string) || 'all')"
     >
       <ToggleGroupItem v-for="f in filters" :key="f.value" :value="f.value" size="sm">
         {{ f.label }}

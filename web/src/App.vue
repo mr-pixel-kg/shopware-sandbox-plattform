@@ -7,7 +7,7 @@ import AuthLayout from '@/layouts/AuthLayout.vue'
 import { Toaster } from '@/components/ui/sonner'
 
 const route = useRoute()
-const layout = computed(() => route.meta.layout === 'auth' ? AuthLayout : DefaultLayout)
+const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : DefaultLayout))
 </script>
 
 <template>

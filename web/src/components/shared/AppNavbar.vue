@@ -47,19 +47,19 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b bg-background">
-    <div class="mx-auto w-full max-w-6xl flex h-14 items-center gap-4 px-6">
+  <header class="bg-background sticky top-0 z-50 border-b">
+    <div class="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-6">
       <RouterLink to="/" class="flex items-center gap-2 text-sm font-semibold">
         <img :src="logo" class="h-7" alt="Shopshredder.de Logo" />
         Shopshredder.de
       </RouterLink>
 
-      <nav v-if="isAuthenticated" class="flex items-center gap-1 ml-4">
+      <nav v-if="isAuthenticated" class="ml-4 flex items-center gap-1">
         <RouterLink
           v-for="tab in userTabs"
           :key="tab.to"
           :to="tab.to"
-          class="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-accent"
+          class="hover:bg-accent rounded-md px-3 py-1.5 text-sm transition-colors"
           active-class="bg-accent"
         >
           {{ tab.name }}
@@ -68,7 +68,7 @@ async function handleLogout() {
       <RouterLink
         v-else
         to="/explore"
-        class="ml-4 px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-accent"
+        class="hover:bg-accent ml-4 rounded-md px-3 py-1.5 text-sm transition-colors"
         active-class="bg-accent"
       >
         Entdecken
@@ -81,7 +81,7 @@ async function handleLogout() {
             v-for="tab in adminTabs"
             :key="tab.to"
             :to="tab.to"
-            class="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-accent"
+            class="hover:bg-accent rounded-md px-3 py-1.5 text-sm transition-colors"
             active-class="bg-accent"
           >
             {{ tab.name }}

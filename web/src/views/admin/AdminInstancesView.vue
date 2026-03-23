@@ -40,8 +40,10 @@ const filteredSandboxes = computed(() => {
   if (statusFilter.value === 'all') return sandboxes.value
   const activeStatuses: SandboxStatus[] = ['running', 'starting']
   const inactiveStatuses: SandboxStatus[] = ['stopped', 'expired', 'deleted', 'failed']
-  if (statusFilter.value === 'active') return sandboxes.value.filter((s) => activeStatuses.includes(s.status))
-  if (statusFilter.value === 'inactive') return sandboxes.value.filter((s) => inactiveStatuses.includes(s.status))
+  if (statusFilter.value === 'active')
+    return sandboxes.value.filter((s) => activeStatuses.includes(s.status))
+  if (statusFilter.value === 'inactive')
+    return sandboxes.value.filter((s) => inactiveStatuses.includes(s.status))
   return sandboxes.value
 })
 
@@ -79,7 +81,7 @@ async function handleConfirmDelete() {
   <div>
     <PageHeader title="Instanzen" subtitle="Alle Sandbox-Instanzen verwalten." />
 
-    <div class="flex items-center gap-3 mb-4">
+    <div class="mb-4 flex items-center gap-3">
       <Select v-model="statusFilter">
         <SelectTrigger class="w-[160px]">
           <SelectValue placeholder="Alle Status" />
@@ -126,7 +128,9 @@ async function handleConfirmDelete() {
               <StatusBadge :status="sandbox.status" />
             </TableCell>
             <TableCell class="font-medium">{{ getImageName(sandbox.imageId) }}</TableCell>
-            <TableCell class="text-muted-foreground">{{ formatDateTime(sandbox.createdAt) }}</TableCell>
+            <TableCell class="text-muted-foreground">{{
+              formatDateTime(sandbox.createdAt)
+            }}</TableCell>
             <TableCell class="text-muted-foreground">
               {{ sandbox.expiresAt ? formatDateTime(sandbox.expiresAt) : '—' }}
             </TableCell>

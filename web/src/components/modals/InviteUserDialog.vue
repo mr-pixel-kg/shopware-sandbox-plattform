@@ -58,7 +58,13 @@ function handleSubmit() {
       <form @submit.prevent="handleSubmit" class="grid gap-4 py-4">
         <div class="grid gap-2">
           <Label for="invite-email">E-Mail</Label>
-          <Input id="invite-email" v-model="email" type="email" placeholder="name@example.com" required />
+          <Input
+            id="invite-email"
+            v-model="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+          />
         </div>
         <div class="grid gap-2">
           <Label for="invite-role">Rolle</Label>
@@ -73,7 +79,9 @@ function handleSubmit() {
           </Select>
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" @click="emit('update:open', false)">Abbrechen</Button>
+          <Button type="button" variant="outline" @click="emit('update:open', false)"
+            >Abbrechen</Button
+          >
           <Button type="submit">Einladen</Button>
         </DialogFooter>
       </form>

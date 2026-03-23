@@ -15,7 +15,7 @@ const showInvite = ref(false)
     <PageHeader title="Benutzer" subtitle="Benutzer und Zugriffsrechte verwalten.">
       <template #actions>
         <Button @click="showInvite = true">
-          <UserPlus class="h-4 w-4 mr-1" />
+          <UserPlus class="mr-1 h-4 w-4" />
           Benutzer einladen
         </Button>
       </template>

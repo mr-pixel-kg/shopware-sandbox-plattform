@@ -77,12 +77,20 @@ function handleSubmit() {
     <DialogContent class="sm:max-w-[500px]">
       <DialogHeader>
         <DialogTitle>Vorlage hinzufügen</DialogTitle>
-        <DialogDescription>Füge ein neues Docker-Image als Sandbox-Vorlage hinzu.</DialogDescription>
+        <DialogDescription
+          >Füge ein neues Docker-Image als Sandbox-Vorlage hinzu.</DialogDescription
+        >
       </DialogHeader>
       <form @submit.prevent="handleSubmit" class="grid gap-4 py-4">
         <div class="grid gap-2">
           <Label for="image-name">Image Name</Label>
-          <Input id="image-name" v-model="name" placeholder="dockware/dev" required :disabled="busy" />
+          <Input
+            id="image-name"
+            v-model="name"
+            placeholder="dockware/dev"
+            required
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="image-tag">Tag</Label>
@@ -90,20 +98,36 @@ function handleSubmit() {
         </div>
         <div class="grid gap-2">
           <Label for="image-title">Titel</Label>
-          <Input id="image-title" v-model="title" placeholder="Leere Installation" :disabled="busy" />
+          <Input
+            id="image-title"
+            v-model="title"
+            placeholder="Leere Installation"
+            :disabled="busy"
+          />
         </div>
         <div class="grid gap-2">
           <Label for="image-description">Beschreibung</Label>
-          <Textarea id="image-description" v-model="description" placeholder="Beschreibung der Vorlage..." :disabled="busy" />
+          <Textarea
+            id="image-description"
+            v-model="description"
+            placeholder="Beschreibung der Vorlage..."
+            :disabled="busy"
+          />
         </div>
         <div class="flex items-center justify-between">
           <Label for="image-public">Öffentlich sichtbar</Label>
           <Switch id="image-public" v-model="isPublic" :disabled="busy" />
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" :disabled="busy" @click="emit('update:open', false)">Abbrechen</Button>
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="busy"
+            @click="emit('update:open', false)"
+            >Abbrechen</Button
+          >
           <Button type="submit" :disabled="!name || !tag || busy">
-            <Loader2 v-if="busy" class="h-4 w-4 animate-spin mr-1" />
+            <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
             {{ busy ? 'Wird hinzugefügt...' : 'Hinzufügen' }}
           </Button>
         </DialogFooter>

@@ -27,7 +27,15 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, ExternalLink, Clock, Square, Trash2 } from 'lucide-vue-next'
 
-const { activeSandboxes, recentSandboxes, loading, createSandbox, extendTTL, deleteSandbox, refresh } = useSandboxes()
+const {
+  activeSandboxes,
+  recentSandboxes,
+  loading,
+  createSandbox,
+  extendTTL,
+  deleteSandbox,
+  refresh,
+} = useSandboxes()
 const { images } = useImages()
 
 const showNewSandbox = ref(false)
@@ -97,7 +105,7 @@ async function handleConfirmDelete() {
     <PageHeader title="Sandboxes" subtitle="Deine aktiven und kürzlich beendeten Sandboxes.">
       <template #actions>
         <Button @click="showNewSandbox = true">
-          <Plus class="h-4 w-4 mr-1" />
+          <Plus class="mr-1 h-4 w-4" />
           Neue Sandbox
         </Button>
       </template>
@@ -105,7 +113,7 @@ async function handleConfirmDelete() {
 
     <div class="space-y-8">
       <section>
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Aktive Sandboxes</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Aktive Sandboxes</h3>
         <div class="rounded-md border">
           <Table class="table-fixed">
             <TableHeader>
@@ -131,16 +139,16 @@ async function handleConfirmDelete() {
                   </TableCell>
                 </TableRow>
               </template>
-              <TableEmpty v-else-if="!hasActive" :colspan="4">
-                Keine aktiven Sandboxes
-              </TableEmpty>
+              <TableEmpty v-else-if="!hasActive" :colspan="4"> Keine aktiven Sandboxes </TableEmpty>
               <TableRow v-for="sandbox in activeSandboxes" :key="sandbox.id" class="h-13">
                 <TableCell>
                   <StatusBadge :status="sandbox.status" />
                 </TableCell>
                 <TableCell>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium truncate">{{ getImageName(sandbox.imageId) }}</span>
+                    <span class="truncate text-sm font-medium">{{
+                      getImageName(sandbox.imageId)
+                    }}</span>
                     <Badge v-if="getImageTag(sandbox.imageId)" variant="secondary" class="text-xs">
                       {{ getImageTag(sandbox.imageId) }}
                     </Badge>
@@ -170,7 +178,12 @@ async function handleConfirmDelete() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" @click="handleDelete(sandbox)">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            class="text-destructive hover:text-destructive"
+                            @click="handleDelete(sandbox)"
+                          >
                             <Square class="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -186,7 +199,7 @@ async function handleConfirmDelete() {
       </section>
 
       <section v-if="hasRecent || loading">
-        <h3 class="text-sm font-medium text-muted-foreground mb-3">Zuletzt beendet</h3>
+        <h3 class="text-muted-foreground mb-3 text-sm font-medium">Zuletzt beendet</h3>
         <div class="rounded-md border">
           <Table class="table-fixed">
             <TableHeader>
@@ -203,7 +216,7 @@ async function handleConfirmDelete() {
                   <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
                   <TableCell><Skeleton class="h-4 w-28" /></TableCell>
                   <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-                  <TableCell class="text-right"><Skeleton class="h-7 w-7 ml-auto" /></TableCell>
+                  <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
                 </TableRow>
               </template>
               <TableRow v-for="sandbox in recentSandboxes" :key="sandbox.id" class="h-13">
@@ -212,7 +225,9 @@ async function handleConfirmDelete() {
                 </TableCell>
                 <TableCell>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium truncate">{{ getImageName(sandbox.imageId) }}</span>
+                    <span class="truncate text-sm font-medium">{{
+                      getImageName(sandbox.imageId)
+                    }}</span>
                     <Badge v-if="getImageTag(sandbox.imageId)" variant="secondary" class="text-xs">
                       {{ getImageTag(sandbox.imageId) }}
                     </Badge>
@@ -225,7 +240,12 @@ async function handleConfirmDelete() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" @click="handleDelete(sandbox)">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          class="text-destructive hover:text-destructive"
+                          @click="handleDelete(sandbox)"
+                        >
                           <Trash2 class="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -255,9 +275,11 @@ async function handleConfirmDelete() {
     <ConfirmDialog
       v-model:open="showConfirmDelete"
       :title="isSelectedActive ? 'Sandbox beenden' : 'Aus Verlauf entfernen'"
-      :description="isSelectedActive
-        ? `Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} beenden möchtest? Diese Aktion kann nicht rückgängig gemacht werden.`
-        : `Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} endgültig aus dem Verlauf entfernen möchtest?`"
+      :description="
+        isSelectedActive
+          ? `Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} beenden möchtest? Diese Aktion kann nicht rückgängig gemacht werden.`
+          : `Bist du sicher, dass du ${selectedSandbox?.containerName ?? 'diese Sandbox'} endgültig aus dem Verlauf entfernen möchtest?`
+      "
       :confirm-label="isSelectedActive ? 'Beenden' : 'Entfernen'"
       @confirm="handleConfirmDelete"
     />

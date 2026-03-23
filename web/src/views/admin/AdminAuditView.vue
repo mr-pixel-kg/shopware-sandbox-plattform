@@ -63,13 +63,13 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
     <PageHeader title="Protokoll" subtitle="Aktivitäten und Audit-Einträge einsehen.">
       <template #actions>
         <Button variant="outline" @click="exportCsv">
-          <Download class="h-4 w-4 mr-1" />
+          <Download class="mr-1 h-4 w-4" />
           Exportieren
         </Button>
       </template>
     </PageHeader>
 
-    <div class="flex items-center gap-3 mb-4">
+    <div class="mb-4 flex items-center gap-3">
       <Select v-model="userFilter">
         <SelectTrigger class="w-[160px]">
           <SelectValue placeholder="Alle Benutzer" />
@@ -101,9 +101,7 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </SelectContent>
       </Select>
 
-      <span class="text-sm text-muted-foreground ml-auto">
-        {{ allLogs.length }} Einträge
-      </span>
+      <span class="text-muted-foreground ml-auto text-sm"> {{ allLogs.length }} Einträge </span>
     </div>
 
     <div class="rounded-md border">
@@ -140,7 +138,7 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
                 {{ actionBadgeConfig(log.action).label }}
               </Badge>
             </TableCell>
-            <TableCell class="max-w-[300px] truncate text-muted-foreground">
+            <TableCell class="text-muted-foreground max-w-[300px] truncate">
               {{ formatDetails(log.details) }}
             </TableCell>
             <TableCell class="text-muted-foreground font-mono text-xs">
@@ -151,10 +149,8 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
       </Table>
     </div>
 
-    <div v-if="totalPages > 1" class="flex items-center justify-between mt-4">
-      <span class="text-sm text-muted-foreground">
-        Seite {{ page }} von {{ totalPages }}
-      </span>
+    <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between">
+      <span class="text-muted-foreground text-sm"> Seite {{ page }} von {{ totalPages }} </span>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" :disabled="page <= 1" @click="page--">
           <ChevronLeft class="h-4 w-4" />

@@ -33,13 +33,7 @@ export interface PendingPull {
   status: string
 }
 
-export type SandboxStatus =
-  | 'starting'
-  | 'running'
-  | 'stopped'
-  | 'expired'
-  | 'deleted'
-  | 'failed'
+export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'deleted' | 'failed'
 
 export interface Sandbox extends BaseModel {
   id: string
