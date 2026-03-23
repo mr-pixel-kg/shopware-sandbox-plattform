@@ -4,6 +4,7 @@ import { ref } from 'vue'
 
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -30,6 +31,7 @@ defineProps<{
   title: string
   actions?: CardAction[]
   metadata?: MetadataGroup[]
+  statusNote?: string
 }>()
 
 const copiedKey = ref<string>()
@@ -48,7 +50,12 @@ async function copyToClipboard(field: MetadataField) {
     <CardHeader>
       <div class="flex items-start justify-between gap-2">
         <CardTitle class="truncate text-sm">{{ title }}</CardTitle>
-        <StatusBadge :status="sandbox.status" />
+        <div class="flex items-center gap-2">
+          <StatusBadge :status="sandbox.status" />
+          <Badge v-if="statusNote" variant="destructive" class="text-xs">
+            {{ statusNote }}
+          </Badge>
+        </div>
       </div>
     </CardHeader>
     <CardContent class="flex-1 space-y-3">

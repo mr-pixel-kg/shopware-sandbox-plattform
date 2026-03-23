@@ -1051,6 +1051,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/sandboxes/{id}/health": {
+            "get": {
+                "description": "SSE endpoint streaming sandbox readiness for active subscribers.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Sandboxes"
+                ],
+                "summary": "Stream sandbox health",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Sandbox ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token fallback for EventSource",
+                        "name": "access_token",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Last emitted SSE event payload",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SandboxHealthEvent"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/sandboxes/{id}/snapshot": {
             "post": {
                 "security": [
@@ -1418,6 +1478,47 @@ const docTemplate = `{
                     "type": "string",
                     "minLength": 8,
                     "example": "Sup3rS3cret!"
+                }
+            }
+        },
+        "dto.SandboxHealthEvent": {
+            "type": "object",
+            "properties": {
+                "checkedAt": {
+                    "type": "string",
+                    "example": "2026-03-23T10:15:07Z"
+                },
+                "failureReason": {
+                    "type": "string",
+                    "example": "tls_handshake_failed"
+                },
+                "httpStatus": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "latencyMs": {
+                    "type": "integer",
+                    "example": 412
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Sandbox URL is reachable"
+                },
+                "ready": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "sandboxId": {
+                    "type": "string",
+                    "example": "0b443c82-d8a3-49a7-b59a-26ce327c7341"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "probing"
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://sandbox-0b443c82.demo.shopshredder.de"
                 }
             }
         },

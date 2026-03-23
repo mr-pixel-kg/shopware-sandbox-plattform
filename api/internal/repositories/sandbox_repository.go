@@ -32,6 +32,14 @@ func (r *SandboxRepository) FindByID(id uuid.UUID) (*models.Sandbox, error) {
 	return &sandbox, nil
 }
 
+func (r *SandboxRepository) FindByContainerID(containerID string) (*models.Sandbox, error) {
+	var sandbox models.Sandbox
+	if err := r.db.First(&sandbox, "container_id = ?", containerID).Error; err != nil {
+		return nil, err
+	}
+	return &sandbox, nil
+}
+
 func (r *SandboxRepository) ListAllActive() ([]models.Sandbox, error) {
 	var sandboxes []models.Sandbox
 	err := r.db.Where("status IN ?", []models.SandboxStatus{

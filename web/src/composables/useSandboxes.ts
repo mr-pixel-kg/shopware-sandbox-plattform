@@ -7,7 +7,8 @@ import { useSandboxesStore } from '@/stores/sandboxes.store'
 export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
   const store = useSandboxesStore()
   const authStore = useAuthStore()
-  const { sandboxes, activeSandboxes, recentSandboxes, loading, error } = storeToRefs(store)
+  const { sandboxes, activeSandboxes, recentSandboxes, loading, error, healthBySandboxId } =
+    storeToRefs(store)
 
   let pollInterval: ReturnType<typeof setInterval> | null = null
 
@@ -29,6 +30,7 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
 
   onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval)
+    store.closeAllHealthStreams()
   })
 
   return {
@@ -44,5 +46,6 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
     deleteSandbox: store.deleteSandbox,
     removeSandboxFromList: store.removeSandboxFromList,
     snapshotSandbox: store.snapshotSandbox,
+    healthBySandboxId,
   }
 }

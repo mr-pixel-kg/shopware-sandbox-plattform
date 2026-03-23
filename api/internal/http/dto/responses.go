@@ -34,3 +34,15 @@ type PendingPullResponse struct {
 	Percent int     `json:"percent" example:"42"`
 	Status  string  `json:"status" example:"pulling"`
 }
+
+type SandboxHealthEvent struct {
+	SandboxID     string `json:"sandboxId" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
+	Status        string `json:"status" example:"probing"`
+	Ready         bool   `json:"ready" example:"false"`
+	URL           string `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
+	HTTPStatus    int    `json:"httpStatus,omitempty" example:"200"`
+	LatencyMs     int64  `json:"latencyMs,omitempty" example:"412"`
+	FailureReason string `json:"failureReason,omitempty" example:"tls_handshake_failed"`
+	Message       string `json:"message,omitempty" example:"Sandbox URL is reachable"`
+	CheckedAt     string `json:"checkedAt" example:"2026-03-23T10:15:07Z"`
+}

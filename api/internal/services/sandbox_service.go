@@ -14,6 +14,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 var (
@@ -140,7 +141,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		ImageID:         image.ID,
 		CreatedByUserID: input.UserID,
 		GuestSessionID:  input.GuestSessionID,
-		Status:          models.SandboxStatusRunning,
+		Status:          models.SandboxStatusStarting,
 		ContainerID:     container.ID,
 		ContainerName:   container.Name,
 		URL:             container.URL,
@@ -336,6 +337,41 @@ func (s *SandboxService) StartCleanupLoop(ctx context.Context) {
 	}()
 }
 
+func (s *SandboxService) StartDockerEventLoop(ctx context.Context) {
+	events, errs := s.docker.SubscribeSandboxEvents(ctx)
+	slog.Info("sandbox docker event loop started", "component", "sandbox_events")
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("sandbox docker event loop stopped", "component", "sandbox_events")
+				return
+			case err, ok := <-errs:
+				if !ok {
+					return
+				}
+				if err != nil {
+					slog.Error("sandbox docker event loop failed", "component", "sandbox_events", "error", err.Error())
+				}
+				return
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
+				if err := s.handleDockerContainerEvent(event); err != nil {
+					slog.Error("handle sandbox docker event failed",
+						"component", "sandbox_events",
+						"container_id", event.ContainerID,
+						"action", event.Action,
+						"error", err.Error(),
+					)
+				}
+			}
+		}
+	}()
+}
+
 func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 	expired, err := s.repo.FindExpired(time.Now().UTC())
 	if err != nil {
@@ -375,6 +411,64 @@ func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 			"container_id", sandbox.ContainerID,
 		)
 		_ = s.addEvent(sandbox.ID, "expired", map[string]any{})
+	}
+
+	return nil
+}
+
+func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContainerEvent) error {
+	sandbox, err := s.repo.FindByContainerID(event.ContainerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	switch event.Action {
+	case "start":
+		if sandbox.Status == models.SandboxStatusStopped {
+			sandbox.Status = models.SandboxStatusStarting
+			if err := s.repo.Update(sandbox); err != nil {
+				return err
+			}
+			return s.addEvent(sandbox.ID, "started", map[string]any{
+				"source": "docker_event",
+				"action": event.Action,
+			})
+		}
+		return nil
+
+	case "stop", "die":
+		if sandbox.Status == models.SandboxStatusDeleted || sandbox.Status == models.SandboxStatusExpired {
+			return nil
+		}
+		if sandbox.Status != models.SandboxStatusStopped {
+			sandbox.Status = models.SandboxStatusStopped
+			if err := s.repo.Update(sandbox); err != nil {
+				return err
+			}
+			return s.addEvent(sandbox.ID, "stopped", map[string]any{
+				"source": "docker_event",
+				"action": event.Action,
+			})
+		}
+		return nil
+
+	case "destroy":
+		if sandbox.Status == models.SandboxStatusDeleted || sandbox.Status == models.SandboxStatusExpired {
+			return nil
+		}
+		sandbox.Status = models.SandboxStatusDeleted
+		now := time.Now().UTC()
+		sandbox.DeletedAt = &now
+		if err := s.repo.Update(sandbox); err != nil {
+			return err
+		}
+		return s.addEvent(sandbox.ID, "deleted", map[string]any{
+			"source": "docker_event",
+			"action": event.Action,
+		})
 	}
 
 	return nil

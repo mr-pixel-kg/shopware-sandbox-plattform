@@ -21,6 +21,7 @@ import type { Image, Sandbox } from '@/types'
 const { images, loading: imagesLoading } = useImages()
 const {
   activeSandboxes,
+  healthBySandboxId,
   loading: sandboxesLoading,
   createPublicDemo,
   createSandbox,
@@ -35,6 +36,22 @@ const stoppingSandboxId = ref<string>()
 
 const hasActiveSandboxes = computed(() => activeSandboxes.value.length > 0)
 
+function getLiveHealth(sandbox: Sandbox) {
+  return healthBySandboxId.value[sandbox.id]
+}
+
+function isSandboxReachable(sandbox: Sandbox): boolean {
+  const health = getLiveHealth(sandbox)
+  if (sandbox.status !== 'running') return false
+  if (!health) return true
+  return health.ready
+}
+
+function getStatusNote(sandbox: Sandbox): string | undefined {
+  if (sandbox.status === 'running' && !isSandboxReachable(sandbox)) return 'Offline'
+  return undefined
+}
+
 function getImageTitle(sandbox: Sandbox): string {
   const image = images.value.find((i) => i.id === sandbox.imageId)
   return image?.title || image?.name || sandbox.containerName
@@ -44,15 +61,15 @@ function getImageTitle(sandbox: Sandbox): string {
 const sandboxActionsMap = computed(() => {
   const map: Record<string, CardAction[]> = {}
   for (const sandbox of activeSandboxes.value) {
-    const actions: CardAction[] = []
-    if (sandbox.url && sandbox.status === 'running') {
-      actions.push({
+    const actions: CardAction[] = [
+      {
         label: 'Öffnen',
         href: sandbox.url,
         variant: 'default',
         icon: ExternalLink,
-      })
-    }
+        disabled: !sandbox.url || !isSandboxReachable(sandbox),
+      },
+    ]
     if (sandbox.status === 'running' || sandbox.status === 'starting') {
       actions.push({
         label: 'Stoppen',
@@ -167,6 +184,7 @@ async function handleDemo(imageId: string) {
               :title="getImageTitle(sandbox)"
               :actions="sandboxActionsMap[sandbox.id]"
               :metadata="sandboxMetadataMap[sandbox.id]"
+              :status-note="getStatusNote(sandbox)"
             />
           </ShredderAnimation>
         </div>

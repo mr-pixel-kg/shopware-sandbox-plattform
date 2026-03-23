@@ -145,6 +145,36 @@ definitions:
     - email
     - password
     type: object
+  dto.SandboxHealthEvent:
+    properties:
+      checkedAt:
+        example: "2026-03-23T10:15:07Z"
+        type: string
+      failureReason:
+        example: tls_handshake_failed
+        type: string
+      httpStatus:
+        example: 200
+        type: integer
+      latencyMs:
+        example: 412
+        type: integer
+      message:
+        example: Sandbox URL is reachable
+        type: string
+      ready:
+        example: false
+        type: boolean
+      sandboxId:
+        example: 0b443c82-d8a3-49a7-b59a-26ce327c7341
+        type: string
+      status:
+        example: probing
+        type: string
+      url:
+        example: https://sandbox-0b443c82.demo.shopshredder.de
+        type: string
+    type: object
   dto.UpdateImageRequest:
     properties:
       description:
@@ -980,6 +1010,46 @@ paths:
       security:
       - BearerAuth: []
       summary: Get sandbox by ID
+      tags:
+      - Sandboxes
+  /api/sandboxes/{id}/health:
+    get:
+      description: SSE endpoint streaming sandbox readiness for active subscribers.
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Bearer token fallback for EventSource
+        in: query
+        name: access_token
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: Last emitted SSE event payload
+          schema:
+            $ref: '#/definitions/dto.SandboxHealthEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Stream sandbox health
       tags:
       - Sandboxes
   /api/sandboxes/{id}/snapshot:
