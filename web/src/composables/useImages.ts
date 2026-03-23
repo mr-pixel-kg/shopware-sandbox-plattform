@@ -30,6 +30,9 @@ export function useImages(mode: FetchMode = 'public') {
     error,
     refresh: () => store.fetchImages(),
     createImage: store.createImage,
+    updateImage: store.updateImage,
+    uploadThumbnail: store.uploadThumbnail,
+    deleteThumbnail: store.deleteThumbnail,
     deleteImage: store.deleteImage,
   }
 }
