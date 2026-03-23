@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
+	dockerevents "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -29,6 +31,11 @@ type SandboxContainer struct {
 	Port *int
 }
 
+type SandboxContainerEvent struct {
+	ContainerID string
+	Action      string
+}
+
 type Client interface {
 	ImageExists(ctx context.Context, imageName string) bool
 	EnsureImage(ctx context.Context, imageName string) error
@@ -37,6 +44,7 @@ type Client interface {
 	CreateContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error)
 	DeleteContainer(ctx context.Context, containerID string) error
 	CommitContainer(ctx context.Context, containerID, targetImage string) error
+	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
 }
 
 type DockerClient struct {
@@ -259,6 +267,51 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 	}
 
 	return nil
+}
+
+func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error) {
+	args := filters.NewArgs()
+	args.Add("type", "container")
+	args.Add("label", "sandbox_container=true")
+	args.Add("event", "start")
+	args.Add("event", "stop")
+	args.Add("event", "die")
+	args.Add("event", "destroy")
+
+	msgs, errs := c.client.Events(ctx, dockerevents.ListOptions{Filters: args})
+
+	out := make(chan SandboxContainerEvent)
+	errOut := make(chan error, 1)
+
+	go func() {
+		defer close(out)
+		defer close(errOut)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err, ok := <-errs:
+				if !ok {
+					return
+				}
+				if err != nil && ctx.Err() == nil {
+					errOut <- err
+				}
+				return
+			case msg, ok := <-msgs:
+				if !ok {
+					return
+				}
+				out <- SandboxContainerEvent{
+					ContainerID: msg.ID,
+					Action:      string(msg.Action),
+				}
+			}
+		}
+	}()
+
+	return out, errOut
 }
 
 func (c *DockerClient) buildTraefikLabels(containerName, hostname string) map[string]string {

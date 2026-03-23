@@ -63,6 +63,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	// Sandbox expiration is handled inside the same process on purpose to keep
 	// deployment simple for the single-service architecture.
 	sandboxService.StartCleanupLoop(context.Background())
+	sandboxService.StartDockerEventLoop(context.Background())
 	sandboxHealthService.StartMonitoringActive()
 
 	imageService.ReconcileOnStartup(context.Background())
