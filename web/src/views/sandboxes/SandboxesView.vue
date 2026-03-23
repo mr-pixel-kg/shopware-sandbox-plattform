@@ -29,14 +29,8 @@ import { formatDateTime } from '@/utils/formatters'
 
 import type { Sandbox } from '@/types'
 
-const {
-  activeSandboxes,
-  recentSandboxes,
-  loading,
-  createSandbox,
-  deleteSandbox,
-  refresh,
-} = useSandboxes()
+const { activeSandboxes, recentSandboxes, loading, createSandbox, deleteSandbox, refresh } =
+  useSandboxes()
 const { images } = useImages()
 
 const showNewSandbox = ref(false)
