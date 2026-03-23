@@ -39,3 +39,10 @@ export function ttlMinutesToLabel(minutes: number): string {
   const hours = minutes / 60
   return `${hours} Stunde${hours > 1 ? 'n' : ''}`
 }
+
+export function resolveAssetUrl(path: string | undefined): string | undefined {
+  if (!path) return undefined
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const base = (import.meta.env.WEB_API_URL || '').replace(/\/$/, '')
+  return base + path
+}

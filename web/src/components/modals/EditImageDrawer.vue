@@ -1,0 +1,186 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Loader2, Upload, Trash2 } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { getApiErrorMessage } from '@/utils/error'
+import { resolveAssetUrl } from '@/utils/formatters'
+import { useImagesStore } from '@/stores/images.store'
+import type { Image } from '@/types'
+
+const props = defineProps<{
+  open: boolean
+  image: Image | null
+}>()
+
+const emit = defineEmits<{
+  'update:open': [value: boolean]
+  saved: []
+}>()
+
+const store = useImagesStore()
+
+const title = ref('')
+const description = ref('')
+const isPublic = ref(true)
+const thumbnailFile = ref<File | null>(null)
+const thumbnailPreview = ref<string | undefined>()
+const removeThumbnail = ref(false)
+const busy = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function revokeBlobPreview() {
+  if (thumbnailPreview.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(thumbnailPreview.value)
+  }
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open && props.image) {
+      revokeBlobPreview()
+      title.value = props.image.title ?? ''
+      description.value = props.image.description ?? ''
+      isPublic.value = props.image.isPublic
+      thumbnailFile.value = null
+      thumbnailPreview.value = resolveAssetUrl(props.image.thumbnailUrl)
+      removeThumbnail.value = false
+      busy.value = false
+      if (fileInputRef.value) fileInputRef.value.value = ''
+    }
+  },
+)
+
+function handleFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  revokeBlobPreview()
+  thumbnailFile.value = file
+  removeThumbnail.value = false
+  thumbnailPreview.value = URL.createObjectURL(file)
+}
+
+function handleRemoveThumbnail() {
+  revokeBlobPreview()
+  thumbnailFile.value = null
+  thumbnailPreview.value = undefined
+  removeThumbnail.value = true
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+async function handleSubmit() {
+  if (!props.image) return
+  busy.value = true
+  try {
+    await store.updateImage(props.image.id, {
+      title: title.value || null,
+      description: description.value || null,
+      isPublic: isPublic.value,
+    })
+
+    if (thumbnailFile.value) {
+      await store.uploadThumbnail(props.image.id, thumbnailFile.value)
+    } else if (removeThumbnail.value && props.image.thumbnailUrl) {
+      await store.deleteThumbnail(props.image.id)
+    }
+
+    toast.success('Vorlage wurde aktualisiert')
+    emit('saved')
+    emit('update:open', false)
+  } catch (e) {
+    toast.error(getApiErrorMessage(e, 'Fehler beim Speichern'))
+  } finally {
+    busy.value = false
+  }
+}
+</script>
+
+<template>
+  <Sheet :open="open" @update:open="emit('update:open', $event)">
+    <SheetContent side="right" class="overflow-y-auto">
+      <SheetHeader>
+        <SheetTitle>Vorlage bearbeiten</SheetTitle>
+        <SheetDescription>Bearbeite die Details dieser Vorlage.</SheetDescription>
+      </SheetHeader>
+      <form id="edit-image-form" @submit.prevent="handleSubmit" class="grid gap-4 px-4">
+        <div class="grid gap-2">
+          <Label for="edit-title">Titel</Label>
+          <Input id="edit-title" v-model="title" placeholder="Leere Installation" :disabled="busy" />
+        </div>
+        <div class="grid gap-2">
+          <Label for="edit-description">Beschreibung</Label>
+          <Textarea
+            id="edit-description"
+            v-model="description"
+            placeholder="Beschreibung der Vorlage..."
+            :disabled="busy"
+          />
+        </div>
+        <div class="grid gap-2">
+          <Label>Thumbnail</Label>
+          <div v-if="thumbnailPreview" class="relative">
+            <img
+              :src="thumbnailPreview"
+              alt="Thumbnail"
+              class="h-32 w-full rounded-md border object-cover"
+            />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-sm"
+              class="absolute top-2 right-2"
+              :disabled="busy"
+              @click="handleRemoveThumbnail"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <Label
+            for="edit-thumbnail"
+            class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+            :class="{ 'pointer-events-none opacity-50': busy }"
+          >
+            <Upload class="h-4 w-4" />
+            {{ thumbnailPreview ? 'Thumbnail ersetzen' : 'Thumbnail hochladen' }}
+          </Label>
+          <input
+            ref="fileInputRef"
+            id="edit-thumbnail"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            :disabled="busy"
+            @change="handleFileChange"
+          />
+        </div>
+        <div class="flex items-center justify-between">
+          <Label for="edit-public">Öffentlich sichtbar</Label>
+          <Switch id="edit-public" v-model="isPublic" :disabled="busy" />
+        </div>
+      </form>
+      <SheetFooter>
+        <Button type="button" variant="outline" :disabled="busy" @click="emit('update:open', false)">
+          Abbrechen
+        </Button>
+        <Button type="submit" form="edit-image-form" :disabled="busy">
+          <Loader2 v-if="busy" class="h-4 w-4 animate-spin mr-1" />
+          {{ busy ? 'Wird gespeichert...' : 'Speichern' }}
+        </Button>
+      </SheetFooter>
+    </SheetContent>
+  </Sheet>
+</template>
