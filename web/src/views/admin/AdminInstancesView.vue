@@ -170,6 +170,7 @@ async function handleConfirmDelete() {
 
     <ExtendTtlDialog
       v-model:open="showExtend"
+      :sandbox-id="selectedSandbox?.id ?? ''"
       :sandbox-name="selectedSandbox?.containerName ?? ''"
     />
 
