@@ -1,21 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Image } from '@/types'
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { Package } from 'lucide-vue-next'
+import { computed } from 'vue'
 
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { resolveAssetUrl } from '@/utils/formatters'
 
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
-import { resolveAssetUrl } from '@/utils/formatters'
+import type { Image } from '@/types'
 
 const props = defineProps<{
   image: Image

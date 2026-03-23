@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2, Trash2, Upload } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Upload, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   open: boolean
@@ -173,15 +172,15 @@ function handleSubmit() {
           </div>
           <Label
             for="image-thumbnail"
-            class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
+            class="text-muted-foreground hover:border-primary hover:text-foreground flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm transition-colors"
             :class="{ 'pointer-events-none opacity-50': busy }"
           >
             <Upload class="h-4 w-4" />
             {{ thumbnailPreview ? 'Thumbnail ersetzen' : 'Thumbnail hochladen' }}
           </Label>
           <input
-            ref="fileInputRef"
             id="image-thumbnail"
+            ref="fileInputRef"
             type="file"
             accept="image/*"
             class="hidden"

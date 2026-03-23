@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { imagesApi } from '@/api'
-import type { Image, CreateImageRequest, UpdateImageRequest, PendingPull } from '@/types'
+
+import type { CreateImageRequest, Image, PendingPull, UpdateImageRequest } from '@/types'
 
 export type FetchMode = 'public' | 'all'
 

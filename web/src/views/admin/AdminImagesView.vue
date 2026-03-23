@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { CircleCheck, CircleX, Loader2, Plus, Trash2 } from 'lucide-vue-next'
+import { CircleCheck, CircleX, Loader2, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import AddImageDialog from '@/components/modals/AddImageDialog.vue'
-import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,10 +22,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, Pencil, Trash2, CircleCheck, CircleX, Loader2 } from 'lucide-vue-next'
+import { useImages } from '@/composables/useImages'
+import { getApiErrorMessage } from '@/utils/error'
+
 import type { Image } from '@/types'
-import { DonutProgress } from '@/components/ui/donut-progress'
-import { Skeleton } from '@/components/ui/skeleton'
 
 const { images, pendingPulls, loading, createImage, updateImage, uploadThumbnail, deleteImage } =
   useImages('all')
@@ -195,18 +195,17 @@ async function handleToggleVisibility(image: Image) {
               </div>
             </TableCell>
             <TableCell>
-              <Switch :model-value="image.isPublic" @update:model-value="handleToggleVisibility(image)" />
+              <Switch
+                :model-value="image.isPublic"
+                @update:model-value="handleToggleVisibility(image)"
+              />
             </TableCell>
             <TableCell class="text-right">
               <div class="flex items-center justify-end gap-1">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        @click="requestEdit(image)"
-                      >
+                      <Button variant="ghost" size="icon-sm" @click="requestEdit(image)">
                         <Pencil class="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
