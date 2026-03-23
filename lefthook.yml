@@ -43,7 +43,7 @@ pre-commit:
       priority: 2
       root: "web/"
       glob: "**/*.{ts,vue}"
-      run: npx vue-tsc --noEmit
+      run: npx vue-tsc -b --noEmit
 
     api-lint:
       priority: 2

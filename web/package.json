@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,vue,js,css,html,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,js,css,html,json}\"",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc -b --noEmit"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
