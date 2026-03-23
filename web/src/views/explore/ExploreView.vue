@@ -3,10 +3,12 @@ import { ExternalLink, Play, Square } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
+import { sandboxesApi } from '@/api'
 import PresetGrid from '@/components/explore/PresetGrid.vue'
 import SandboxCard from '@/components/explore/SandboxCard.vue'
 import CardGridSkeleton from '@/components/shared/CardGridSkeleton.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
+import ShredderAnimation from '@/components/shared/ShredderAnimation.vue'
 import { useImages } from '@/composables/useImages'
 import { useSandboxes } from '@/composables/useSandboxes'
 import { useAuthStore } from '@/stores/auth.store'
@@ -23,10 +25,11 @@ const {
   loading: sandboxesLoading,
   createPublicDemo,
   createSandbox,
-  deleteSandbox,
+  removeSandboxFromList,
   refresh: refreshSandboxes,
 } = useSandboxes()
 const authStore = useAuthStore()
+const shredderRefs = ref<Record<string, InstanceType<typeof ShredderAnimation>>>({})
 
 const creatingImageId = ref<string>()
 const stoppingSandboxId = ref<string>()
@@ -117,16 +120,17 @@ async function handleStopSandbox(sandbox: Sandbox) {
   if (stoppingSandboxId.value) return
   stoppingSandboxId.value = sandbox.id
   try {
-    if (authStore.isAuthenticated) {
-      await deleteSandbox(sandbox.id)
-    } else {
-      const { sandboxesApi } = await import('@/api')
-      await sandboxesApi.removeGuest(sandbox.id)
-      refreshSandboxes()
-    }
+    const animationPromise = shredderRefs.value[sandbox.id]?.shred() ?? Promise.resolve()
+    const apiPromise = authStore.isAuthenticated
+      ? sandboxesApi.remove(sandbox.id)
+      : sandboxesApi.removeGuest(sandbox.id)
+
+    await Promise.all([animationPromise, apiPromise])
+    removeSandboxFromList(sandbox.id)
     toast.success('Sandbox wird gestoppt')
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Stoppen'))
+    refreshSandboxes()
   } finally {
     stoppingSandboxId.value = undefined
   }
@@ -166,15 +170,23 @@ async function handleDemo(imageId: string) {
           v-else-if="hasActiveSandboxes"
           class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4"
         >
-          <SandboxCard
+          <ShredderAnimation
             v-for="sandbox in activeSandboxes"
             :key="sandbox.id"
-            :sandbox="sandbox"
-            :title="getImageTitle(sandbox)"
-            :actions="sandboxActionsMap[sandbox.id]"
-            :metadata="sandboxMetadataMap[sandbox.id]"
-            :status-note="getStatusNote(sandbox)"
-          />
+            :ref="
+              (el: any) => {
+                if (el) shredderRefs[sandbox.id] = el
+              }
+            "
+          >
+            <SandboxCard
+              :sandbox="sandbox"
+              :title="getImageTitle(sandbox)"
+              :actions="sandboxActionsMap[sandbox.id]"
+              :metadata="sandboxMetadataMap[sandbox.id]"
+              :status-note="getStatusNote(sandbox)"
+            />
+          </ShredderAnimation>
         </div>
       </section>
 

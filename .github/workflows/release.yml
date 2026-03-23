@@ -40,3 +40,18 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:latest
           docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }}
           docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Deploy to Portainer
+        uses: ./.github/actions/deploy-portainer
+        with:
+          webhook-url: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+          environment: production

@@ -1,0 +1,31 @@
+name: Deploy via Portainer
+description: Trigger a Portainer webhook to redeploy a stack
+
+inputs:
+  webhook-url:
+    description: Portainer webhook URL
+    required: true
+  environment:
+    description: Environment name for logging (e.g., staging or production)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger Portainer webhook
+      shell: bash
+      env:
+        WEBHOOK_URL: ${{ inputs.webhook-url }}
+        ENV_LABEL: ${{ inputs.environment }}
+      run: |
+        [ -n "$ENV_LABEL" ] && ENV_LABEL=" ($ENV_LABEL)"
+
+        response=$(curl -s -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 2 -X POST "$WEBHOOK_URL")
+
+        if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+          echo "Deployment triggered${ENV_LABEL} (HTTP $response)"
+        else
+          echo "::error::Webhook failed${ENV_LABEL} (HTTP $response)"
+          exit 1
+        fi

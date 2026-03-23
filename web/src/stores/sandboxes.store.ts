@@ -198,6 +198,10 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
     sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
   }
 
+  function removeSandboxFromList(id: string) {
+    sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
+  }
+
   async function snapshotSandbox(id: string, req: CreateSnapshotRequest): Promise<Image> {
     return await sandboxesApi.snapshot(id, req)
   }
@@ -217,6 +221,7 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
     createPublicDemo,
     extendTTL,
     deleteSandbox,
+    removeSandboxFromList,
     snapshotSandbox,
     closeAllHealthStreams,
   }
