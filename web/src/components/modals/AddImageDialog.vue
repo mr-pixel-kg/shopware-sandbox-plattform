@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { Loader2 } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -8,12 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Loader2 } from 'lucide-vue-next'
+import { Textarea } from '@/components/ui/textarea'
 
 const props = defineProps<{
   open: boolean
@@ -81,7 +82,7 @@ function handleSubmit() {
           >Füge ein neues Docker-Image als Sandbox-Vorlage hinzu.</DialogDescription
         >
       </DialogHeader>
-      <form @submit.prevent="handleSubmit" class="grid gap-4 py-4">
+      <form class="grid gap-4 py-4" @submit.prevent="handleSubmit">
         <div class="grid gap-2">
           <Label for="image-name">Image Name</Label>
           <Input

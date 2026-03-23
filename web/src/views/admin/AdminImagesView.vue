@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { CircleCheck, CircleX, Loader2, Plus, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
 import { toast } from 'vue-sonner'
-import PageHeader from '@/components/shared/PageHeader.vue'
+
 import AddImageDialog from '@/components/modals/AddImageDialog.vue'
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DonutProgress } from '@/components/ui/donut-progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import {
   Table,
@@ -19,9 +21,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, Trash2, CircleCheck, CircleX, Loader2 } from 'lucide-vue-next'
-import { DonutProgress } from '@/components/ui/donut-progress'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useImages } from '@/composables/useImages'
+import { getApiErrorMessage } from '@/utils/error'
 
 const { images, pendingPulls, loading, createImage, deleteImage } = useImages('all')
 

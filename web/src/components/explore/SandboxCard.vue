@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { Check, Copy } from 'lucide-vue-next'
 import { ref } from 'vue'
-import type { Sandbox } from '@/types'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Copy, Check } from 'lucide-vue-next'
-import StatusBadge from '@/components/shared/StatusBadge.vue'
+
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+
 import ActionButton from './ActionButton.vue'
+
 import type { CardAction } from './ActionButton.vue'
+import type { Sandbox } from '@/types'
 
 // TODO: Replace with dynamic schema from API
 export interface MetadataField {

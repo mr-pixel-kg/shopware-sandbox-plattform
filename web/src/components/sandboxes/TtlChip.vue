@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useTtlCountdown } from '@/composables/useTtlCountdown'
 import { Progress } from '@/components/ui/progress'
+import { useTtlCountdown } from '@/composables/useTtlCountdown'
 
 const props = defineProps<{
   expiresAt?: string

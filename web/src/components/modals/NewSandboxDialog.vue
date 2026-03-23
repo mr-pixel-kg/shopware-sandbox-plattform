@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { Image } from '@/types'
+import { Loader2 } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,12 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Loader2 } from 'lucide-vue-next'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+import type { Image } from '@/types'
 
 const props = defineProps<{
   open: boolean

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { Image } from '@/types'
-import type { CardAction } from './ActionButton.vue'
-import PresetCard from './PresetCard.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+
+import PresetCard from './PresetCard.vue'
+
+import type { CardAction } from './ActionButton.vue'
+import type { Image } from '@/types'
 
 defineProps<{
   images: Image[]

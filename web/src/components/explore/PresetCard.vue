@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Image } from '@/types'
+import { Package } from 'lucide-vue-next'
+
 import {
   Card,
   CardContent,
@@ -8,9 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Package } from 'lucide-vue-next'
+
 import ActionButton from './ActionButton.vue'
+
 import type { CardAction } from './ActionButton.vue'
+import type { Image } from '@/types'
 
 defineProps<{
   image: Image

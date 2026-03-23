@@ -2,9 +2,10 @@
 import 'vue-sonner/style.css'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import AuthLayout from '@/layouts/AuthLayout.vue'
+
 import { Toaster } from '@/components/ui/sonner'
+import AuthLayout from '@/layouts/AuthLayout.vue'
+import DefaultLayout from '@/layouts/DefaultLayout.vue'
 
 const route = useRoute()
 const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : DefaultLayout))
@@ -14,5 +15,5 @@ const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : Defau
   <component :is="layout">
     <RouterView />
   </component>
-  <Toaster richColors />
+  <Toaster rich-colors />
 </template>

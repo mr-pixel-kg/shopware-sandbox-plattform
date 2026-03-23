@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useSandboxes } from '@/composables/useSandboxes'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
+import { Clock, Square } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { formatDateTime } from '@/utils/formatters'
-import type { Sandbox, SandboxStatus } from '@/types'
+
+import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
-import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -17,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -26,10 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Clock, Square } from 'lucide-vue-next'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useImages } from '@/composables/useImages'
+import { useSandboxes } from '@/composables/useSandboxes'
+import { getApiErrorMessage } from '@/utils/error'
+import { formatDateTime } from '@/utils/formatters'
+
+import type { Sandbox, SandboxStatus } from '@/types'
 
 const { sandboxes, deleteSandbox, loading } = useSandboxes('all')
 const { images } = useImages('all')

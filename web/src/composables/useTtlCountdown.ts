@@ -1,4 +1,5 @@
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
+
 import { formatTtlRemaining } from '@/utils/formatters'
 
 export function useTtlCountdown(expiresAt: () => string | undefined, createdAt: () => string) {

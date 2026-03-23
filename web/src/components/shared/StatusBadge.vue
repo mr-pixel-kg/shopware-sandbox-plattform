@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+
 import { Badge } from '@/components/ui/badge'
+
 import type { SandboxStatus } from '@/types'
 
 const props = defineProps<{

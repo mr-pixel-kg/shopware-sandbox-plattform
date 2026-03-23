@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+
 import type { CreateSandboxRequest, CreateSnapshotRequest, Image, Sandbox } from '@/types'
 
 export const sandboxesApi = {

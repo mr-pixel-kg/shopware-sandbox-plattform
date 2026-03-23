@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useSandboxes } from '@/composables/useSandboxes'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
-import { formatDateTime } from '@/utils/formatters'
+import { Clock, ExternalLink, Plus, Square, Trash2 } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import type { Sandbox } from '@/types'
+
+import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
+import NewSandboxDialog from '@/components/modals/NewSandboxDialog.vue'
+import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import TtlChip from '@/components/sandboxes/TtlChip.vue'
-import NewSandboxDialog from '@/components/modals/NewSandboxDialog.vue'
-import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
-import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -25,7 +22,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, ExternalLink, Clock, Square, Trash2 } from 'lucide-vue-next'
+import { useImages } from '@/composables/useImages'
+import { useSandboxes } from '@/composables/useSandboxes'
+import { getApiErrorMessage } from '@/utils/error'
+import { formatDateTime } from '@/utils/formatters'
+
+import type { Sandbox } from '@/types'
 
 const {
   activeSandboxes,

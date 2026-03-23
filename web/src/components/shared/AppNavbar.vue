@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { LogOut } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { useAuthStore } from '@/stores/auth.store'
 import { useRouter } from 'vue-router'
-import { Separator } from '@/components/ui/separator'
-import { Button } from '@/components/ui/button'
+
+import logo from '@/assets/logo.png'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,8 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LogOut } from 'lucide-vue-next'
-import logo from '@/assets/logo.png'
+import { Separator } from '@/components/ui/separator'
+import { useAuthStore } from '@/stores/auth.store'
 
 const authStore = useAuthStore()
 const { user, isAuthenticated, isAdmin } = storeToRefs(authStore)

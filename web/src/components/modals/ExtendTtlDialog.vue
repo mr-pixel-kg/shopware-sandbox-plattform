@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { useSandboxesStore } from '@/stores/sandboxes.store'
-import { getApiErrorMessage } from '@/utils/error'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,9 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useSandboxesStore } from '@/stores/sandboxes.store'
+import { getApiErrorMessage } from '@/utils/error'
 
 const props = defineProps<{
   open: boolean

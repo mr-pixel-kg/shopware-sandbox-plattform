@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useAuditLogs } from '@/composables/useAuditLogs'
-import { formatDateTime } from '@/utils/formatters'
+import { ChevronLeft, ChevronRight, Download } from 'lucide-vue-next'
+
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -20,8 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Download, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useAuditLogs } from '@/composables/useAuditLogs'
+import { formatDateTime } from '@/utils/formatters'
 
 const {
   logs,

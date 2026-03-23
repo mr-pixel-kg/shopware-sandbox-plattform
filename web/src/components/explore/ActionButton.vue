@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
-import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-vue-next'
+
+import { Button } from '@/components/ui/button'
+
+import type { Component } from 'vue'
 
 // TODO: Replace with dynamic schema from API
 export interface CardAction {
