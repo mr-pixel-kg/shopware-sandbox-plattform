@@ -279,9 +279,11 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, ErrSandboxNotFound
 	}
 
-	// The Docker commit creates the runtime image, then the image service stores
-	// the corresponding template metadata in PostgreSQL.
-	if err := s.docker.CommitContainer(ctx, sandbox.ContainerID, targetImage); err != nil {
+	// use a separate context so that when docker clinet disconnects because of a timeout it doesnt cancels the potentially long image commit
+	commitCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	if err := s.docker.CommitContainer(commitCtx, sandbox.ContainerID, targetImage); err != nil {
 		return nil, err
 	}
 

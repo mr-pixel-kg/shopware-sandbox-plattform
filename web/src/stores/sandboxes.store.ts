@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import { sandboxesApi } from '@/api'
 
-import type { CreateSandboxRequest, Sandbox } from '@/types'
+import type { CreateSandboxRequest, CreateSnapshotRequest, Image, Sandbox } from '@/types'
 
 export const useSandboxesStore = defineStore('sandboxes', () => {
   const sandboxes = ref<Sandbox[]>([])
@@ -87,6 +87,10 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
     sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
   }
 
+  async function snapshotSandbox(id: string, req: CreateSnapshotRequest): Promise<Image> {
+    return await sandboxesApi.snapshot(id, req)
+  }
+
   return {
     sandboxes,
     loading,
@@ -101,5 +105,6 @@ export const useSandboxesStore = defineStore('sandboxes', () => {
     createPublicDemo,
     extendTTL,
     deleteSandbox,
+    snapshotSandbox,
   }
 })

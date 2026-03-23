@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Clock, ExternalLink, Plus, Square, Trash2 } from 'lucide-vue-next'
+import { Camera, Clock, ExternalLink, Plus, Square, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
 import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
 import NewSandboxDialog from '@/components/modals/NewSandboxDialog.vue'
+import SnapshotDialog from '@/components/modals/SnapshotDialog.vue'
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
@@ -29,12 +30,20 @@ import { formatDateTime } from '@/utils/formatters'
 
 import type { Sandbox } from '@/types'
 
-const { activeSandboxes, recentSandboxes, loading, createSandbox, deleteSandbox, refresh } =
-  useSandboxes()
-const { images } = useImages()
+const {
+  activeSandboxes,
+  recentSandboxes,
+  loading,
+  createSandbox,
+  deleteSandbox,
+  snapshotSandbox,
+  refresh,
+} = useSandboxes()
+const { images, uploadThumbnail } = useImages()
 
 const showNewSandbox = ref(false)
 const showExtend = ref(false)
+const showSnapshot = ref(false)
 const showConfirmDelete = ref(false)
 const selectedSandbox = ref<Sandbox | null>(null)
 
@@ -64,6 +73,11 @@ function handleExtend(sandbox: Sandbox) {
   showExtend.value = true
 }
 
+function handleSnapshot(sandbox: Sandbox) {
+  selectedSandbox.value = sandbox
+  showSnapshot.value = true
+}
+
 function handleDelete(sandbox: Sandbox) {
   selectedSandbox.value = sandbox
   showConfirmDelete.value = true
@@ -80,6 +94,33 @@ async function handleCreateSandbox(
     done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Starten der Sandbox'))
+    done(false)
+  }
+}
+
+async function handleCreateSnapshot(
+  payload: {
+    name: string
+    tag: string
+    title: string
+    description: string
+    isPublic: boolean
+    thumbnailFile?: File
+  },
+  done: (success: boolean) => void,
+) {
+  if (!selectedSandbox.value) return
+  try {
+    const image = await snapshotSandbox(selectedSandbox.value.id, payload)
+
+    if (payload.thumbnailFile) {
+      await uploadThumbnail(image.id, payload.thumbnailFile)
+    }
+
+    toast.success('Snapshot wurde erstellt')
+    done(true)
+  } catch (e) {
+    toast.error(getApiErrorMessage(e, 'Fehler beim Erstellen des Snapshots'))
     done(false)
   }
 }
@@ -122,11 +163,18 @@ async function handleConfirmDelete() {
             <TableBody>
               <template v-if="loading">
                 <TableRow v-for="i in 2" :key="i" class="h-13">
-                  <TableCell><Skeleton class="h-5 w-14 rounded-full" /></TableCell>
-                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton class="h-4 w-20" /></TableCell>
+                  <TableCell>
+                    <Skeleton class="h-5 w-14 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton class="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton class="h-4 w-20" />
+                  </TableCell>
                   <TableCell class="text-right">
                     <div class="flex items-center justify-end gap-1">
+                      <Skeleton class="h-7 w-7" />
                       <Skeleton class="h-7 w-7" />
                       <Skeleton class="h-7 w-7" />
                       <Skeleton class="h-7 w-7" />
@@ -173,6 +221,14 @@ async function handleConfirmDelete() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger as-child>
+                          <Button variant="ghost" size="icon-sm" @click="handleSnapshot(sandbox)">
+                            <Camera class="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Snapshot erstellen</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
                           <Button
                             variant="ghost"
                             size="icon-sm"
@@ -208,10 +264,18 @@ async function handleConfirmDelete() {
             <TableBody>
               <template v-if="loading">
                 <TableRow v-for="i in 2" :key="i" class="h-13">
-                  <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
-                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-                  <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
+                  <TableCell>
+                    <Skeleton class="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton class="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton class="h-4 w-24" />
+                  </TableCell>
+                  <TableCell class="text-right">
+                    <Skeleton class="ml-auto h-7 w-7" />
+                  </TableCell>
                 </TableRow>
               </template>
               <TableRow v-for="sandbox in recentSandboxes" :key="sandbox.id" class="h-13">
@@ -265,6 +329,12 @@ async function handleConfirmDelete() {
       v-model:open="showExtend"
       :sandbox-id="selectedSandbox?.id ?? ''"
       :sandbox-name="selectedSandbox?.containerName ?? ''"
+    />
+
+    <SnapshotDialog
+      v-model:open="showSnapshot"
+      :sandbox-name="selectedSandbox?.containerName ?? ''"
+      @submit="handleCreateSnapshot"
     />
 
     <ConfirmDialog

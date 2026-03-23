@@ -85,7 +85,7 @@ async function handleConfirmDelete() {
 
     <div class="mb-4 flex items-center gap-3">
       <Select v-model="statusFilter">
-        <SelectTrigger class="w-[160px]">
+        <SelectTrigger class="w-40">
           <SelectValue placeholder="Alle Status" />
         </SelectTrigger>
         <SelectContent>
@@ -110,10 +110,18 @@ async function handleConfirmDelete() {
         <TableBody>
           <template v-if="loading">
             <TableRow v-for="i in 3" :key="i" class="h-13">
-              <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-28" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+              <TableCell>
+                <Skeleton class="h-5 w-16 rounded-full" />
+              </TableCell>
+              <TableCell>
+                <Skeleton class="h-4 w-28" />
+              </TableCell>
+              <TableCell>
+                <Skeleton class="h-4 w-24" />
+              </TableCell>
+              <TableCell>
+                <Skeleton class="h-4 w-24" />
+              </TableCell>
               <TableCell class="text-right">
                 <div class="flex items-center justify-end gap-1">
                   <Skeleton class="h-7 w-7" />

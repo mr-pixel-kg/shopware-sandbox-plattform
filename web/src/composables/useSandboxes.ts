@@ -42,5 +42,6 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
     createPublicDemo: store.createPublicDemo,
     extendTTL: store.extendTTL,
     deleteSandbox: store.deleteSandbox,
+    snapshotSandbox: store.snapshotSandbox,
   }
 }

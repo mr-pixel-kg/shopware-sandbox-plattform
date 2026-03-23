@@ -241,10 +241,19 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		return fmt.Errorf("invalid target image reference")
 	}
 
+	// we need to pause the source container and freeze it because ongoing mysql writes/reads makes the process crash
+	if err := c.client.ContainerPause(ctx, containerID); err != nil {
+		return fmt.Errorf("pause container %s before commit: %w", containerID, err)
+	}
+	defer func() {
+		_ = c.client.ContainerUnpause(ctx, containerID)
+	}()
+
 	if _, err := c.client.ContainerCommit(ctx, containerID, container.CommitOptions{
 		Reference: targetImage,
 		Author:    c.dockerCfg.SnapshotAuthor,
 		Comment:   c.dockerCfg.SnapshotComment,
+		Pause:     true,
 	}); err != nil {
 		return fmt.Errorf("commit container %s to %s: %w", containerID, targetImage, err)
 	}
