@@ -79,7 +79,12 @@ export interface CreateImageRequest {
   tag: string
   title?: string
   description?: string
-  thumbnailUrl?: string
+  isPublic: boolean
+}
+
+export interface UpdateImageRequest {
+  title?: string | null
+  description?: string | null
   isPublic: boolean
 }
 

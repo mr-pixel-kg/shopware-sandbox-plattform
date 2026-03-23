@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import AddImageDialog from '@/components/modals/AddImageDialog.vue'
+import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
@@ -21,14 +22,24 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { useImages } from '@/composables/useImages'
-import { getApiErrorMessage } from '@/utils/error'
+import { Plus, Pencil, Trash2, CircleCheck, CircleX, Loader2 } from 'lucide-vue-next'
+import type { Image } from '@/types'
+import { DonutProgress } from '@/components/ui/donut-progress'
+import { Skeleton } from '@/components/ui/skeleton'
 
-const { images, pendingPulls, loading, createImage, deleteImage } = useImages('all')
+const { images, pendingPulls, loading, createImage, updateImage, uploadThumbnail, deleteImage } =
+  useImages('all')
 
 const showAddImage = ref(false)
+const showEditDrawer = ref(false)
+const selectedImage = ref<Image | null>(null)
 const showConfirmDelete = ref(false)
 const selectedImageId = ref<string | null>(null)
+
+function requestEdit(image: Image) {
+  selectedImage.value = image
+  showEditDrawer.value = true
+}
 
 function requestDelete(id: string) {
   selectedImageId.value = id
@@ -36,11 +47,23 @@ function requestDelete(id: string) {
 }
 
 async function handleCreateImage(
-  payload: { name: string; tag: string; title: string; description: string; isPublic: boolean },
+  payload: {
+    name: string
+    tag: string
+    title: string
+    description: string
+    isPublic: boolean
+    thumbnailFile?: File
+  },
   done: (success: boolean) => void,
 ) {
   try {
     const image = await createImage(payload)
+
+    if (payload.thumbnailFile) {
+      await uploadThumbnail(image.id, payload.thumbnailFile)
+    }
+
     if (image.status === 'ready') {
       toast.success('Vorlage wurde hinzugefügt')
     } else {
@@ -63,9 +86,17 @@ async function handleConfirmDelete() {
   }
 }
 
-function handleToggleVisibility() {
-  // TODO: Call update API when available
-  toast.info('Sichtbarkeit ändern ist noch nicht verfügbar')
+async function handleToggleVisibility(image: Image) {
+  try {
+    await updateImage(image.id, {
+      title: image.title ?? null,
+      description: image.description ?? null,
+      isPublic: !image.isPublic,
+    })
+    toast.success(image.isPublic ? 'Vorlage ist jetzt privat' : 'Vorlage ist jetzt öffentlich')
+  } catch (e) {
+    toast.error(getApiErrorMessage(e, 'Fehler beim Ändern der Sichtbarkeit'))
+  }
 }
 </script>
 
@@ -164,24 +195,40 @@ function handleToggleVisibility() {
               </div>
             </TableCell>
             <TableCell>
-              <Switch :model-value="image.isPublic" @update:model-value="handleToggleVisibility" />
+              <Switch :model-value="image.isPublic" @update:model-value="handleToggleVisibility(image)" />
             </TableCell>
             <TableCell class="text-right">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      class="text-destructive hover:text-destructive"
-                      @click="requestDelete(image.id)"
-                    >
-                      <Trash2 class="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Löschen</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div class="flex items-center justify-end gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        @click="requestEdit(image)"
+                      >
+                        <Pencil class="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Bearbeiten</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        class="text-destructive hover:text-destructive"
+                        @click="requestDelete(image.id)"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Löschen</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -189,6 +236,12 @@ function handleToggleVisibility() {
     </div>
 
     <AddImageDialog v-model:open="showAddImage" @submit="handleCreateImage" />
+
+    <EditImageDrawer
+      v-model:open="showEditDrawer"
+      :image="selectedImage"
+      @saved="selectedImage = null"
+    />
 
     <ConfirmDialog
       v-model:open="showConfirmDelete"

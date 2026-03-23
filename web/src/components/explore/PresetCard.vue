@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import type { Image } from '@/types'
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Package } from 'lucide-vue-next'
 
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,20 +15,22 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/comp
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
-import type { Image } from '@/types'
+import { resolveAssetUrl } from '@/utils/formatters'
 
-defineProps<{
+const props = defineProps<{
   image: Image
   actions: CardAction[]
 }>()
+
+const thumbnailSrc = computed(() => resolveAssetUrl(props.image.thumbnailUrl))
 </script>
 
 <template>
   <Card class="overflow-hidden pt-0">
     <div class="bg-muted relative flex h-36 items-center justify-center">
       <img
-        v-if="image.thumbnailUrl"
-        :src="image.thumbnailUrl"
+        v-if="thumbnailSrc"
+        :src="thumbnailSrc"
         :alt="image.title || image.name"
         class="h-full w-full object-cover"
       />
