@@ -29,6 +29,7 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
 
   onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval)
+    store.closeAllHealthStreams()
   })
 
   return {
@@ -43,5 +44,6 @@ export function useSandboxes(mode: 'mine' | 'all' = 'mine') {
     extendTTL: store.extendTTL,
     deleteSandbox: store.deleteSandbox,
     snapshotSandbox: store.snapshotSandbox,
+    healthBySandboxId: store.healthBySandboxId,
   }
 }

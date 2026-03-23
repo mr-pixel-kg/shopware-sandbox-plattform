@@ -122,6 +122,7 @@ function getImageTag(imageId: string): string | undefined {
 }
 
 function handleOpen(sandbox: Sandbox) {
+  if (sandbox.status !== 'running') return
   if (sandbox.url) window.open(sandbox.url, '_blank')
 }
 
@@ -262,11 +263,18 @@ async function handleConfirmDelete() {
                     <div class="flex items-center justify-end gap-1">
                       <Tooltip>
                         <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon-sm" @click="handleOpen(sandbox)">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            :disabled="sandbox.status !== 'running'"
+                            @click="handleOpen(sandbox)"
+                          >
                             <ExternalLink class="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Öffnen</TooltipContent>
+                        <TooltipContent>
+                          {{ sandbox.status === 'running' ? 'Öffnen' : 'Wird erreichbar, sobald die Sandbox bereit ist' }}
+                        </TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger as-child>

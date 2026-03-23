@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -380,19 +378,6 @@ func (h *ImageHandler) PullProgress(c echo.Context) error {
 	default:
 		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
 	}
-}
-
-func writeSSEHeaders(c echo.Context) {
-	c.Response().Header().Set("Content-Type", "text/event-stream")
-	c.Response().Header().Set("Cache-Control", "no-cache")
-	c.Response().Header().Set("Connection", "keep-alive")
-	c.Response().WriteHeader(200)
-}
-
-func sendSSEEvent(c echo.Context, v any) {
-	data, _ := json.Marshal(v)
-	fmt.Fprintf(c.Response(), "data: %s\n\n", data)
-	c.Response().Flush()
 }
 
 func mapImageError(c echo.Context, code, message string, err error) error {

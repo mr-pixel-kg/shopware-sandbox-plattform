@@ -140,7 +140,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		ImageID:         image.ID,
 		CreatedByUserID: input.UserID,
 		GuestSessionID:  input.GuestSessionID,
-		Status:          models.SandboxStatusRunning,
+		Status:          models.SandboxStatusStarting,
 		ContainerID:     container.ID,
 		ContainerName:   container.Name,
 		URL:             container.URL,

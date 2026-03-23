@@ -50,6 +50,18 @@ export interface Sandbox extends BaseModel {
   lastSeenAt?: string
 }
 
+export interface SandboxHealthEvent {
+  sandboxId: string
+  status: string
+  ready: boolean
+  url: string
+  httpStatus?: number
+  latencyMs?: number
+  failureReason?: string
+  message?: string
+  checkedAt: string
+}
+
 export interface AuditLog {
   id: string
   userId?: string

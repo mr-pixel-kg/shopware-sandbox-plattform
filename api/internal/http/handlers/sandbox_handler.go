@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,15 +12,32 @@ import (
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
+	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
 type SandboxHandler struct {
-	sandboxes *services.SandboxService
+	sandboxes       *services.SandboxService
+	health          *services.SandboxHealthService
+	auth            *services.AuthService
+	guest           *services.GuestSessionService
+	guestCookieName string
 }
 
-func NewSandboxHandler(sandboxes *services.SandboxService) *SandboxHandler {
-	return &SandboxHandler{sandboxes: sandboxes}
+func NewSandboxHandler(
+	sandboxes *services.SandboxService,
+	health *services.SandboxHealthService,
+	auth *services.AuthService,
+	guest *services.GuestSessionService,
+	guestCookieName string,
+) *SandboxHandler {
+	return &SandboxHandler{
+		sandboxes:       sandboxes,
+		health:          health,
+		auth:            auth,
+		guest:           guest,
+		guestCookieName: guestCookieName,
+	}
 }
 
 // List godoc
@@ -104,6 +122,52 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 	}
 	slog.Debug("sandbox loaded", logging.RequestFields(c, "component", "sandbox", "sandbox_id", sandbox.ID.String(), "status", sandbox.Status)...)
 	return c.JSON(200, sandbox)
+}
+
+// Health godoc
+// @Summary      Stream sandbox health
+// @Description  SSE endpoint streaming sandbox readiness for active subscribers.
+// @Tags         Sandboxes
+// @Produce      text/event-stream
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Param        access_token query string false "Bearer token fallback for EventSource"
+// @Success      200 {object} dto.SandboxHealthEvent "Last emitted SSE event payload"
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id}/health [get]
+func (h *SandboxHandler) Health(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+	}
+
+	sandbox, err := h.sandboxes.FindByID(id)
+	if err != nil {
+		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
+	}
+
+	if err := h.authorizeHealthAccess(c, sandbox); err != nil {
+		return err
+	}
+
+	writeSSEHeaders(c)
+	ch, cancel := h.health.Watch(sandbox)
+	defer cancel()
+
+	ctx := c.Request().Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case event, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			sendSSEEvent(c, event)
+		}
+	}
 }
 
 // CreatePublicDemo godoc
@@ -389,5 +453,66 @@ func mapSandboxError(c echo.Context, err error) error {
 		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox does not belong to the current user"))
 	default:
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_ERROR", "Sandbox operation failed").WithCause(err))
+	}
+}
+
+func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.Sandbox) error {
+	userToken := c.QueryParam("access_token")
+	if userToken == "" {
+		authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
+		if token, ok := parseAuthorizationHeader(authHeader); ok {
+			userToken = token
+		}
+	}
+
+	if userToken != "" {
+		user, _, err := h.auth.Authenticate(userToken)
+		if err != nil {
+			return responses.FromAppError(c, apperror.Unauthorized("Invalid or expired token"))
+		}
+
+		if sandbox.CreatedByUserID != nil && *sandbox.CreatedByUserID == user.ID {
+			return nil
+		}
+
+		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox access denied"))
+	}
+
+	if sandbox.GuestSessionID == nil {
+		return responses.FromAppError(c, apperror.Unauthorized("Missing bearer token"))
+	}
+
+	cookie, err := c.Cookie(h.guestCookieName)
+	if err != nil || cookie == nil || cookie.Value == "" {
+		return responses.FromAppError(c, apperror.Unauthorized("Missing guest session"))
+	}
+
+	sessionID, _, err := h.guest.Validate(cookie.Value)
+	if err != nil {
+		return responses.FromAppError(c, apperror.Unauthorized("Invalid guest session"))
+	}
+
+	if *sandbox.GuestSessionID != sessionID {
+		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox access denied"))
+	}
+
+	return nil
+}
+
+func parseAuthorizationHeader(authHeader string) (string, bool) {
+	parts := strings.Fields(authHeader)
+	switch len(parts) {
+	case 1:
+		if parts[0] == "" || strings.EqualFold(parts[0], "Bearer") {
+			return "", false
+		}
+		return parts[0], true
+	case 2:
+		if !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
+			return "", false
+		}
+		return parts[1], true
+	default:
+		return "", false
 	}
 }
