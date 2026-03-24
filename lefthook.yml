@@ -29,7 +29,7 @@ pre-commit:
       root: "api/"
       glob: "**/*.go"
       exclude: "docs/**"
-      run: go tool golangci-lint run --fix {staged_files}
+      run: go tool golangci-lint run --fix ./...
       stage_fixed: true
 
     web-lint:

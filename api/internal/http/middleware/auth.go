@@ -8,6 +8,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
+	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 	"github.com/manuel/shopware-testenv-platform/api/internal/types"
 )
@@ -49,6 +50,18 @@ func Auth(authService *services.AuthService) echo.MiddlewareFunc {
 
 func MustAuth(c echo.Context) types.AuthContext {
 	return c.Get(authContextKey).(types.AuthContext)
+}
+
+func RequireAdmin() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			user, ok := c.Get("user").(*models.User)
+			if !ok || !user.IsAdmin() {
+				return responses.FromAppError(c, apperror.Forbidden("Admin access required"))
+			}
+			return next(c)
+		}
+	}
 }
 
 func parseAuthorizationHeader(authHeader string) (string, bool) {

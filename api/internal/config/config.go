@@ -11,14 +11,15 @@ import (
 )
 
 type Config struct {
-	Logging  LoggingConfig
-	Server   ServerConfig
-	Database DatabaseConfig
-	Auth     AuthConfig
-	Sandbox  SandboxConfig
-	Docker   DockerConfig
-	Storage  StorageConfig
-	Guard    GuardConfig
+	Logging      LoggingConfig
+	Server       ServerConfig
+	Database     DatabaseConfig
+	Auth         AuthConfig
+	Registration RegistrationConfig
+	Sandbox      SandboxConfig
+	Docker       DockerConfig
+	Storage      StorageConfig
+	Guard        GuardConfig
 }
 
 type LogLevel string
@@ -62,6 +63,18 @@ type AuthConfig struct {
 	JWTTTLMinutes      int
 	GuestJWTTTLMinutes int
 	GuestCookieName    string
+}
+
+type RegistrationMode string
+
+const (
+	RegistrationModePublic    RegistrationMode = "public"
+	RegistrationModeWhitelist RegistrationMode = "whitelist"
+)
+
+type RegistrationConfig struct {
+	Mode      RegistrationMode
+	AutoAdmin bool
 }
 
 type SandboxConfig struct {
@@ -143,6 +156,10 @@ func MustLoad() Config {
 			GuestJWTTTLMinutes: v.GetInt("auth.guest_jwt_ttl_minutes"),
 			GuestCookieName:    v.GetString("auth.guest_cookie_name"),
 		},
+		Registration: RegistrationConfig{
+			Mode:      RegistrationMode(v.GetString("registration.mode")),
+			AutoAdmin: v.GetBool("registration.auto_admin"),
+		},
 		Sandbox: SandboxConfig{
 			HostSuffix:      v.GetString("sandbox.url_suffix"),
 			URLPrefix:       v.GetString("sandbox.url_prefix"),
@@ -199,6 +216,12 @@ func MustLoad() Config {
 	}
 	if cfg.Auth.GuestCookieName == "" {
 		cfg.Auth.GuestCookieName = "shopshredder_guest"
+	}
+	if cfg.Registration.Mode == "" {
+		cfg.Registration.Mode = RegistrationModePublic
+	}
+	if cfg.Registration.Mode != RegistrationModePublic && cfg.Registration.Mode != RegistrationModeWhitelist {
+		panic(fmt.Sprintf("invalid registration.mode %q: must be \"public\" or \"whitelist\"", cfg.Registration.Mode))
 	}
 	if cfg.Sandbox.DefaultTTL == 0 {
 		cfg.Sandbox.DefaultTTL = 60 * time.Minute

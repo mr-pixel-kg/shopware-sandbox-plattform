@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { Loader2 } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -27,25 +27,31 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
+  invite: [payload: { email: string; role: 'admin' | 'user' }, done: (success: boolean) => void]
 }>()
 
 const email = ref('')
-const role = ref('developer')
+const role = ref<'admin' | 'user'>('user')
+const busy = ref(false)
 
 watch(
   () => props.open,
   (open) => {
     if (open) {
       email.value = ''
-      role.value = 'developer'
+      role.value = 'user'
     }
   },
 )
 
 function handleSubmit() {
-  // TODO: Call invite API when available
-  toast.info('Benutzer einladen ist noch nicht verfügbar')
-  emit('update:open', false)
+  busy.value = true
+  emit('invite', { email: email.value, role: role.value }, (success) => {
+    busy.value = false
+    if (success) {
+      emit('update:open', false)
+    }
+  })
 }
 </script>
 
@@ -74,7 +80,7 @@ function handleSubmit() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="developer">Developer</SelectItem>
+              <SelectItem value="user">User</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
@@ -83,7 +89,10 @@ function handleSubmit() {
           <Button type="button" variant="outline" @click="emit('update:open', false)"
             >Abbrechen</Button
           >
-          <Button type="submit">Einladen</Button>
+          <Button type="submit" :disabled="!email || busy">
+            <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
+            {{ busy ? 'Wird eingeladen...' : 'Einladen' }}
+          </Button>
         </DialogFooter>
       </form>
     </DialogContent>
