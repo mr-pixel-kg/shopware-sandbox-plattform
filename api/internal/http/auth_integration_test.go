@@ -94,7 +94,7 @@ func newTestAuthServices(db *gorm.DB) (*services.AuthService, *services.AuditSer
 	})
 	auditService := services.NewAuditService(auditRepo)
 	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService, config.RegistrationConfig{
-		Mode: config.RegistrationModeOpen,
+		Mode: config.RegistrationModePublic,
 	})
 
 	return authService, auditService
