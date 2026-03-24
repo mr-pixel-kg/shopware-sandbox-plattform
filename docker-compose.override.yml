@@ -1,17 +1,47 @@
 services:
-  proxy:
+  traefik:
+    image: traefik:v2.10
+    restart: always
     ports:
       - "80:80"
       - "9000:8080"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ./proxy/traefik:/etc/traefik
+    networks:
+      - sandbox-network
+      - internal
 
   api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: mpxsandbox-api:local
     ports:
       - "8080:8080"
+    environment:
+      DB_HOST: database
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - ./api/storage:/app/storage
 
   web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: mpxsandbox-web:local
     ports:
       - "8000:80"
+    environment:
+      WEB_API_URL: ${WEB_API_URL:-http://localhost:8080}
 
   database:
     ports:
       - "5432:5432"
+
+networks:
+  internal:
+    external: false
+    driver: bridge

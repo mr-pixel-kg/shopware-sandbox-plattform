@@ -1,0 +1,46 @@
+logging:
+  level: "debug"
+  format: "text"
+
+server:
+  port: 8080
+  app_url: "http://localhost:8080"
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://localhost:5175"
+    - "http://localhost:8000"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "mrpix_sandbox"
+  password: "sandXbox_mrpix2025"
+  name: "mrpix_sandbox"
+  sslmode: "disable"
+
+auth:
+  jwt_secret: "local-dev-secret"
+  jwt_ttl_minutes: 480
+  guest_jwt_ttl_minutes: 43200
+  guest_cookie_name: "shopshredder_guest"
+
+sandbox:
+  url_prefix: "sandbox-"
+  url_suffix: ".localhost"
+  default_lifetime: 60
+  max_lifetime: 1440
+  cleanup_interval_seconds: 60
+  internal_port: 80
+
+docker:
+  mode: "port"
+  network: "internal"
+  traefik_enable: false
+
+storage:
+  thumbnail_dir: "storage/thumbnails"
+
+guard:
+  max_total_sandboxes: 32
+  max_sandboxes_per_ip: 5
+  max_sandboxes_per_user: 10

@@ -1,68 +1,67 @@
-version: '3.8'
-
 services:
-  proxy:
-    image: "traefik:v2.10"
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./proxy/traefik:/etc/traefik
-    networks:
-      - sandbox-network
-      - internal
-
   api:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-api:latest
     restart: always
-    build:
-      context: ./api
-      dockerfile: Dockerfile
     expose:
       - 8080
     environment:
-      - GOPROXY=proxy.golang.org
-      - DOCKER_HOST=unix:///Users/manuel.kienlein/.docker/run/docker.sock #unix:///var/run/docker.sock
+      CONFIG_PATH: /app/config.yml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
-      - /var/run/docker.sock:/Users/manuel.kienlein/.docker/run/docker.sock #/var/run/docker.sock
-      - ./config.yml:/app/config.yml
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - api_storage:/app/storage
     networks:
       - sandbox-network
       - internal
     depends_on:
       database:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=internal"
+      - "traefik.http.routers.sandbox-api.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-api.rule=Host(`sandbox-api.zion.mr-pixel.de`)"
+      - "traefik.http.routers.sandbox-api.tls=true"
+      - "traefik.http.routers.sandbox-api.tls.certresolver=production"
 
   web:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-web:latest
     restart: always
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      args:
-        VITE_BACKEND_URL: http://localhost:8080
     expose:
       - 80
     environment:
-      - VITE_BACKEND_URL=http://backend:8080
+      WEB_API_URL: ${WEB_API_URL:-https://sandbox-api.zion.mr-pixel.de}
     networks:
       - sandbox-network
+      - internal
     depends_on:
-      backend:
+      api:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=internal"
+      - "traefik.http.routers.sandbox-web.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-web.rule=Host(`sandbox.zion.mr-pixel.de`)"
+      - "traefik.http.routers.sandbox-web.tls=true"
+      - "traefik.http.routers.sandbox-web.tls.certresolver=production"
 
   database:
     image: postgres:17.4
     restart: always
     shm_size: 128mb
     volumes:
-        - database_data:/var/lib/postgresql/data
+      - database_data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: mrpix_sandbox
-      POSTGRES_PASSWORD: sandXbox_mrpix2025
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: mrpix_sandbox
     networks:
       - sandbox-network
     healthcheck:
-      test: ["CMD-SHELL", "sh -c 'pg_isready -U mrpix_sandbox -d mrpix_sandbox'"]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U mrpix_sandbox -d mrpix_sandbox"]
+      interval: 15s
       timeout: 5s
       retries: 3
       start_period: 15s
@@ -71,9 +70,10 @@ networks:
   sandbox-network:
     driver: bridge
   internal:
-    name: internal
-    driver: bridge
+    external: true
 
 volumes:
   database_data:
+    driver: local
+  api_storage:
     driver: local

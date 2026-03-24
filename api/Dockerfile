@@ -24,6 +24,7 @@ COPY --from=builder /src/internal/database/migrations /app/internal/database/mig
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY config.yml /app/config.yml
 
 RUN mkdir -p /app/storage/thumbnails
 

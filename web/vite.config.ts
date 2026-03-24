@@ -12,9 +12,9 @@ export default defineConfig({
     viteEnvs({
       declarationFile: '.env.declaration',
       computedEnv: ({ resolvedConfig }) => {
-        const env = loadEnv(resolvedConfig.mode, resolvedConfig.root, 'WEB_')
+        const env = loadEnv(resolvedConfig.mode, path.join(resolvedConfig.root, '..'), 'WEB_')
         return {
-          WEB_API_URL: env.WEB_API_URL || 'http://localhost:8080',
+          WEB_API_URL: env.WEB_API_URL || '',
         }
       },
     }),

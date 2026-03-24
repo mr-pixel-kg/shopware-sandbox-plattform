@@ -17,7 +17,7 @@ dist-ssr/
 *.sln
 *.sw?
 
-api/config.yml
+api/config.local.yml
 web/src/vite-env.d.ts
 lefthook-local.yml
 /api/storage/
