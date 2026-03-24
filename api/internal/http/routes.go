@@ -49,7 +49,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	passwordService := services.NewPasswordService()
 	tokenService := services.NewTokenService(cfg.Auth)
 	auditService := services.NewAuditService(auditRepo)
-	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService)
+	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService, cfg.Registration)
 	guestService := services.NewGuestSessionService(sessionRepo, tokenService)
 	dockerClient, err := docker.NewClient(cfg.Sandbox, cfg.Docker)
 	if err != nil {
@@ -77,6 +77,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 		cfg.Auth.GuestCookieName,
 	)
 	auditHandler := handlers.NewAuditHandler(auditService)
+	whitelistHandler := handlers.NewWhitelistHandler(userRepo, auditService)
 
 	e.GET("/health", healthCheck)
 
@@ -116,6 +117,12 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	private.PATCH("/sandboxes/:id/ttl", sandboxHandler.ExtendTTL)
 	private.POST("/sandboxes/:id/snapshot", sandboxHandler.Snapshot)
 	private.GET("/audit-logs", auditHandler.List)
+
+	admin := private.Group("/admin")
+	admin.Use(authmw.RequireAdmin())
+	admin.GET("/whitelist", whitelistHandler.List)
+	admin.POST("/whitelist", whitelistHandler.Add)
+	admin.DELETE("/whitelist/:id", whitelistHandler.Remove)
 
 	e.GET("/docs", func(c echo.Context) error {
 		return c.Redirect(http.StatusMovedPermanently, "/docs/index.html")
