@@ -3,13 +3,7 @@ tasks:
     desc: Copy example configs and install git hooks
     run:
       - cmd: go tool lefthook install
-      - cmd: |
-          [ -f api/config.yml ] && echo "api/config.yml already exists, skipping." || (cp api/config.example.yml api/config.yml && echo "Created api/config.yml")
-          [ -f .env ] && echo ".env already exists, skipping." || (cp .env.example .env && echo "Created .env")
-          [ -f web/.env ] && echo "web/.env already exists, skipping." || (cp web/.env.example web/.env && echo "Created web/.env")
-          echo ""
-          echo "Setup complete! Edit api/config.yml and .env with your settings."
-
+        
   dev:
     desc: Start all dev servers
     run:

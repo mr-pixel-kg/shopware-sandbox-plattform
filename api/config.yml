@@ -1,0 +1,46 @@
+logging:
+  level: "info"
+  format: "json"
+
+server:
+  port: 8080
+  app_url: ""           # set via SERVER_APP_URL env
+  allowed_origins: []   # set via SERVER_ALLOWED_ORIGINS env (only one possible in env)
+
+database:
+  host: ""       # set via DATABASE_HOST env
+  port: 5432
+  user: ""       # set via DATABASE_USER env
+  password: ""   # set via DATABASE_PASSWORD env
+  name: ""       # set via DATABASE_NAME env
+  sslmode: ""    # set via DATABASE_SSLMODE env
+
+auth:
+  jwt_secret: ""  # set via AUTH_JWT_SECRET env
+  jwt_ttl_minutes: 480
+  guest_jwt_ttl_minutes: 43200
+  guest_cookie_name: "shopshredder_guest"
+
+sandbox:
+  url_prefix: ""    # set via SANDBOX_URL_PREFIX env
+  url_suffix: ""    # set via SANDBOX_URL_SUFFIX env
+  default_lifetime: 60
+  max_lifetime: 1440
+  cleanup_interval_seconds: 60
+  internal_port: 80
+
+docker:
+  mode: "traefik"
+  network: "internal"
+  traefik_enable: true
+  traefik_entrypoints: "websecure"
+  traefik_certresolver: "production"
+  traefik_middlewares: "sandbox-middleware@file,https-redirect@file"
+
+storage:
+  thumbnail_dir: "storage/thumbnails"
+
+guard:
+  max_total_sandboxes: 32
+  max_sandboxes_per_ip: 5
+  max_sandboxes_per_user: 10
