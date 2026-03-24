@@ -8,6 +8,7 @@ services:
       CONFIG_PATH: /app/config.yml
       DOCKER_HOST: unix:///var/run/docker.sock
       DATABASE_HOST: ${DATABASE_HOST:-database}
+      SERVER_ALLOWED_ORIGINS: ${SERVER_ALLOWED_ORIGINS}
       DATABASE_PORT: ${DATABASE_PORT:-5432}
       DATABASE_USER: ${DATABASE_USER:-mrpix_sandbox}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
