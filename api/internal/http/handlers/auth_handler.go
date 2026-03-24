@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/labstack/echo/v4"
@@ -41,6 +42,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	slog.Debug("register request received", logging.RequestFields(c, "component", "auth", "email", logging.MaskEmail(input.Email))...)
 	user, err := h.auth.Register(input.Email, input.Password)
 	if err != nil {
+		if errors.Is(err, services.ErrEmailNotWhitelisted) {
+			return responses.FromAppError(c, apperror.Forbidden("Email not whitelisted for registration"))
+		}
 		return responses.FromAppError(c, apperror.BadRequest("REGISTER_FAILED", "Could not register user").WithCause(err))
 	}
 

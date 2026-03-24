@@ -21,6 +21,10 @@ auth:
   guest_jwt_ttl_minutes: 43200
   guest_cookie_name: "shopshredder_guest"
 
+registration:
+  mode: "whitelist"       # "public" or "whitelist"
+  auto_admin: false       # set via REGISTRATION_AUTO_ADMIN env
+
 sandbox:
   url_prefix: ""    # set via SANDBOX_URL_PREFIX env
   url_suffix: ""    # set via SANDBOX_URL_SUFFIX env

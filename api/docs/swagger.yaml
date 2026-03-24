@@ -1,5 +1,20 @@
 basePath: /
 definitions:
+  dto.AddWhitelistRequest:
+    properties:
+      email:
+        example: jane.doe@example.com
+        type: string
+      role:
+        enum:
+        - admin
+        - user
+        example: user
+        type: string
+    required:
+    - email
+    - role
+    type: object
   dto.AuthLoginResponse:
     properties:
       token:
@@ -332,6 +347,9 @@ definitions:
         example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
         format: uuid
         type: string
+      role:
+        example: user
+        type: string
       updatedAt:
         example: "2026-03-20T10:20:00Z"
         type: string
@@ -343,6 +361,92 @@ info:
   title: Shopshredder Sandbox API
   version: 1.0.0
 paths:
+  /api/admin/whitelist:
+    get:
+      description: Return all pending (whitelisted but not yet registered) users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List whitelisted emails
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Create a pending user row so the email can register in whitelist
+        mode
+      parameters:
+      - description: Email to whitelist
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddWhitelistRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add email to whitelist
+      tags:
+      - Admin
+  /api/admin/whitelist/{id}:
+    delete:
+      description: Delete a pending user row (only works for users that have not yet
+        registered)
+      parameters:
+      - description: Pending user ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove email from whitelist
+      tags:
+      - Admin
   /api/audit-logs:
     get:
       description: Returns recent audit log entries, optionally limited

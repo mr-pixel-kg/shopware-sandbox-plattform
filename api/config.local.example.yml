@@ -24,6 +24,10 @@ auth:
   guest_jwt_ttl_minutes: 43200
   guest_cookie_name: "shopshredder_guest"
 
+registration:
+  mode: "public"
+  auto_admin: true
+
 sandbox:
   url_prefix: "sandbox-"
   url_suffix: ".localhost"
