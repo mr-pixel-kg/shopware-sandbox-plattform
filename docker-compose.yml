@@ -7,14 +7,14 @@ services:
     environment:
       CONFIG_PATH: /app/config.yml
       DOCKER_HOST: unix:///var/run/docker.sock
-      DB_HOST: ${DB_HOST:-database}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER:-mrpix_sandbox}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-mrpix_sandbox}
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
-      JWT_SECRET: ${JWT_SECRET}
-      APP_URL: ${APP_URL:-https://${API_DOMAIN}}
+      DATABASE_HOST: ${DATABASE_HOST:-database}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_USER: ${DATABASE_USER:-mrpix_sandbox}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME:-mrpix_sandbox}
+      DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      SERVER_APP_URL: ${SERVER_APP_URL:-https://${API_DOMAIN}}
       SANDBOX_URL_PREFIX: ${SANDBOX_URL_PREFIX:-sandbox-}
       SANDBOX_URL_SUFFIX: ${SANDBOX_URL_SUFFIX:-.zion.mr-pixel.de}
     volumes:
@@ -62,13 +62,13 @@ services:
     volumes:
       - database_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: ${DB_USER:-mrpix_sandbox}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-mrpix_sandbox}
+      POSTGRES_USER: ${DATABASE_USER:-mrpix_sandbox}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME:-mrpix_sandbox}
     networks:
       - sandbox-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mrpix_sandbox} -d ${DB_NAME:-mrpix_sandbox}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-mrpix_sandbox} -d ${DATABASE_NAME:-mrpix_sandbox}"]
       interval: 15s
       timeout: 5s
       retries: 3

@@ -20,14 +20,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DB_HOST: ${DB_HOST:-database}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER:-mrpix_sandbox}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-mrpix_sandbox}
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
-      JWT_SECRET: ${JWT_SECRET}
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      DATABASE_HOST: ${DATABASE_HOST:-database}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_USER: ${DATABASE_USER:-mrpix_sandbox}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME:-mrpix_sandbox}
+      DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      SERVER_APP_URL: ${SERVER_APP_URL:-http://localhost:8080}
       SANDBOX_URL_PREFIX: ${SANDBOX_URL_PREFIX:-sandbox-}
       SANDBOX_URL_SUFFIX: ${SANDBOX_URL_SUFFIX:-.localhost}
     volumes:
