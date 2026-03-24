@@ -63,6 +63,10 @@ func Conflict(code, message string) *AppError {
 	return New(http.StatusConflict, code, message)
 }
 
+func Forbidden(message string) *AppError {
+	return New(http.StatusForbidden, "FORBIDDEN", message)
+}
+
 func Internal(code, message string) *AppError {
 	return New(http.StatusInternalServerError, code, message)
 }
