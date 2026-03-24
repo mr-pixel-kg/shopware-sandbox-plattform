@@ -9,6 +9,7 @@ services:
     environment:
       - GOPROXY=proxy.golang.org
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - RUN_MIGRATIONS_ON_START=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/mpxsandbox/config.yml:/app/config.yml
