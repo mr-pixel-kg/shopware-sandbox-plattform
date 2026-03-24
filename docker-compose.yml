@@ -1,68 +1,76 @@
-version: '3.8'
-
 services:
-  proxy:
-    image: "traefik:v2.10"
+  api:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-api:latest
     restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./proxy/traefik:/etc/traefik
-    networks:
-      - sandbox-network
-      - internal
-
-  backend:
-    restart: always
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     expose:
       - 8080
     environment:
-      - GOPROXY=proxy.golang.org
-      - DOCKER_HOST=unix:///Users/manuel.kienlein/.docker/run/docker.sock #unix:///var/run/docker.sock
+      CONFIG_PATH: /app/config.yml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DATABASE_HOST: ${DATABASE_HOST:-database}
+      SERVER_ALLOWED_ORIGINS: ${SERVER_ALLOWED_ORIGINS}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_USER: ${DATABASE_USER:-mrpix_sandbox}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME:-mrpix_sandbox}
+      DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      SERVER_APP_URL: ${SERVER_APP_URL:-https://${API_DOMAIN}}
+      SANDBOX_URL_PREFIX: ${SANDBOX_URL_PREFIX:-sandbox-}
+      SANDBOX_URL_SUFFIX: ${SANDBOX_URL_SUFFIX:-.zion.mr-pixel.de}
     volumes:
-      - /var/run/docker.sock:/Users/manuel.kienlein/.docker/run/docker.sock #/var/run/docker.sock
-      - ./config.yml:/app/config.yml
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - api_storage:/app/storage
     networks:
       - sandbox-network
       - internal
     depends_on:
       database:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=internal"
+      - "traefik.http.routers.sandbox-api.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.sandbox-api.tls=true"
+      - "traefik.http.routers.sandbox-api.tls.certresolver=production"
 
-  frontend:
+  web:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-web:latest
     restart: always
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_BACKEND_URL: http://localhost:8080
     expose:
       - 80
     environment:
-      - VITE_BACKEND_URL=http://backend:8080
+      WEB_API_URL: ${WEB_API_URL:-https://${API_DOMAIN}}
     networks:
       - sandbox-network
+      - internal
     depends_on:
-      backend:
+      api:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=internal"
+      - "traefik.http.routers.sandbox-web.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-web.rule=Host(`${WEB_DOMAIN}`)"
+      - "traefik.http.routers.sandbox-web.tls=true"
+      - "traefik.http.routers.sandbox-web.tls.certresolver=production"
 
   database:
     image: postgres:17.4
     restart: always
     shm_size: 128mb
     volumes:
-        - database_data:/var/lib/postgresql/data
+      - database_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: mrpix_sandbox
-      POSTGRES_PASSWORD: sandXbox_mrpix2025
-      POSTGRES_DB: mrpix_sandbox
+      POSTGRES_USER: ${DATABASE_USER:-mrpix_sandbox}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME:-mrpix_sandbox}
     networks:
       - sandbox-network
     healthcheck:
-      test: ["CMD-SHELL", "sh -c 'pg_isready -U mrpix_sandbox -d mrpix_sandbox'"]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-mrpix_sandbox} -d ${DATABASE_NAME:-mrpix_sandbox}"]
+      interval: 15s
       timeout: 5s
       retries: 3
       start_period: 15s
@@ -71,9 +79,10 @@ networks:
   sandbox-network:
     driver: bridge
   internal:
-    name: internal
-    driver: bridge
+    external: true
 
 volumes:
   database_data:
+    driver: local
+  api_storage:
     driver: local

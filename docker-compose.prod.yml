@@ -1,14 +1,15 @@
 version: '3.8'
 
 services:
-  backend:
-    image: ghcr.io/mr-pixel-kg/mpxsandbox-backend:latest
+  api:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-api:latest
     restart: always
     expose:
       - 8080
     environment:
       - GOPROXY=proxy.golang.org
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - RUN_MIGRATIONS_ON_START=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/mpxsandbox/config.yml:/app/config.yml
@@ -21,13 +22,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=internal"
-      - "traefik.http.routers.sandbox-backend.entrypoints=websecure"
-      - "traefik.http.routers.sandbox-backend.rule=Host(`sandbox-api.zion.mr-pixel.de`)"
-      - "traefik.http.routers.sandbox-backend.tls=true"
-      - "traefik.http.routers.sandbox-backend.tls.certresolver=production"
+      - "traefik.http.routers.sandbox-api.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-api.rule=Host(`shopschredder-api.zion.mr-pixel.de`)"
+      - "traefik.http.routers.sandbox-api.tls=true"
+      - "traefik.http.routers.sandbox-api.tls.certresolver=production"
 
-  frontend:
-    image: ghcr.io/mr-pixel-kg/mpxsandbox-frontend:latest
+  web:
+    image: ghcr.io/mr-pixel-kg/mpxsandbox-web:latest
     restart: always
     expose:
       - 80
@@ -42,10 +43,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=internal"
-      - "traefik.http.routers.sandbox-frontend.entrypoints=websecure"
-      - "traefik.http.routers.sandbox-frontend.rule=Host(`sandbox.zion.mr-pixel.de`)"
-      - "traefik.http.routers.sandbox-frontend.tls=true"
-      - "traefik.http.routers.sandbox-frontend.tls.certresolver=production"
+      - "traefik.http.routers.sandbox-web.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-web.rule=Host(`shopschredder.zion.mr-pixel.de`)"
+      - "traefik.http.routers.sandbox-web.tls=true"
+      - "traefik.http.routers.sandbox-web.tls.certresolver=production"
 
   database:
     image: postgres:17.4

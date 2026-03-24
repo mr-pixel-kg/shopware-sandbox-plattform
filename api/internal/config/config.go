@@ -3,8 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -101,6 +103,8 @@ type GuardConfig struct {
 }
 
 func MustLoad() Config {
+	_ = godotenv.Load("../.env")
+
 	cfgPath := getEnv("CONFIG_PATH", "config.yml")
 
 	v := viper.New()
@@ -109,6 +113,9 @@ func MustLoad() Config {
 	if err := v.ReadInConfig(); err != nil {
 		panic(fmt.Sprintf("read config file %s: %v", cfgPath, err))
 	}
+
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
 
 	// Map the raw Viper values into typed config structs once so the rest of the
 	// application can avoid stringly-typed lookups.

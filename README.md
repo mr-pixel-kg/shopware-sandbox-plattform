@@ -211,7 +211,8 @@ Notes:
 - `bab db:migrate` applies only pending migrations and records them in Goose's `goose_db_version` table.
 - `bab db:migrate:create` creates a new sequential SQL migration with Goose annotations.
 - `bab db:migrate:fresh` is destructive and intended for local development only.
-- For deployment, run `bab db:migrate` before starting the new API version.
+- The production API image includes the `migrate` CLI and runs `migrate up` automatically on container start by default.
+- Set `RUN_MIGRATIONS_ON_START=false` if migrations should be handled separately during deployment.
 
 You can also run the project-local migration CLI directly:
 

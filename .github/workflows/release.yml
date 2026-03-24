@@ -24,22 +24,22 @@ jobs:
         id: get_tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      - name: Build Backend Docker Image
+      - name: Build API Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }} -f backend/Dockerfile ./backend
-          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:latest
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-api:${{ env.TAG }} -f api/Dockerfile ./api
+          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-api:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-api:latest
 
-      - name: Build Frontend Docker Image
+      - name: Build WEB Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} -f frontend/Dockerfile --build-arg VITE_BACKEND_URL=https://sandbox-api.zion.mr-pixel.de ./frontend
-          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }} -f web/Dockerfile --build-arg VITE_BACKEND_URL=https://shopschredder-api.zion.mr-pixel.de ./web
+          docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:latest
 
       - name: Push Docker Image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:${{ env.TAG }}
-          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-backend:latest
-          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:${{ env.TAG }}
-          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-frontend:latest
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-api:${{ env.TAG }}
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-api:latest
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }}
+          docker push ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:latest
 
   deploy:
     needs: build-and-push
