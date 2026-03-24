@@ -93,7 +93,9 @@ func newTestAuthServices(db *gorm.DB) (*services.AuthService, *services.AuditSer
 		GuestCookieName:    "test_guest",
 	})
 	auditService := services.NewAuditService(auditRepo)
-	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService)
+	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService, config.RegistrationConfig{
+		Mode: config.RegistrationModeOpen,
+	})
 
 	return authService, auditService
 }
