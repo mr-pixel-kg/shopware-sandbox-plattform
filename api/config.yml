@@ -4,19 +4,19 @@ logging:
 
 server:
   port: 8080
-  app_url: ""         # set via APP_URL env
-  allowed_origins: [] # set via ALLOWED_ORIGINS env or override in local config
+  app_url: ""           # set via SERVER_APP_URL env
+  allowed_origins: []   # set via SERVER_ALLOWED_ORIGINS env (comma-separated)
 
 database:
-  host: ""       # set via DB_HOST env
+  host: ""       # set via DATABASE_HOST env
   port: 5432
-  user: ""       # set via DB_USER env
-  password: ""   # set via DB_PASSWORD env
-  name: ""       # set via DB_NAME env
-  sslmode: ""    # set via DB_SSLMODE env
+  user: ""       # set via DATABASE_USER env
+  password: ""   # set via DATABASE_PASSWORD env
+  name: ""       # set via DATABASE_NAME env
+  sslmode: ""    # set via DATABASE_SSLMODE env
 
 auth:
-  jwt_secret: ""  # set via JWT_SECRET env
+  jwt_secret: ""  # set via AUTH_JWT_SECRET env
   jwt_ttl_minutes: 480
   guest_jwt_ttl_minutes: 43200
   guest_cookie_name: "shopshredder_guest"
