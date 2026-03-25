@@ -1,6 +1,12 @@
 import { apiClient } from './client'
 
-import type { CreateImageRequest, Image, PendingPull, UpdateImageRequest } from '@/types'
+import type {
+  CreateImageRequest,
+  Image,
+  MetadataItem,
+  PendingPull,
+  UpdateImageRequest,
+} from '@/types'
 
 export const imagesApi = {
   async listPublic(): Promise<Image[]> {
@@ -43,5 +49,12 @@ export const imagesApi = {
 
   async remove(id: string): Promise<void> {
     await apiClient.delete(`/api/images/${id}`)
+  },
+
+  async lookupRegistry(imageName: string): Promise<MetadataItem[]> {
+    const { data } = await apiClient.get<MetadataItem[]>('/api/registry/lookup', {
+      params: { name: imageName },
+    })
+    return data
   },
 }

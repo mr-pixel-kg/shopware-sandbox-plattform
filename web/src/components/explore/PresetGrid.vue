@@ -13,7 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <div v-if="images.length > 0" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+  <div v-if="images.length > 0" class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
     <PresetCard
       v-for="image in images"
       :key="image.id"

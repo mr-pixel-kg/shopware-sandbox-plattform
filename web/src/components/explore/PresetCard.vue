@@ -40,8 +40,7 @@ const thumbnailSrc = computed(() => resolveAssetUrl(props.image.thumbnailUrl))
         {{ image.description }}
       </CardDescription>
     </CardHeader>
-    <!-- TODO: Replace with dynamic schema from API -->
-    <CardFooter class="mt-auto flex gap-2">
+    <CardFooter class="mt-auto flex gap-2 overflow-x-auto">
       <ActionButton v-for="action in actions" :key="action.label" :action="action" />
     </CardFooter>
   </Card>

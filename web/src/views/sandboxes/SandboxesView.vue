@@ -38,7 +38,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { getApiErrorMessage } from '@/utils/error'
 import { formatDateTime } from '@/utils/formatters'
 
-import type { Sandbox, SandboxStatus } from '@/types'
+import type { MetadataItem, Sandbox, SandboxStatus } from '@/types'
 
 const authStore = useAuthStore()
 const { isAdmin } = storeToRefs(authStore)
@@ -165,7 +165,7 @@ function handleDelete(sandbox: Sandbox) {
 }
 
 async function handleCreateSandbox(
-  payload: { imageId: string; ttlMinutes: number },
+  payload: { imageId: string; ttlMinutes: number; metadata?: Record<string, string> },
   done: (success: boolean) => void,
 ) {
   try {
@@ -187,6 +187,7 @@ async function handleCreateSnapshot(
     description: string
     isPublic: boolean
     thumbnailFile?: File
+    metadata?: MetadataItem[]
   },
   done: (success: boolean) => void,
 ) {
@@ -520,6 +521,8 @@ async function handleConfirmDelete() {
     <SnapshotDialog
       v-model:open="showSnapshot"
       :sandbox-name="selectedSandbox?.containerName ?? ''"
+      :source-image="selectedSandbox ? images.find((i) => i.id === selectedSandbox!.imageId) : null"
+      :source-sandbox="selectedSandbox"
       @submit="handleCreateSnapshot"
     />
 

@@ -66,16 +66,13 @@ export function useShredder(userOptions?: ShredderOptions) {
       feedClip.style.height = `${cardHeight}px`
 
       const feedCard = contentEl.cloneNode(true) as HTMLElement
-      feedCard.classList.add('shredder-feed-card')
       feedCard.style.setProperty('--shredder-h', `${cardHeight}px`)
       feedClip.appendChild(feedCard)
-      container.appendChild(feedClip)
 
       const shredderBar = document.createElement('div')
-      shredderBar.className = 'shredder-bar shredder-bar-shaking'
+      shredderBar.className = 'shredder-bar'
       shredderBar.setAttribute('aria-hidden', 'true')
       shredderBar.style.top = `${cardHeight - 7}px`
-      container.appendChild(shredderBar)
 
       const stripClip = document.createElement('div')
       stripClip.className = 'shredder-strip-clip'
@@ -101,14 +98,25 @@ export function useShredder(userOptions?: ShredderOptions) {
         shadow.style.background = `radial-gradient(${STRIP_GRADIENTS[i % STRIP_GRADIENTS.length]}, rgba(0,0,0,0.3), rgba(0,0,0,0) 70%)`
         strip.appendChild(shadow)
 
-        strip.classList.add(i % 2 === 0 ? 'shredder-strip-even' : 'shredder-strip-odd')
         strip.style.setProperty('--shredder-h', `${cardHeight}px`)
         stripClip.appendChild(strip)
       }
-      container.appendChild(stripClip)
 
+      container.appendChild(feedClip)
+      container.appendChild(shredderBar)
+      container.appendChild(stripClip)
       contentEl.style.opacity = '0'
       contentEl.style.transition = 'none'
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          feedCard.classList.add('shredder-feed-card')
+          shredderBar.classList.add('shredder-bar-shaking')
+          stripClip.querySelectorAll('.shredder-strip').forEach((strip, i) => {
+            strip.classList.add(i % 2 === 0 ? 'shredder-strip-even' : 'shredder-strip-odd')
+          })
+        })
+      })
 
       setTimeout(() => {
         feedClip.remove()

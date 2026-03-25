@@ -1,26 +1,27 @@
 <script setup lang="ts">
-import { Check, Copy } from 'lucide-vue-next'
+import { Check, Copy, Eye, EyeOff, Package } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { resolveIcon } from '@/utils/icons'
 
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
 import type { Sandbox } from '@/types'
 
-// TODO: Replace with dynamic schema from API
 export interface MetadataField {
   label: string
   value: string
   secret?: boolean
+  icon?: string
+  loading?: boolean
 }
 
-// TODO: Replace with dynamic schema from API
 export interface MetadataGroup {
   title: string
   fields: MetadataField[]
@@ -29,12 +30,14 @@ export interface MetadataGroup {
 defineProps<{
   sandbox: Sandbox
   title: string
+  thumbnailUrl?: string
   actions?: CardAction[]
   metadata?: MetadataGroup[]
   statusNote?: string
 }>()
 
 const copiedKey = ref<string>()
+const revealedKeys = ref<Set<string>>(new Set())
 
 async function copyToClipboard(field: MetadataField) {
   await navigator.clipboard.writeText(field.value)
@@ -46,7 +49,16 @@ async function copyToClipboard(field: MetadataField) {
 </script>
 
 <template>
-  <Card class="flex flex-col">
+  <Card class="flex h-[460px] flex-col overflow-hidden pt-0">
+    <div class="bg-muted relative flex h-36 shrink-0 items-center justify-center">
+      <img
+        v-if="thumbnailUrl"
+        :src="thumbnailUrl"
+        :alt="title"
+        class="h-full w-full object-cover"
+      />
+      <Package v-else class="text-muted-foreground/40 h-8 w-8" />
+    </div>
     <CardHeader>
       <div class="flex items-start justify-between gap-2">
         <CardTitle class="truncate text-sm">{{ title }}</CardTitle>
@@ -64,7 +76,6 @@ async function copyToClipboard(field: MetadataField) {
         :expires-at="sandbox.expiresAt"
         :created-at="sandbox.createdAt"
       />
-      <!-- TODO: Replace with dynamic schema from API -->
       <div
         v-for="group in metadata"
         :key="group.title"
@@ -78,25 +89,54 @@ async function copyToClipboard(field: MetadataField) {
           :key="field.label"
           class="flex items-center justify-between gap-2 text-xs"
         >
-          <span class="text-muted-foreground">{{ field.label }}</span>
-          <div class="flex items-center gap-0.5">
-            <span class="font-mono text-[11px]">{{ field.value }}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-3 w-3 min-w-0 p-0"
-              @click="copyToClipboard(field)"
-            >
-              <Check v-if="copiedKey === field.label" class="size-2.5 text-green-500" />
-              <Copy v-else class="size-2.5" />
-            </Button>
+          <span class="text-muted-foreground flex items-center gap-1">
+            <component :is="resolveIcon(field.icon)" v-if="field.icon" class="h-3 w-3" />
+            {{ field.label }}
+          </span>
+          <div class="flex items-center gap-1">
+            <template v-if="field.loading">
+              <Skeleton class="h-3 w-16 rounded" />
+            </template>
+            <template v-else>
+              <span class="font-mono text-[11px]">
+                {{ field.secret && !revealedKeys.has(field.label) ? '••••••••' : field.value }}
+              </span>
+              <button
+                v-if="field.secret"
+                class="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
+                @click="
+                  revealedKeys.has(field.label)
+                    ? revealedKeys.delete(field.label)
+                    : revealedKeys.add(field.label)
+                "
+              >
+                <EyeOff v-if="revealedKeys.has(field.label)" class="h-3 w-3" />
+                <Eye v-else class="h-3 w-3" />
+              </button>
+              <button
+                class="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
+                @click="copyToClipboard(field)"
+              >
+                <Check v-if="copiedKey === field.label" class="h-3 w-3 text-green-500" />
+                <Copy v-else class="h-3 w-3" />
+              </button>
+            </template>
           </div>
         </div>
       </div>
     </CardContent>
-    <!-- TODO: Replace with dynamic schema from API -->
-    <CardFooter v-if="actions?.length" class="flex gap-2">
+    <CardFooter v-if="actions?.length" class="sandbox-actions flex gap-2 overflow-x-auto">
       <ActionButton v-for="action in actions" :key="action.label" :action="action" />
     </CardFooter>
   </Card>
 </template>
+
+<style scoped>
+.sandbox-actions {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sandbox-actions::-webkit-scrollbar {
+  display: none;
+}
+</style>

@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useImages } from '@/composables/useImages'
 import { getApiErrorMessage } from '@/utils/error'
 
-import type { Image } from '@/types'
+import type { Image, MetadataItem } from '@/types'
 
 const { images, pendingPulls, loading, createImage, updateImage, uploadThumbnail, deleteImage } =
   useImages('all')
@@ -54,6 +54,7 @@ async function handleCreateImage(
     description: string
     isPublic: boolean
     thumbnailFile?: File
+    metadata?: MetadataItem[]
   },
   done: (success: boolean) => void,
 ) {

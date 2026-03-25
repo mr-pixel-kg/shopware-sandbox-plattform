@@ -82,7 +82,7 @@ defineExpose({ shred, isShredding })
   position: absolute;
   left: 0;
   transform-style: preserve-3d;
-  will-change: transform, opacity;
+  will-change: transform;
   z-index: 99;
   overflow: hidden;
   border-radius: var(--radius-xl, 0.75rem);
@@ -166,17 +166,17 @@ defineExpose({ shred, isShredding })
   50% {
     top: calc(var(--shredder-h) * -0.2);
     transform: scaleY(1.06) rotateX(5deg);
-    opacity: 0.9;
+    opacity: 1;
   }
   60% {
     top: calc(var(--shredder-h) * -0.05);
     transform: scaleY(1.08) rotateX(6deg);
-    opacity: 0.7;
+    opacity: 1;
   }
   64% {
     top: 0;
     transform: scaleY(1.1) rotateX(7deg);
-    opacity: 0.5;
+    opacity: 1;
   }
   76% {
     top: 150px;
@@ -214,17 +214,17 @@ defineExpose({ shred, isShredding })
   50% {
     top: calc(var(--shredder-h) * -0.2);
     transform: scaleY(1.06) rotateX(-5deg);
-    opacity: 0.9;
+    opacity: 1;
   }
   60% {
     top: calc(var(--shredder-h) * -0.05);
     transform: scaleY(1.08) rotateX(-6deg);
-    opacity: 0.7;
+    opacity: 1;
   }
   64% {
     top: 0;
     transform: scaleY(1.1) rotateX(-7deg);
-    opacity: 0.5;
+    opacity: 1;
   }
   76% {
     top: 150px;
