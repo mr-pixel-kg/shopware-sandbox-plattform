@@ -18,6 +18,14 @@ func (r *UserRepository) Create(user *models.User) error {
 	return r.db.Create(user).Error
 }
 
+func (r *UserRepository) List() ([]models.User, error) {
+	var users []models.User
+	if err := r.db.Order("created_at DESC").Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {
@@ -44,6 +52,10 @@ func (r *UserRepository) FindPendingByEmail(email string) (*models.User, error) 
 
 func (r *UserRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
+}
+
+func (r *UserRepository) Delete(id uuid.UUID) error {
+	return r.db.Delete(&models.User{}, "id = ?", id).Error
 }
 
 func (r *UserRepository) ListPending() ([]models.User, error) {

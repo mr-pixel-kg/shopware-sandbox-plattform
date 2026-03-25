@@ -50,6 +50,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	tokenService := services.NewTokenService(cfg.Auth)
 	auditService := services.NewAuditService(auditRepo)
 	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService, cfg.Registration)
+	userService := services.NewUserService(userRepo, passwordService)
 	guestService := services.NewGuestSessionService(sessionRepo, tokenService)
 	dockerClient, err := docker.NewClient(cfg.Sandbox, cfg.Docker)
 	if err != nil {
@@ -77,6 +78,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 		cfg.Auth.GuestCookieName,
 	)
 	auditHandler := handlers.NewAuditHandler(auditService)
+	userHandler := handlers.NewUserHandler(userService, auditService)
 	whitelistHandler := handlers.NewWhitelistHandler(userRepo, auditService)
 
 	e.GET("/health", healthCheck)
@@ -120,6 +122,11 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 
 	admin := private.Group("/admin")
 	admin.Use(authmw.RequireAdmin())
+	admin.GET("/users", userHandler.List)
+	admin.GET("/users/:id", userHandler.Get)
+	admin.POST("/users", userHandler.Create)
+	admin.PUT("/users/:id", userHandler.Update)
+	admin.DELETE("/users/:id", userHandler.Delete)
 	admin.GET("/whitelist", whitelistHandler.List)
 	admin.POST("/whitelist", whitelistHandler.Add)
 	admin.DELETE("/whitelist/:id", whitelistHandler.Remove)

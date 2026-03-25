@@ -10,6 +10,10 @@ export interface User extends BaseModel {
   role: string
 }
 
+export interface ManagedUser extends User {
+  pending: boolean
+}
+
 export type ImageStatus = 'pulling' | 'ready' | 'failed'
 
 export interface Image extends BaseModel {
@@ -107,6 +111,18 @@ export interface UpdateImageRequest {
 export interface AddWhitelistRequest {
   email: string
   role: 'admin' | 'user'
+}
+
+export interface CreateUserRequest {
+  email: string
+  role: 'admin' | 'user'
+  password?: string
+}
+
+export interface UpdateUserRequest {
+  email: string
+  role: 'admin' | 'user'
+  password?: string
 }
 
 export type CreateSnapshotRequest = CreateImageRequest
