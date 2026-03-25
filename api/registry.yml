@@ -1,0 +1,78 @@
+
+images:
+  - match: "dockware/*"
+    internal_port: 80
+    metadata:
+      - key: "admin_user"
+        label: "Admin Username"
+        type: "field"
+        value: "admin"
+        input: "text"
+        required: true
+        condition: "ready"
+        icon: "user"
+      - key: "admin_password"
+        label: "Admin Password"
+        type: "field"
+        value: "shopware"
+        input: "password"
+        required: true
+        condition: "ready"
+        icon: "lock"
+      - key: "open_admin"
+        label: "Admin"
+        type: "action"
+        value: "{{.URL}}/admin"
+        variant: "default"
+        condition: "ready"
+        icon: "shield"
+      - key: "open_storefront"
+        label: "Storefront"
+        type: "action"
+        value: "{{.URL}}"
+        variant: "outline"
+        condition: "ready"
+        icon: "store"
+    env:
+      TRUSTED_PROXIES: "{{.TrustedProxies}}"
+      SHOP_DOMAIN: "{{.Hostname}}"
+      APP_URL: "{{.URL}}"
+    post_start:
+      - command: ["bash", "-c", "mkdir -p /var/www/html/config/packages && printf 'framework:\\n    trusted_proxies: \"127.0.0.1,REMOTE_ADDR\"\\n' > /var/www/html/config/packages/framework.yaml"]
+        delay: 3s
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+      - command: ["bash", "-c", "mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"DELETE FROM sales_channel_domain WHERE url LIKE 'https://%';\" && mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE sales_channel_domain SET url='{{.URL}}' WHERE url LIKE 'http://%' AND url <> '{{.URL}}';\""]
+        delay: 10s
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+      - command: ["bash", "-c", "cd /var/www/html && if bin/console user:change-password admin --password='{{.Meta.admin_password}}' 2>/dev/null; then mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE user SET username='{{.Meta.admin_user}}' WHERE username='admin';\"; else bin/console user:create --admin --email=admin@example.com --firstName=Admin --lastName=Admin --password='{{.Meta.admin_password}}' '{{.Meta.admin_user}}'; fi"]
+        delay: 2s
+        timeout: 60s
+        retries: 3
+        retry_delay: 10s
+      - command: ["bash", "-c", "cd /var/www/html && bin/console cache:clear"]
+        delay: 2s
+        timeout: 30s
+        retries: 2
+        retry_delay: 3s
+    health_check:
+      path: "/api/_info/health-check"
+      timeout: 5s
+      interval: 3s
+  - match: "*"
+    internal_port: 80
+    metadata:
+      - key: "open"
+        label: "Öffnen"
+        type: "action"
+        value: "{{.URL}}"
+        variant: "default"
+        condition: "ready"
+        icon: "external-link"
+    health_check:
+      path: "/"
+      timeout: 5s
+      interval: 5s

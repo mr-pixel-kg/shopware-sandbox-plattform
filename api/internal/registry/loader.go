@@ -47,6 +47,20 @@ func validate(reg *ImageRegistry) error {
 				return fmt.Errorf("entry %d: pre_stop[%d]: command must not be empty", i, j)
 			}
 		}
+
+		seen := make(map[string]bool)
+		for j, item := range entry.Metadata {
+			if item.Key == "" {
+				return fmt.Errorf("entry %d: metadata[%d]: key is required", i, j)
+			}
+			if item.Type == "" {
+				return fmt.Errorf("entry %d: metadata[%d]: type is required", i, j)
+			}
+			if seen[item.Key] {
+				return fmt.Errorf("entry %d: metadata[%d]: duplicate key %q", i, j, item.Key)
+			}
+			seen[item.Key] = true
+		}
 	}
 
 	return nil

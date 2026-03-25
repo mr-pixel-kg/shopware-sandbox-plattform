@@ -32,7 +32,22 @@ type ImageEntry struct {
 	PreStop      []ExecCommand      `yaml:"pre_stop,omitempty"`
 	HealthCheck  *HealthCheckConfig `yaml:"health_check,omitempty"`
 	Labels       map[string]string  `yaml:"labels,omitempty"`
-	Volumes      []string           `yaml:"volumes,omitempty"`
+	Metadata     []MetadataItem     `yaml:"metadata,omitempty"`
+}
+
+type MetadataItem struct {
+	Key       string   `yaml:"key"                json:"key"`
+	Label     string   `yaml:"label"              json:"label"`
+	Type      string   `yaml:"type"               json:"type"`
+	Value     string   `yaml:"value,omitempty"    json:"value,omitempty"`
+	Input     string   `yaml:"input,omitempty"    json:"input,omitempty"`
+	Required  bool     `yaml:"required,omitempty" json:"required,omitempty"`
+	Options   []string `yaml:"options,omitempty"   json:"options,omitempty"`
+	Variant   string   `yaml:"variant,omitempty"   json:"variant,omitempty"`
+	Show      string   `yaml:"show,omitempty"      json:"show,omitempty"`
+	Condition string   `yaml:"condition,omitempty" json:"condition,omitempty"`
+	Icon      string   `yaml:"icon,omitempty"      json:"icon,omitempty"`
+	Size      string   `yaml:"size,omitempty"      json:"size,omitempty"`
 }
 
 type ExecCommand struct {
@@ -67,6 +82,7 @@ type TemplateContext struct {
 	TTL            string
 	ExpiresAt      string
 	ClientIP       string
+	Meta           map[string]string
 }
 
 type ResolvedImage struct {
@@ -76,5 +92,4 @@ type ResolvedImage struct {
 	PreStop      []ExecCommand
 	HealthCheck  *HealthCheckConfig
 	Labels       map[string]string
-	Volumes      []string
 }

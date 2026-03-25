@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -13,17 +14,24 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
+	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type ImageHandler struct {
-	images *services.ImageService
-	audit  *services.AuditService
+	images   *services.ImageService
+	audit    *services.AuditService
+	resolver RegistryResolver
 }
 
-func NewImageHandler(images *services.ImageService, audit *services.AuditService) *ImageHandler {
-	return &ImageHandler{images: images, audit: audit}
+type RegistryResolver interface {
+	ResolveMetadata(imageName string) []registry.MetadataItem
+}
+
+func NewImageHandler(images *services.ImageService, audit *services.AuditService, resolver RegistryResolver) *ImageHandler {
+	return &ImageHandler{images: images, audit: audit, resolver: resolver}
 }
 
 // ListPublic godoc
@@ -39,6 +47,7 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load public images").WithCause(err))
 	}
+	h.enrichMetadata(images)
 	slog.Debug("listed public images", logging.RequestFields(c, "component", "image", "count", len(images))...)
 	return c.JSON(200, images)
 }
@@ -58,6 +67,7 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load images").WithCause(err))
 	}
+	h.enrichMetadata(images)
 	slog.Debug("listed all images", logging.RequestFields(c, "component", "image", "count", len(images))...)
 	return c.JSON(200, images)
 }
@@ -89,6 +99,7 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		"is_public", input.IsPublic,
 	)...)
 
+	metadataJSON, _ := json.Marshal(input.Metadata)
 	image, err := h.images.CreateForUser(
 		c.Request().Context(),
 		&auth.UserID,
@@ -97,6 +108,8 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		input.Title,
 		input.Description,
 		input.IsPublic,
+		metadataJSON,
+		nil,
 	)
 	if err != nil {
 		return responses.FromAppError(c, apperror.BadRequest("IMAGE_CREATE_FAILED", err.Error()).WithCause(err))
@@ -150,7 +163,8 @@ func (h *ImageHandler) Update(c echo.Context) error {
 		"image_id", id.String(),
 		"is_public", input.IsPublic,
 	)...)
-	image, err := h.images.Update(id, input.Title, input.Description, input.IsPublic)
+	metadataJSON, _ := json.Marshal(input.Metadata)
+	image, err := h.images.Update(id, input.Title, input.Description, input.IsPublic, metadataJSON)
 	if err != nil {
 		return mapImageError(c, "IMAGE_UPDATE_FAILED", "Could not update image", err)
 	}
@@ -377,6 +391,51 @@ func (h *ImageHandler) PullProgress(c echo.Context) error {
 
 	default:
 		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+	}
+}
+
+// RegistryLookup godoc
+// @Summary      Lookup registry metadata
+// @Description  Return registry-defined metadata for an image by name or ID
+// @Tags         Images
+// @Produce      json
+// @Param        name query string false "Image name (e.g. dockware/dev:6.6.9.0)"
+// @Param        id query string false "Image ID" format(uuid)
+// @Success      200 {array} registry.MetadataItem
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/registry/lookup [get]
+func (h *ImageHandler) RegistryLookup(c echo.Context) error {
+	name := c.QueryParam("name")
+
+	if name == "" {
+		if idStr := c.QueryParam("id"); idStr != "" {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+			}
+			image, err := h.images.FindByID(id)
+			if err != nil {
+				return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+			}
+			name = image.RegistryName()
+		}
+	}
+
+	if name == "" {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "name or id query parameter is required"))
+	}
+
+	meta := h.resolver.ResolveMetadata(name)
+	return c.JSON(http.StatusOK, meta)
+}
+
+func (h *ImageHandler) enrichMetadata(images []models.Image) {
+	for i := range images {
+		reg := h.resolver.ResolveMetadata(images[i].RegistryName())
+		merged := mergeRegistryAndDB(reg, images[i].Metadata)
+		data, _ := json.Marshal(merged)
+		images[i].Metadata = datatypes.JSON(data)
 	}
 }
 

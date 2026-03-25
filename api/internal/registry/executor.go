@@ -17,33 +17,34 @@ type Executor struct {
 }
 
 func (e *Executor) RunPostStart(ctx context.Context, containerID string, commands []ExecCommand) {
+	slog.Debug("post-start starting", "container_id", containerID, "commands", len(commands))
 	for i, cmd := range commands {
+		slog.Debug("post-start executing", "container_id", containerID, "index", i, "command", cmd.Command, "delay", cmd.Delay.Duration, "timeout", cmd.Timeout.Duration)
 		if err := e.execWithRetry(ctx, containerID, cmd); err != nil {
-			slog.Warn("post-start command failed",
-				"container_id", containerID,
-				"command_index", i,
-				"command", cmd.Command,
-				"error", err,
-			)
+			slog.Warn("post-start command failed", "container_id", containerID, "index", i, "command", cmd.Command, "error", err)
+		} else {
+			slog.Debug("post-start command succeeded", "container_id", containerID, "index", i)
 		}
 	}
+	slog.Debug("post-start finished", "container_id", containerID)
 }
 
 func (e *Executor) RunPreStop(ctx context.Context, containerID string, commands []ExecCommand) {
+	slog.Debug("pre-stop starting", "container_id", containerID, "commands", len(commands))
 	for i, cmd := range commands {
+		slog.Debug("pre-stop executing", "container_id", containerID, "index", i, "command", cmd.Command)
 		if err := e.execWithRetry(ctx, containerID, cmd); err != nil {
-			slog.Warn("pre-stop command failed",
-				"container_id", containerID,
-				"command_index", i,
-				"command", cmd.Command,
-				"error", err,
-			)
+			slog.Warn("pre-stop command failed", "container_id", containerID, "index", i, "command", cmd.Command, "error", err)
+		} else {
+			slog.Debug("pre-stop command succeeded", "container_id", containerID, "index", i)
 		}
 	}
+	slog.Debug("pre-stop finished", "container_id", containerID)
 }
 
 func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd ExecCommand) error {
 	if cmd.Delay.Duration > 0 {
+		slog.Debug("exec waiting for delay", "container_id", containerID, "delay", cmd.Delay.Duration)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -56,6 +57,7 @@ func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd Ex
 
 	for attempt := range attempts {
 		if attempt > 0 && cmd.RetryDelay.Duration > 0 {
+			slog.Debug("exec retry waiting", "container_id", containerID, "attempt", attempt+1, "retry_delay", cmd.RetryDelay.Duration)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -63,17 +65,16 @@ func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd Ex
 			}
 		}
 
+		start := time.Now()
 		lastErr = e.exec(ctx, containerID, cmd)
+		elapsed := time.Since(start)
+
 		if lastErr == nil {
+			slog.Debug("exec succeeded", "container_id", containerID, "attempt", attempt+1, "elapsed", elapsed)
 			return nil
 		}
 
-		slog.Debug("exec attempt failed",
-			"container_id", containerID,
-			"attempt", attempt+1,
-			"max_attempts", attempts,
-			"error", lastErr,
-		)
+		slog.Debug("exec attempt failed", "container_id", containerID, "attempt", attempt+1, "max_attempts", attempts, "elapsed", elapsed, "error", lastErr)
 	}
 
 	return lastErr

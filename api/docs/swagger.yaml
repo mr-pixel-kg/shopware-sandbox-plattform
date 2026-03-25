@@ -31,6 +31,10 @@ definitions:
       isPublic:
         example: true
         type: boolean
+      metadata:
+        items:
+          $ref: '#/definitions/registry.MetadataItem'
+        type: array
       name:
         example: dockware/dev
         type: string
@@ -50,6 +54,10 @@ definitions:
         example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
         format: uuid
         type: string
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
       ttlMinutes:
         example: 120
         type: integer
@@ -64,6 +72,10 @@ definitions:
       isPublic:
         example: true
         type: boolean
+      metadata:
+        items:
+          $ref: '#/definitions/registry.MetadataItem'
+        type: array
       name:
         example: dockware/dev
         type: string
@@ -196,6 +208,10 @@ definitions:
         type: string
       isPublic:
         type: boolean
+      metadata:
+        items:
+          $ref: '#/definitions/registry.MetadataItem'
+        type: array
       title:
         type: string
     type: object
@@ -243,7 +259,12 @@ definitions:
       isPublic:
         example: true
         type: boolean
+      metadata:
+        type: string
       name:
+        example: dockware/dev
+        type: string
+      registryRef:
         example: dockware/dev
         type: string
       status:
@@ -297,6 +318,8 @@ definitions:
         type: string
       lastSeenAt:
         example: "2026-03-20T10:45:00Z"
+        type: string
+      metadata:
         type: string
       port:
         example: 8080
@@ -352,6 +375,35 @@ definitions:
         type: string
       updatedAt:
         example: "2026-03-20T10:20:00Z"
+        type: string
+    type: object
+  registry.MetadataItem:
+    properties:
+      condition:
+        type: string
+      icon:
+        type: string
+      input:
+        type: string
+      key:
+        type: string
+      label:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      required:
+        type: boolean
+      show:
+        type: string
+      size:
+        type: string
+      type:
+        type: string
+      value:
+        type: string
+      variant:
         type: string
     type: object
 host: localhost:8080
@@ -977,6 +1029,39 @@ paths:
       summary: Delete a guest sandbox
       tags:
       - Public
+  /api/registry/lookup:
+    get:
+      description: Return registry-defined metadata for an image by name or ID
+      parameters:
+      - description: Image name (e.g. dockware/dev:6.6.9.0)
+        in: query
+        name: name
+        type: string
+      - description: Image ID
+        format: uuid
+        in: query
+        name: id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/registry.MetadataItem'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Lookup registry metadata
+      tags:
+      - Images
   /api/sandboxes:
     get:
       description: Returns all sandboxes that are currently active (admin view)

@@ -65,6 +65,7 @@ type CreateSandboxInput struct {
 	GuestSessionID *uuid.UUID
 	ClientIP       string
 	TTL            *time.Duration
+	Metadata       map[string]string
 }
 
 func (s *SandboxService) ListActive() ([]models.Sandbox, error) {
@@ -129,16 +130,20 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	expiresAt := time.Now().UTC().Add(ttl)
 	container, err := s.docker.CreateContainer(ctx, docker.SandboxCreateRequest{
 		ImageName:     image.FullName(),
+		RegistryRef:   image.RegistryName(),
 		ContainerName: containerName,
 		Hostname:      hostname,
 		SandboxID:     sandboxID.String(),
 		TTL:           ttl.String(),
 		ExpiresAt:     expiresAt.Format(time.RFC3339),
 		ClientIP:      input.ClientIP,
+		Metadata:      input.Metadata,
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	fieldsJSON, _ := json.Marshal(input.Metadata)
 	sandbox := &models.Sandbox{
 		ID:              sandboxID,
 		ImageID:         image.ID,
@@ -150,6 +155,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		URL:             container.URL,
 		Port:            container.Port,
 		ClientIP:        input.ClientIP,
+		Metadata:        datatypes.JSON(fieldsJSON),
 		ExpiresAt:       &expiresAt,
 	}
 
@@ -273,6 +279,7 @@ type CreateSnapshotInput struct {
 	IsPublic    bool
 	ClientIP    string
 	UserID      *uuid.UUID
+	Metadata    json.RawMessage
 }
 
 func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapshotInput) (*models.Image, error) {
@@ -291,6 +298,12 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, err
 	}
 
+	var registryRef *string
+	if sourceImage, srcErr := s.imageRepo.FindByID(sandbox.ImageID); srcErr == nil {
+		ref := sourceImage.RegistryName()
+		registryRef = &ref
+	}
+
 	image, err := s.images.CreateForUser(
 		ctx,
 		input.UserID,
@@ -299,6 +312,8 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		input.Title,
 		input.Description,
 		input.IsPublic,
+		input.Metadata,
+		registryRef,
 	)
 	if err != nil {
 		return nil, err

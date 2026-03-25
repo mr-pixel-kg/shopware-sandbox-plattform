@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"time"
@@ -13,11 +14,15 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
+	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"gorm.io/datatypes"
 )
 
 type SandboxHandler struct {
 	sandboxes       *services.SandboxService
+	images          *services.ImageService
+	resolver        RegistryResolver
 	health          *services.SandboxHealthService
 	auth            *services.AuthService
 	guest           *services.GuestSessionService
@@ -26,6 +31,8 @@ type SandboxHandler struct {
 
 func NewSandboxHandler(
 	sandboxes *services.SandboxService,
+	images *services.ImageService,
+	resolver RegistryResolver,
 	health *services.SandboxHealthService,
 	auth *services.AuthService,
 	guest *services.GuestSessionService,
@@ -33,6 +40,8 @@ func NewSandboxHandler(
 ) *SandboxHandler {
 	return &SandboxHandler{
 		sandboxes:       sandboxes,
+		images:          images,
+		resolver:        resolver,
 		health:          health,
 		auth:            auth,
 		guest:           guest,
@@ -56,6 +65,7 @@ func (h *SandboxHandler) List(c echo.Context) error {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load sandboxes").WithCause(err))
 	}
 	auth := mw.MustAuth(c)
+	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed all sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
 	return c.JSON(200, sandboxes)
 }
@@ -76,6 +86,7 @@ func (h *SandboxHandler) ListMine(c echo.Context) error {
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load own sandboxes").WithCause(err))
 	}
+	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed user sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
 	return c.JSON(200, sandboxes)
 }
@@ -94,6 +105,7 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load guest sandboxes").WithCause(err))
 	}
+	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed guest sandboxes", logging.RequestFields(c, "component", "sandbox", "guest_session_id", guest.SessionID.String(), "count", len(sandboxes))...)
 	return c.JSON(200, sandboxes)
 }
@@ -120,6 +132,7 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 	if err != nil {
 		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
 	}
+	h.enrichSandbox(sandbox)
 	slog.Debug("sandbox loaded", logging.RequestFields(c, "component", "sandbox", "sandbox_id", sandbox.ID.String(), "status", sandbox.Status)...)
 	return c.JSON(200, sandbox)
 }
@@ -204,6 +217,7 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 		ImageID:        imageID,
 		GuestSessionID: &guest.SessionID,
 		ClientIP:       c.RealIP(),
+		Metadata:       input.Metadata,
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -217,6 +231,7 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 		"image_id", sandbox.ImageID.String(),
 		"expires_at", sandbox.ExpiresAt,
 	)...)
+	h.enrichSandbox(sandbox)
 	return c.JSON(201, sandbox)
 }
 
@@ -264,6 +279,7 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 		UserID:   &auth.UserID,
 		ClientIP: c.RealIP(),
 		TTL:      ttl,
+		Metadata: input.Metadata,
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -277,6 +293,7 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 		"image_id", sandbox.ImageID.String(),
 		"expires_at", sandbox.ExpiresAt,
 	)...)
+	h.enrichSandbox(sandbox)
 	return c.JSON(201, sandbox)
 }
 
@@ -421,6 +438,7 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		"tag", input.Tag,
 		"is_public", input.IsPublic,
 	)...)
+	metadataJSON, _ := json.Marshal(input.Metadata)
 	image, err := h.sandboxes.CreateSnapshot(c.Request().Context(), services.CreateSnapshotInput{
 		SandboxID:   id,
 		Name:        input.Name,
@@ -430,6 +448,7 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		IsPublic:    input.IsPublic,
 		ClientIP:    c.RealIP(),
 		UserID:      &auth.UserID,
+		Metadata:    metadataJSON,
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -456,6 +475,52 @@ func mapSandboxError(c echo.Context, err error) error {
 	default:
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_ERROR", "Sandbox operation failed").WithCause(err))
 	}
+}
+
+func (h *SandboxHandler) enrichSandboxMetadata(sandboxes []models.Sandbox) {
+	imageCache := make(map[uuid.UUID][]registry.MetadataItem)
+
+	for idx := range sandboxes {
+		sb := &sandboxes[idx]
+		imgMeta, ok := imageCache[sb.ImageID]
+		if !ok {
+			img, err := h.images.FindByID(sb.ImageID)
+			if err != nil {
+				slog.Warn("enrich sandbox metadata: image not found", "image_id", sb.ImageID)
+				imageCache[sb.ImageID] = nil
+			} else {
+				reg := h.resolver.ResolveMetadata(img.RegistryName())
+				imgMeta = mergeRegistryAndDB(reg, img.Metadata)
+				imageCache[sb.ImageID] = imgMeta
+			}
+		}
+
+		if imgMeta == nil {
+			continue
+		}
+
+		var values map[string]string
+		if len(sb.Metadata) > 0 {
+			_ = json.Unmarshal(sb.Metadata, &values)
+		}
+
+		enriched := make([]registry.MetadataItem, len(imgMeta))
+		copy(enriched, imgMeta)
+		for j := range enriched {
+			if v, exists := values[enriched[j].Key]; exists {
+				enriched[j].Value = v
+			}
+		}
+
+		data, _ := json.Marshal(enriched)
+		sb.Metadata = datatypes.JSON(data)
+	}
+}
+
+func (h *SandboxHandler) enrichSandbox(sandbox *models.Sandbox) {
+	sl := []models.Sandbox{*sandbox}
+	h.enrichSandboxMetadata(sl)
+	*sandbox = sl[0]
 }
 
 func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.Sandbox) error {

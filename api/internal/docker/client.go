@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -23,12 +24,14 @@ import (
 
 type SandboxCreateRequest struct {
 	ImageName     string
+	RegistryRef   string
 	ContainerName string
 	Hostname      string
 	SandboxID     string
 	TTL           string
 	ExpiresAt     string
 	ClientIP      string
+	Metadata      map[string]string
 }
 
 type SandboxContainer struct {
@@ -142,8 +145,15 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request SandboxCreat
 	return c.createTraefikContainer(ctx, request)
 }
 
+func registryName(req SandboxCreateRequest) string {
+	if req.RegistryRef != "" {
+		return req.RegistryRef
+	}
+	return req.ImageName
+}
+
 func (c *DockerClient) scheme() string {
-	if c.dockerCfg.TraefikCertResolver != "" {
+	if c.dockerCfg.Mode == config.DockerModeTraefik && c.dockerCfg.TraefikCertResolver != "" {
 		return "https"
 	}
 	return "http"
@@ -158,7 +168,7 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request SandboxC
 	scheme := c.scheme()
 	shopDomain := fmt.Sprintf("localhost:%d", hostPort)
 	imageRepo, imageTag := splitImageRef(request.ImageName)
-	resolved, err := c.resolver.Resolve(request.ImageName, registry.TemplateContext{
+	resolved, err := c.resolver.Resolve(registryName(request), registry.TemplateContext{
 		Hostname:       shopDomain,
 		URL:            scheme + "://" + shopDomain,
 		Scheme:         scheme,
@@ -176,6 +186,7 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request SandboxC
 		TTL:            request.TTL,
 		ExpiresAt:      request.ExpiresAt,
 		ClientIP:       request.ClientIP,
+		Meta:           request.Metadata,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", request.ImageName, err)
@@ -254,7 +265,7 @@ func findFreePort() (int, error) {
 func (c *DockerClient) createTraefikContainer(ctx context.Context, request SandboxCreateRequest) (*SandboxContainer, error) {
 	scheme := c.scheme()
 	imageRepo, imageTag := splitImageRef(request.ImageName)
-	resolved, err := c.resolver.Resolve(request.ImageName, registry.TemplateContext{
+	resolved, err := c.resolver.Resolve(registryName(request), registry.TemplateContext{
 		Hostname:       request.Hostname,
 		URL:            scheme + "://" + request.Hostname,
 		Scheme:         scheme,
@@ -271,6 +282,7 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Sandb
 		TTL:            request.TTL,
 		ExpiresAt:      request.ExpiresAt,
 		ClientIP:       request.ClientIP,
+		Meta:           request.Metadata,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", request.ImageName, err)
@@ -324,10 +336,12 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Sandb
 func (c *DockerClient) DeleteContainer(ctx context.Context, containerID string, imageName string) error {
 	if imageName != "" {
 		resolved, err := c.resolver.Resolve(imageName, registry.TemplateContext{ImageName: imageName})
-		if err == nil && len(resolved.PreStop) > 0 {
-			preStopCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		if err != nil {
+			slog.Warn("pre-stop resolve failed, skipping", "container_id", containerID, "image", imageName, "error", err)
+		} else if len(resolved.PreStop) > 0 {
+			preStopCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			defer cancel()
 			c.executor.RunPreStop(preStopCtx, containerID, resolved.PreStop)
-			cancel()
 		}
 	}
 

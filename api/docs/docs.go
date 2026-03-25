@@ -967,6 +967,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/registry/lookup": {
+            "get": {
+                "description": "Return registry-defined metadata for an image by name or ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Images"
+                ],
+                "summary": "Lookup registry metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Image name (e.g. dockware/dev:6.6.9.0)",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Image ID",
+                        "name": "id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/registry.MetadataItem"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/sandboxes": {
             "get": {
                 "security": [
@@ -1456,6 +1506,12 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "metadata": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/registry.MetadataItem"
+                    }
+                },
                 "name": {
                     "type": "string",
                     "example": "dockware/dev"
@@ -1481,6 +1537,12 @@ const docTemplate = `{
                     "format": "uuid",
                     "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
                 },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "ttlMinutes": {
                     "type": "integer",
                     "example": 120
@@ -1501,6 +1563,12 @@ const docTemplate = `{
                 "isPublic": {
                     "type": "boolean",
                     "example": true
+                },
+                "metadata": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/registry.MetadataItem"
+                    }
                 },
                 "name": {
                     "type": "string",
@@ -1685,6 +1753,12 @@ const docTemplate = `{
                 "isPublic": {
                     "type": "boolean"
                 },
+                "metadata": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/registry.MetadataItem"
+                    }
+                },
                 "title": {
                     "type": "string"
                 }
@@ -1749,7 +1823,14 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "metadata": {
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string",
+                    "example": "dockware/dev"
+                },
+                "registryRef": {
                     "type": "string",
                     "example": "dockware/dev"
                 },
@@ -1821,6 +1902,9 @@ const docTemplate = `{
                 "lastSeenAt": {
                     "type": "string",
                     "example": "2026-03-20T10:45:00Z"
+                },
+                "metadata": {
+                    "type": "string"
                 },
                 "port": {
                     "type": "integer",
@@ -1894,6 +1978,50 @@ const docTemplate = `{
                 "updatedAt": {
                     "type": "string",
                     "example": "2026-03-20T10:20:00Z"
+                }
+            }
+        },
+        "registry.MetadataItem": {
+            "type": "object",
+            "properties": {
+                "condition": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "show": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                },
+                "variant": {
+                    "type": "string"
                 }
             }
         }

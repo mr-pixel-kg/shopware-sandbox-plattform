@@ -68,7 +68,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker, cfg.Server.BaseURL, cfg.Storage.ThumbnailDir)
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient)
-	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo)
+	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver)
 
 	// Sandbox expiration is handled inside the same process on purpose to keep
 	// deployment simple for the single-service architecture.
@@ -78,9 +78,11 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 
 	imageService.ReconcileOnStartup(context.Background())
 	authHandler := handlers.NewAuthHandler(authService, auditService)
-	imageHandler := handlers.NewImageHandler(imageService, auditService)
+	imageHandler := handlers.NewImageHandler(imageService, auditService, resolver)
 	sandboxHandler := handlers.NewSandboxHandler(
 		sandboxService,
+		imageService,
+		resolver,
 		sandboxHealthService,
 		authService,
 		guestService,
@@ -100,6 +102,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	public.Use(authmw.EnsureGuestSession(guestService, cfg.Auth.GuestCookieName))
 
 	api.GET("/images/:id/progress", imageHandler.PullProgress)
+	api.GET("/registry/lookup", imageHandler.RegistryLookup)
 	api.GET("/sandboxes/:id/health", sandboxHandler.Health)
 
 	private.GET("/images/pulls", imageHandler.ListPulls)

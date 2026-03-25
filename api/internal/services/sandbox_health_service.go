@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
+	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 )
 
@@ -39,26 +40,40 @@ type sandboxHealthState struct {
 	last        *SandboxHealthEvent
 }
 
+type HealthCheckResolver interface {
+	ResolveHealthCheck(imageName string) *registry.HealthCheckConfig
+}
+
 type SandboxHealthService struct {
 	repo     *repositories.SandboxRepository
+	imgRepo  *repositories.ImageRepository
+	resolver HealthCheckResolver
 	interval time.Duration
 	client   *http.Client
 
-	mu     sync.Mutex
-	active map[uuid.UUID]*sandboxHealthState
+	mu          sync.Mutex
+	active      map[uuid.UUID]*sandboxHealthState
+	healthCache map[uuid.UUID]*registry.HealthCheckConfig
 }
 
-func NewSandboxHealthService(repo *repositories.SandboxRepository) *SandboxHealthService {
+func NewSandboxHealthService(
+	repo *repositories.SandboxRepository,
+	imgRepo *repositories.ImageRepository,
+	resolver HealthCheckResolver,
+) *SandboxHealthService {
 	return &SandboxHealthService{
 		repo:     repo,
+		imgRepo:  imgRepo,
+		resolver: resolver,
 		interval: 5 * time.Second,
 		client: &http.Client{
-			Timeout: 3 * time.Second,
+			Timeout: 5 * time.Second,
 			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
 		},
-		active: make(map[uuid.UUID]*sandboxHealthState),
+		active:      make(map[uuid.UUID]*sandboxHealthState),
+		healthCache: make(map[uuid.UUID]*registry.HealthCheckConfig),
 	}
 }
 
@@ -121,7 +136,15 @@ func (s *SandboxHealthService) monitor(ctx context.Context, sandboxID uuid.UUID)
 
 	s.runProbe(sandboxID)
 
-	ticker := time.NewTicker(s.interval)
+	interval := s.interval
+	sandbox, err := s.repo.FindByID(sandboxID)
+	if err == nil {
+		if hc := s.getHealthConfig(sandbox); hc != nil && hc.Interval.Duration > 0 {
+			interval = hc.Interval.Duration
+		}
+	}
+
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -177,10 +200,35 @@ func (s *SandboxHealthService) runProbe(sandboxID uuid.UUID) bool {
 	}
 }
 
+func (s *SandboxHealthService) getHealthConfig(sandbox *models.Sandbox) *registry.HealthCheckConfig {
+	s.mu.Lock()
+	hc, ok := s.healthCache[sandbox.ImageID]
+	s.mu.Unlock()
+	if ok {
+		return hc
+	}
+
+	img, err := s.imgRepo.FindByID(sandbox.ImageID)
+	if err == nil && s.resolver != nil {
+		hc = s.resolver.ResolveHealthCheck(img.RegistryName())
+	}
+
+	s.mu.Lock()
+	s.healthCache[sandbox.ImageID] = hc
+	s.mu.Unlock()
+	return hc
+}
+
 func (s *SandboxHealthService) probeSandbox(sandbox *models.Sandbox, wasReady bool) SandboxHealthEvent {
 	status := "probing"
 	if wasReady || sandbox.Status == models.SandboxStatusRunning {
 		status = "offline"
+	}
+
+	probeURL := sandbox.URL
+	hc := s.getHealthConfig(sandbox)
+	if hc != nil && hc.Path != "" {
+		probeURL = strings.TrimRight(sandbox.URL, "/") + hc.Path
 	}
 
 	event := SandboxHealthEvent{
@@ -191,13 +239,21 @@ func (s *SandboxHealthService) probeSandbox(sandbox *models.Sandbox, wasReady bo
 		CheckedAt: time.Now().UTC(),
 	}
 
-	if sandbox.URL == "" {
+	if probeURL == "" {
 		event.FailureReason = "missing_url"
 		event.Message = "Sandbox URL is empty"
 		return event
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, sandbox.URL, nil)
+	timeout := s.client.Timeout
+	if hc != nil && hc.Timeout.Duration > 0 {
+		timeout = hc.Timeout.Duration
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	if err != nil {
 		event.FailureReason = "invalid_url"
 		event.Message = err.Error()

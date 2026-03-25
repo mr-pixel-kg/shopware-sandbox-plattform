@@ -18,7 +18,7 @@ func TestSandboxHealthServiceProbeSandboxReady(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewSandboxHealthService(nil)
+	service := NewSandboxHealthService(nil, nil, nil)
 	event := service.probeSandbox(&models.Sandbox{
 		ID:     uuid.New(),
 		Status: models.SandboxStatusStarting,
@@ -37,7 +37,7 @@ func TestSandboxHealthServiceProbeSandboxPending(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewSandboxHealthService(nil)
+	service := NewSandboxHealthService(nil, nil, nil)
 	event := service.probeSandbox(&models.Sandbox{
 		ID:     uuid.New(),
 		Status: models.SandboxStatusStarting,
