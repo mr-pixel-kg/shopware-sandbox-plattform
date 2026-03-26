@@ -35,16 +35,6 @@ definitions:
       user:
         $ref: '#/definitions/dto.UserSummary'
     type: object
-  dto.UserSummary:
-    properties:
-      email:
-        example: jane.doe@example.com
-        type: string
-      id:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
-    type: object
   dto.AuthLoginResponse:
     properties:
       token:
@@ -162,6 +152,15 @@ definitions:
         example: ok
         type: string
     type: object
+  dto.ImagePullProgressEvent:
+    properties:
+      percent:
+        example: 75
+        type: integer
+      status:
+        example: pulling
+        type: string
+    type: object
   dto.ImageResponse:
     properties:
       createdAt:
@@ -189,10 +188,6 @@ definitions:
         type: string
       owner:
         $ref: '#/definitions/dto.UserSummary'
-      ownerId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
       registryRef:
         example: dockware/dev
         type: string
@@ -210,15 +205,6 @@ definitions:
         type: string
       updatedAt:
         example: "2026-03-20T10:20:00Z"
-        type: string
-    type: object
-  dto.ImagePullProgressEvent:
-    properties:
-      percent:
-        example: 75
-        type: integer
-      status:
-        example: pulling
         type: string
     type: object
   dto.LoginRequest:
@@ -338,14 +324,12 @@ definitions:
         type: string
       owner:
         $ref: '#/definitions/dto.UserSummary'
-      ownerId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
       port:
         example: 8080
         type: integer
       status:
+        allOf:
+        - $ref: '#/definitions/models.SandboxStatus'
         enum:
         - starting
         - running
@@ -354,7 +338,6 @@ definitions:
         - deleted
         - failed
         example: running
-        type: string
       updatedAt:
         example: "2026-03-20T10:20:00Z"
         type: string
@@ -393,14 +376,20 @@ definitions:
         example: admin
         type: string
     type: object
+  dto.UserSummary:
+    properties:
+      email:
+        example: jane.doe@example.com
+        type: string
+      id:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
+        type: string
+    type: object
   models.Image:
     properties:
       createdAt:
         example: "2026-03-20T10:15:00Z"
-        type: string
-      ownerId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
         type: string
       description:
         example: Prepared image for sales demos and internal QA.
@@ -419,6 +408,10 @@ definitions:
         type: string
       name:
         example: dockware/dev
+        type: string
+      ownerId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       registryRef:
         example: dockware/dev
@@ -453,10 +446,6 @@ definitions:
       createdAt:
         example: "2026-03-20T10:15:00Z"
         type: string
-      ownerId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
       displayName:
         example: My Test Shop
         type: string
@@ -479,6 +468,10 @@ definitions:
         example: "2026-03-20T10:45:00Z"
         type: string
       metadata:
+        type: string
+      ownerId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       port:
         example: 8080

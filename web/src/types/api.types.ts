@@ -50,7 +50,6 @@ export interface Image extends BaseModel {
   error?: string
   metadata?: MetadataItem[]
   registryRef?: string
-  ownerId?: string
   owner?: UserSummary | null
 }
 
@@ -68,7 +67,6 @@ export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'de
 export interface Sandbox extends BaseModel {
   id: string
   imageId: string
-  ownerId?: string
   owner?: UserSummary | null
   guestSessionId?: string
   displayName: string

@@ -1371,7 +1371,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.SandboxResponse"
+                            "$ref": "#/definitions/models.Sandbox"
                         }
                     },
                     "400": {
@@ -1436,7 +1436,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Sandbox"
+                            "$ref": "#/definitions/dto.SandboxResponse"
                         }
                     },
                     "400": {
@@ -1859,20 +1859,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UserSummary": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "jane.doe@example.com"
-                },
-                "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
-                }
-            }
-        },
         "dto.AuthLoginResponse": {
             "type": "object",
             "properties": {
@@ -2041,6 +2027,19 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ImagePullProgressEvent": {
+            "type": "object",
+            "properties": {
+                "percent": {
+                    "type": "integer",
+                    "example": 75
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pulling"
+                }
+            }
+        },
         "dto.ImageResponse": {
             "type": "object",
             "properties": {
@@ -2078,11 +2077,6 @@ const docTemplate = `{
                 "owner": {
                     "$ref": "#/definitions/dto.UserSummary"
                 },
-                "ownerId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
-                },
                 "registryRef": {
                     "type": "string",
                     "example": "dockware/dev"
@@ -2106,19 +2100,6 @@ const docTemplate = `{
                 "updatedAt": {
                     "type": "string",
                     "example": "2026-03-20T10:20:00Z"
-                }
-            }
-        },
-        "dto.ImagePullProgressEvent": {
-            "type": "object",
-            "properties": {
-                "percent": {
-                    "type": "integer",
-                    "example": 75
-                },
-                "status": {
-                    "type": "string",
-                    "example": "pulling"
                 }
             }
         },
@@ -2282,17 +2263,11 @@ const docTemplate = `{
                 "owner": {
                     "$ref": "#/definitions/dto.UserSummary"
                 },
-                "ownerId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
-                },
                 "port": {
                     "type": "integer",
                     "example": 8080
                 },
                 "status": {
-                    "type": "string",
                     "enum": [
                         "starting",
                         "running",
@@ -2300,6 +2275,11 @@ const docTemplate = `{
                         "expired",
                         "deleted",
                         "failed"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.SandboxStatus"
+                        }
                     ],
                     "example": "running"
                 },
@@ -2359,17 +2339,26 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UserSummary": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "jane.doe@example.com"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
+                }
+            }
+        },
         "models.Image": {
             "type": "object",
             "properties": {
                 "createdAt": {
                     "type": "string",
                     "example": "2026-03-20T10:15:00Z"
-                },
-                "ownerId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "description": {
                     "type": "string",
@@ -2394,6 +2383,11 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "dockware/dev"
+                },
+                "ownerId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "registryRef": {
                     "type": "string",
@@ -2440,11 +2434,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "2026-03-20T10:15:00Z"
                 },
-                "ownerId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
-                },
                 "displayName": {
                     "type": "string",
                     "example": "My Test Shop"
@@ -2474,6 +2463,11 @@ const docTemplate = `{
                 },
                 "metadata": {
                     "type": "string"
+                },
+                "ownerId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
                 },
                 "port": {
                     "type": "integer",
