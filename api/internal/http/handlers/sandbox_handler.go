@@ -53,7 +53,7 @@ func NewSandboxHandler(
 // @Tags         Sandboxes
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200 {array} models.Sandbox
+// @Success      200 {array} dto.SandboxResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes [get]
@@ -65,7 +65,7 @@ func (h *SandboxHandler) List(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed all sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
-	return c.JSON(200, sandboxes)
+	return c.JSON(200, toSandboxResponses(sandboxes))
 }
 
 // ListMine godoc
@@ -74,7 +74,7 @@ func (h *SandboxHandler) List(c echo.Context) error {
 // @Tags         Sandboxes
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200 {array} models.Sandbox
+// @Success      200 {array} dto.SandboxResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/me/sandboxes [get]
@@ -86,7 +86,7 @@ func (h *SandboxHandler) ListMine(c echo.Context) error {
 	}
 	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed user sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
-	return c.JSON(200, sandboxes)
+	return c.JSON(200, toSandboxResponses(sandboxes))
 }
 
 // ListGuest godoc
@@ -94,7 +94,7 @@ func (h *SandboxHandler) ListMine(c echo.Context) error {
 // @Description  Returns sandboxes for the current guest session (cookie-based)
 // @Tags         Public
 // @Produce      json
-// @Success      200 {array} models.Sandbox
+// @Success      200 {array} dto.SandboxResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/public/sandboxes [get]
 func (h *SandboxHandler) ListGuest(c echo.Context) error {
@@ -105,7 +105,7 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 	}
 	h.enrichSandboxMetadata(sandboxes)
 	slog.Debug("listed guest sandboxes", logging.RequestFields(c, "component", "sandbox", "guest_session_id", guest.SessionID.String(), "count", len(sandboxes))...)
-	return c.JSON(200, sandboxes)
+	return c.JSON(200, toSandboxResponses(sandboxes))
 }
 
 // Get godoc
@@ -115,7 +115,7 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 // @Security     BearerAuth
 // @Produce      json
 // @Param        id path string true "Sandbox ID" format(uuid)
-// @Success      200 {object} models.Sandbox
+// @Success      200 {object} dto.SandboxResponse
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
@@ -132,7 +132,7 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 	}
 	h.enrichSandbox(sandbox)
 	slog.Debug("sandbox loaded", logging.RequestFields(c, "component", "sandbox", "sandbox_id", sandbox.ID.String(), "status", sandbox.Status)...)
-	return c.JSON(200, sandbox)
+	return c.JSON(200, toSandboxResponse(sandbox))
 }
 
 // Health godoc

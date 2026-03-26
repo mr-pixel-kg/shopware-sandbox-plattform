@@ -22,6 +22,7 @@ type Sandbox struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
 	ImageID        uuid.UUID      `gorm:"type:uuid;not null;index" json:"imageId" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
 	OwnerID        *uuid.UUID     `gorm:"column:owner_id;type:uuid;index" json:"ownerId,omitempty" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
+	Owner          *User          `gorm:"foreignKey:OwnerID;references:ID" json:"-" swaggerignore:"true"`
 	GuestSessionID *uuid.UUID     `gorm:"type:uuid;index" json:"guestSessionId,omitempty" format:"uuid" example:"db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"`
 	DisplayName    string         `gorm:"size:255;default:''" json:"displayName" example:"My Test Shop"`
 	Status         SandboxStatus  `gorm:"size:32;not null;index" json:"status" enums:"starting,running,stopped,expired,deleted,failed" example:"running"`

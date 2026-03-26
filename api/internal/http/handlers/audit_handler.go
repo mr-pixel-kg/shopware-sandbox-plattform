@@ -49,17 +49,9 @@ func (h *AuditHandler) List(c echo.Context) error {
 
 	response := make([]dto.AuditLogResponse, 0, len(logs))
 	for _, logEntry := range logs {
-		var user *dto.AuditLogUser
-		if logEntry.User != nil {
-			user = &dto.AuditLogUser{
-				ID:    logEntry.User.ID,
-				Email: logEntry.User.Email,
-			}
-		}
-
 		response = append(response, dto.AuditLogResponse{
 			ID:        logEntry.ID,
-			User:      user,
+			User:      toUserSummary(logEntry.User),
 			Action:    logEntry.Action,
 			IPAddress: logEntry.IPAddress,
 			Details:   logEntry.Details,

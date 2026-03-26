@@ -629,7 +629,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Image"
+                                "$ref": "#/definitions/dto.ImageResponse"
                             }
                         }
                     },
@@ -1067,7 +1067,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Sandbox"
+                                "$ref": "#/definitions/dto.SandboxResponse"
                             }
                         }
                     },
@@ -1160,7 +1160,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Image"
+                                "$ref": "#/definitions/dto.ImageResponse"
                             }
                         }
                     },
@@ -1189,7 +1189,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Sandbox"
+                                "$ref": "#/definitions/dto.SandboxResponse"
                             }
                         }
                     },
@@ -1321,7 +1321,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Sandbox"
+                                "$ref": "#/definitions/dto.SandboxResponse"
                             }
                         }
                     },
@@ -1371,7 +1371,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/models.Sandbox"
+                            "$ref": "#/definitions/dto.SandboxResponse"
                         }
                     },
                     "400": {
@@ -1855,11 +1855,11 @@ const docTemplate = `{
                     "example": "203.0.113.25"
                 },
                 "user": {
-                    "$ref": "#/definitions/dto.AuditLogUser"
+                    "$ref": "#/definitions/dto.UserSummary"
                 }
             }
         },
-        "dto.AuditLogUser": {
+        "dto.UserSummary": {
             "type": "object",
             "properties": {
                 "email": {
@@ -2041,6 +2041,74 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ImageResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
+                },
+                "deletedAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Prepared image for sales demos and internal QA."
+                },
+                "error": {
+                    "type": "string",
+                    "example": "pull access denied"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
+                },
+                "isPublic": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "dockware/dev"
+                },
+                "owner": {
+                    "$ref": "#/definitions/dto.UserSummary"
+                },
+                "ownerId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
+                },
+                "registryRef": {
+                    "type": "string",
+                    "example": "dockware/dev"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ready"
+                },
+                "tag": {
+                    "type": "string",
+                    "example": "6.6.9.0"
+                },
+                "thumbnailUrl": {
+                    "type": "string",
+                    "example": "https://cdn.example.com/images/shopware-demo.png"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Shopware Demo Image"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-03-20T10:20:00Z"
+                }
+            }
+        },
         "dto.ImagePullProgressEvent": {
             "type": "object",
             "properties": {
@@ -2152,6 +2220,92 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "example": "probing"
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://sandbox-0b443c82.demo.shopshredder.de"
+                }
+            }
+        },
+        "dto.SandboxResponse": {
+            "type": "object",
+            "properties": {
+                "clientIp": {
+                    "type": "string",
+                    "example": "203.0.113.25"
+                },
+                "containerId": {
+                    "type": "string",
+                    "example": "1a2b3c4d5e6f7g8h9i0j"
+                },
+                "containerName": {
+                    "type": "string",
+                    "example": "sandbox-0b443c82"
+                },
+                "createdAt": {
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
+                },
+                "deletedAt": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "My Test Shop"
+                },
+                "expiresAt": {
+                    "type": "string",
+                    "example": "2026-03-20T12:00:00Z"
+                },
+                "guestSessionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "0b443c82-d8a3-49a7-b59a-26ce327c7341"
+                },
+                "imageId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"
+                },
+                "lastSeenAt": {
+                    "type": "string",
+                    "example": "2026-03-20T10:45:00Z"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "owner": {
+                    "$ref": "#/definitions/dto.UserSummary"
+                },
+                "ownerId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
+                },
+                "port": {
+                    "type": "integer",
+                    "example": 8080
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "starting",
+                        "running",
+                        "stopped",
+                        "expired",
+                        "deleted",
+                        "failed"
+                    ],
+                    "example": "running"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-03-20T10:20:00Z"
                 },
                 "url": {
                     "type": "string",

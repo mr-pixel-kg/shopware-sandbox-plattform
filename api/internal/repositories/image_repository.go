@@ -14,21 +14,30 @@ func NewImageRepository(db *gorm.DB) *ImageRepository {
 	return &ImageRepository{db: db}
 }
 
+func (r *ImageRepository) withOwner(db *gorm.DB) *gorm.DB {
+	return db.Preload("Owner", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "email")
+	})
+}
+
 func (r *ImageRepository) ListPublic() ([]models.Image, error) {
 	var images []models.Image
-	err := r.db.Where("is_public = ? AND status = ?", true, models.ImageStatusReady).Order("created_at desc").Find(&images).Error
+	err := r.withOwner(r.db).
+		Where("is_public = ? AND status = ?", true, models.ImageStatusReady).
+		Order("created_at desc").
+		Find(&images).Error
 	return images, err
 }
 
 func (r *ImageRepository) ListAll() ([]models.Image, error) {
 	var images []models.Image
-	err := r.db.Order("created_at desc").Find(&images).Error
+	err := r.withOwner(r.db).Order("created_at desc").Find(&images).Error
 	return images, err
 }
 
 func (r *ImageRepository) FindByID(id uuid.UUID) (*models.Image, error) {
 	var image models.Image
-	if err := r.db.First(&image, "id = ?", id).Error; err != nil {
+	if err := r.withOwner(r.db).First(&image, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &image, nil

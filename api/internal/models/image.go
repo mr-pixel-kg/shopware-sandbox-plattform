@@ -24,6 +24,7 @@ type Image struct {
 	Metadata     datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"metadata,omitempty" swaggertype:"string"`
 	RegistryRef  *string        `gorm:"size:255" json:"registryRef,omitempty" example:"dockware/dev"`
 	OwnerID      *uuid.UUID     `gorm:"column:owner_id;type:uuid" json:"ownerId,omitempty" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
+	Owner        *User          `gorm:"foreignKey:OwnerID;references:ID" json:"-" swaggerignore:"true"`
 	BaseModel
 }
 
