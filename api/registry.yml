@@ -19,6 +19,13 @@ images:
         required: true
         condition: "ready"
         icon: "lock"
+      - key: "app_env"
+        label: "App Env"
+        type: "field"
+        value: "prod"
+        input: "text"
+        required: true
+        icon: "file-box"
       - key: "open_admin"
         label: "Admin"
         type: "action"
@@ -37,12 +44,18 @@ images:
       TRUSTED_PROXIES: "{{.TrustedProxies}}"
       SHOP_DOMAIN: "{{.Hostname}}"
       APP_URL: "{{.URL}}"
+      APP_ENV: "{{.Meta.env_mode}}"
     post_start:
       - command: ["bash", "-c", "mkdir -p /var/www/html/config/packages && printf 'framework:\\n    trusted_proxies: \"127.0.0.1,REMOTE_ADDR\"\\n' > /var/www/html/config/packages/framework.yaml"]
         delay: 3s
         timeout: 30s
         retries: 3
         retry_delay: 5s
+      - command: [ "bash", "-c", "cd /var/www/html && grep -q '^APP_ENV=' \".env\" && sed -i \"s/^APP_ENV=.*/APP_ENV={{.Meta.app_env}}/\" \".env\" || echo \"APP_ENV={{.Meta.app_env}}\" >> \".env\"" ]
+        delay: 10s
+        timeout: 30s
+        retries: 2
+        retry_delay: 3s
       - command: ["bash", "-c", "mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"DELETE FROM sales_channel_domain WHERE url LIKE 'https://%';\" && mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE sales_channel_domain SET url='{{.URL}}' WHERE url LIKE 'http://%' AND url <> '{{.URL}}';\""]
         delay: 10s
         timeout: 30s
@@ -54,7 +67,7 @@ images:
         retries: 3
         retry_delay: 10s
       - command: ["bash", "-c", "cd /var/www/html && bin/console cache:clear"]
-        delay: 2s
+        delay: 6s
         timeout: 30s
         retries: 2
         retry_delay: 3s
