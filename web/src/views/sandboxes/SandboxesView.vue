@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { Camera, Clock, ExternalLink, Plus, Square, Trash2 } from 'lucide-vue-next'
+import {
+  Camera,
+  Clock,
+  ExternalLink,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Square,
+  Trash2,
+} from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
+import EditSandboxDialog from '@/components/modals/EditSandboxDialog.vue'
 import ExtendTtlDialog from '@/components/modals/ExtendTtlDialog.vue'
 import NewSandboxDialog from '@/components/modals/NewSandboxDialog.vue'
 import SnapshotDialog from '@/components/modals/SnapshotDialog.vue'
@@ -13,6 +23,13 @@ import PageHeader from '@/components/shared/PageHeader.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -30,7 +47,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useImages } from '@/composables/useImages'
 import { useSandboxes } from '@/composables/useSandboxes'
 import { useAuthStore } from '@/stores/auth.store'
@@ -50,6 +66,7 @@ const {
   busyIds,
   createSandbox,
   deleteSandbox,
+  updateSandbox,
   extendTTL,
   snapshotSandbox,
   refresh,
@@ -80,6 +97,7 @@ const filteredAllSandboxes = computed(() => {
 })
 
 const showNewSandbox = ref(false)
+const showEdit = ref(false)
 const showExtend = ref(false)
 const showSnapshot = ref(false)
 const showConfirmDelete = ref(false)
@@ -131,10 +149,9 @@ function isSandboxReadyForOpen(sandbox: Sandbox): boolean {
   return health.ready
 }
 
-function getOpenTooltip(sandbox: Sandbox): string {
-  if (isSandboxReadyForOpen(sandbox)) return 'Öffnen'
-  if (isSandboxOffline(sandbox)) return 'Sandbox ist laut Health-Check aktuell offline'
-  return 'Wird erreichbar, sobald die Sandbox bereit ist'
+function handleEdit(sandbox: Sandbox) {
+  selectedSandbox.value = sandbox
+  showEdit.value = true
 }
 
 function handleExtend(sandbox: Sandbox) {
@@ -150,6 +167,20 @@ function handleSnapshot(sandbox: Sandbox) {
 function handleDelete(sandbox: Sandbox) {
   selectedSandbox.value = sandbox
   showConfirmDelete.value = true
+}
+
+async function handleEditSandbox(
+  payload: { id: string; displayName: string },
+  done: (success: boolean) => void,
+) {
+  try {
+    await updateSandbox(payload.id, { displayName: payload.displayName })
+    toast.success('Sandbox wurde aktualisiert')
+    done(true)
+  } catch (e) {
+    toast.error(getApiErrorMessage(e, 'Fehler beim Speichern'))
+    done(false)
+  }
 }
 
 async function handleExtendTtl(
@@ -178,7 +209,7 @@ async function handleCreateSandbox(
   try {
     await createSandbox(payload)
     toast.success('Sandbox wird gestartet')
-    refresh()
+    await refresh()
     done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Starten der Sandbox'))
@@ -250,38 +281,23 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
             <TableHeader>
               <TableRow>
                 <TableHead class="w-[12%]">Status</TableHead>
-                <TableHead class="w-[22%]">Name</TableHead>
-                <TableHead class="w-[22%]">Vorlage</TableHead>
-                <TableHead class="w-[22%]">Verbleibend</TableHead>
-                <TableHead class="w-[22%] text-right">Aktionen</TableHead>
+                <TableHead class="w-[24%]">Name</TableHead>
+                <TableHead class="w-[24%]">Vorlage</TableHead>
+                <TableHead class="w-[28%]">Verbleibend</TableHead>
+                <TableHead class="w-[12%] text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <template v-if="loading">
                 <TableRow v-for="i in 2" :key="i" class="h-13">
-                  <TableCell>
-                    <Skeleton class="h-5 w-14 rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-28" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-20" />
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <div class="flex items-center justify-end gap-1">
-                      <Skeleton class="h-7 w-7" />
-                      <Skeleton class="h-7 w-7" />
-                      <Skeleton class="h-7 w-7" />
-                      <Skeleton class="h-7 w-7" />
-                    </div>
-                  </TableCell>
+                  <TableCell><Skeleton class="h-5 w-14 rounded-full" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-20" /></TableCell>
+                  <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
                 </TableRow>
               </template>
-              <TableEmpty v-else-if="!hasActive" :colspan="5"> Keine aktiven Sandboxes </TableEmpty>
+              <TableEmpty v-else-if="!hasActive" :colspan="5">Keine aktiven Sandboxes</TableEmpty>
               <TableRow v-for="sandbox in activeSandboxes" :key="sandbox.id" class="h-13">
                 <TableCell>
                   <div class="flex items-center gap-2">
@@ -310,63 +326,39 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                   <TtlChip :expires-at="sandbox.expiresAt" :created-at="sandbox.createdAt" />
                 </TableCell>
                 <TableCell class="text-right">
-                  <TooltipProvider>
-                    <div class="flex items-center justify-end gap-1">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            :disabled="!isSandboxReadyForOpen(sandbox) || busyIds.has(sandbox.id)"
-                            @click="handleOpen(sandbox)"
-                          >
-                            <ExternalLink class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{{ getOpenTooltip(sandbox) }}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            :disabled="busyIds.has(sandbox.id)"
-                            @click="handleExtend(sandbox)"
-                          >
-                            <Clock class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Verlängern</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            :disabled="busyIds.has(sandbox.id)"
-                            @click="handleSnapshot(sandbox)"
-                          >
-                            <Camera class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Snapshot erstellen</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            class="text-destructive hover:text-destructive"
-                            :disabled="busyIds.has(sandbox.id)"
-                            @click="handleDelete(sandbox)"
-                          >
-                            <Square class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Beenden</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipProvider>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon-sm" :disabled="busyIds.has(sandbox.id)">
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        :disabled="!isSandboxReadyForOpen(sandbox)"
+                        @click="handleOpen(sandbox)"
+                      >
+                        <ExternalLink class="mr-2 h-4 w-4" />
+                        Öffnen
+                      </DropdownMenuItem>
+                      <DropdownMenuItem @click="handleEdit(sandbox)">
+                        <Pencil class="mr-2 h-4 w-4" />
+                        Bearbeiten
+                      </DropdownMenuItem>
+                      <DropdownMenuItem @click="handleExtend(sandbox)">
+                        <Clock class="mr-2 h-4 w-4" />
+                        Verlängern
+                      </DropdownMenuItem>
+                      <DropdownMenuItem @click="handleSnapshot(sandbox)">
+                        <Camera class="mr-2 h-4 w-4" />
+                        Snapshot
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem class="text-destructive" @click="handleDelete(sandbox)">
+                        <Square class="mr-2 h-4 w-4" />
+                        Beenden
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -381,30 +373,20 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
             <TableHeader>
               <TableRow>
                 <TableHead class="w-[12%]">Status</TableHead>
-                <TableHead class="w-[20%]">Name</TableHead>
+                <TableHead class="w-[22%]">Name</TableHead>
                 <TableHead class="w-[28%]">Vorlage</TableHead>
-                <TableHead class="w-[22%]">Beendet</TableHead>
-                <TableHead class="w-[18%] text-right">Aktionen</TableHead>
+                <TableHead class="w-[26%]">Beendet</TableHead>
+                <TableHead class="w-[12%] text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <template v-if="loading">
                 <TableRow v-for="i in 2" :key="i" class="h-13">
-                  <TableCell>
-                    <Skeleton class="h-5 w-16 rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-28" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <Skeleton class="ml-auto h-7 w-7" />
-                  </TableCell>
+                  <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
                 </TableRow>
               </template>
               <TableRow v-for="sandbox in recentSandboxes" :key="sandbox.id" class="h-13">
@@ -430,22 +412,19 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                   {{ formatDateTime(sandbox.updatedAt) }}
                 </TableCell>
                 <TableCell class="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          class="text-destructive hover:text-destructive"
-                          :disabled="busyIds.has(sandbox.id)"
-                          @click="handleDelete(sandbox)"
-                        >
-                          <Trash2 class="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Löschen</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon-sm" :disabled="busyIds.has(sandbox.id)">
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem class="text-destructive" @click="handleDelete(sandbox)">
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Entfernen
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -477,36 +456,19 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                 <TableHead class="w-[18%]">Besitzer</TableHead>
                 <TableHead class="w-[14%]">Gestartet</TableHead>
                 <TableHead class="w-[14%]">Läuft ab</TableHead>
-                <TableHead class="w-[14%] text-right">Aktionen</TableHead>
+                <TableHead class="w-[10%] text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <template v-if="allLoading">
                 <TableRow v-for="i in 3" :key="i" class="h-13">
-                  <TableCell>
-                    <Skeleton class="h-5 w-16 rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-28" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-28" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton class="h-4 w-24" />
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <div class="flex items-center justify-end gap-1">
-                      <Skeleton class="h-7 w-7" />
-                      <Skeleton class="h-7 w-7" />
-                    </div>
-                  </TableCell>
+                  <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                  <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
                 </TableRow>
               </template>
               <TableEmpty v-else-if="filteredAllSandboxes.length === 0" :colspan="7">
@@ -532,37 +494,29 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                   {{ sandbox.expiresAt ? formatDateTime(sandbox.expiresAt) : '—' }}
                 </TableCell>
                 <TableCell class="text-right">
-                  <TooltipProvider>
-                    <div class="flex items-center justify-end gap-1">
-                      <Tooltip v-if="sandbox.status === 'running' || sandbox.status === 'starting'">
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            :disabled="busyIds.has(sandbox.id)"
-                            @click="handleExtend(sandbox)"
-                          >
-                            <Clock class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Verlängern</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            class="text-destructive hover:text-destructive"
-                            :disabled="busyIds.has(sandbox.id)"
-                            @click="handleDelete(sandbox)"
-                          >
-                            <Square class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Beenden</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipProvider>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon-sm" :disabled="busyIds.has(sandbox.id)">
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        v-if="sandbox.status === 'running' || sandbox.status === 'starting'"
+                        @click="handleExtend(sandbox)"
+                      >
+                        <Clock class="mr-2 h-4 w-4" />
+                        Verlängern
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator
+                        v-if="sandbox.status === 'running' || sandbox.status === 'starting'"
+                      />
+                      <DropdownMenuItem class="text-destructive" @click="handleDelete(sandbox)">
+                        <Square class="mr-2 h-4 w-4" />
+                        Beenden
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -575,6 +529,12 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
       v-model:open="showNewSandbox"
       :images="images"
       @submit="handleCreateSandbox"
+    />
+
+    <EditSandboxDialog
+      v-model:open="showEdit"
+      :sandbox="selectedSandbox"
+      @submit="handleEditSandbox"
     />
 
     <ExtendTtlDialog
