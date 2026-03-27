@@ -320,7 +320,7 @@ async function handleDelete(done: (success: boolean) => void) {
     </Tabs>
 
     <CreateUserDialog v-model:open="showCreateUser" @submit="handleCreate" />
-    <InviteUserDialog v-model:open="showInvite" @invite="handleInvite" />
+    <InviteUserDialog v-model:open="showInvite" @submit="handleInvite" />
     <EditUserDrawer v-model:open="showEditDrawer" :user="selectedUser" @submit="handleEdit" />
 
     <ConfirmDialog

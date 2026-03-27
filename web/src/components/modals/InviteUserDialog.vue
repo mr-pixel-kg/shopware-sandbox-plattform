@@ -27,7 +27,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  invite: [payload: { email: string; role: 'admin' | 'user' }, done: (success: boolean) => void]
+  submit: [payload: { email: string; role: 'admin' | 'user' }, done: (success: boolean) => void]
 }>()
 
 const email = ref('')
@@ -40,13 +40,14 @@ watch(
     if (open) {
       email.value = ''
       role.value = 'user'
+      busy.value = false
     }
   },
 )
 
 function handleSubmit() {
   busy.value = true
-  emit('invite', { email: email.value, role: role.value }, (success) => {
+  emit('submit', { email: email.value, role: role.value }, (success) => {
     busy.value = false
     if (success) {
       emit('update:open', false)
@@ -57,7 +58,7 @@ function handleSubmit() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[400px]">
+    <DialogContent class="sm:max-w-[440px]">
       <DialogHeader>
         <DialogTitle>Benutzer einladen</DialogTitle>
         <DialogDescription>Lade einen neuen Benutzer per E-Mail ein.</DialogDescription>
@@ -71,12 +72,13 @@ function handleSubmit() {
             type="email"
             placeholder="name@example.com"
             required
+            :disabled="busy"
           />
         </div>
         <div class="grid gap-2">
           <Label for="invite-role">Rolle</Label>
           <Select v-model="role">
-            <SelectTrigger>
+            <SelectTrigger id="invite-role">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -86,9 +88,14 @@ function handleSubmit() {
           </Select>
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" @click="emit('update:open', false)"
-            >Abbrechen</Button
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="busy"
+            @click="emit('update:open', false)"
           >
+            Abbrechen
+          </Button>
           <Button type="submit" :disabled="!email || busy">
             <Loader2 v-if="busy" class="mr-1 h-4 w-4 animate-spin" />
             {{ busy ? 'Wird eingeladen...' : 'Einladen' }}
