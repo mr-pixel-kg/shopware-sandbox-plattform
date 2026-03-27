@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.1.0] - 2026-03-27
+### Added
+- User management
+- Registration modes:
+  - Open registration
+  - Invite-only registration
+- Image registry
+  - Metadata for images
+  - Custom action buttons
+  - Credentials
+  - Post start commands
+  - Environment variables
+- Display Names for Sandbox Instances
+
+### Changed
+- Improved user interface and user experience
+
 ## [1.0.0] - 2026-03-24
 This is a complete rewrite of the project, with a new architecture and implementation.
 

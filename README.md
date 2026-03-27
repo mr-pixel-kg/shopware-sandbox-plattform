@@ -230,6 +230,9 @@ If using Docker Desktop on macOS, set your socket path in `.env`:
 ```
 DOCKER_SOCKET_PATH=/Users/<username>/.docker/run/docker.sock
 ```
+```
+DOCKER_HOST=/Users/<username>/.docker/run/docker.sock
+```
 
 ### Web Frontend (`/web/`)
 
