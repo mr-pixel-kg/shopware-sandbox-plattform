@@ -33,17 +33,7 @@ definitions:
         example: 203.0.113.25
         type: string
       user:
-        $ref: '#/definitions/dto.AuditLogUser'
-    type: object
-  dto.AuditLogUser:
-    properties:
-      email:
-        example: jane.doe@example.com
-        type: string
-      id:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
+        $ref: '#/definitions/dto.UserSummary'
     type: object
   dto.AuthLoginResponse:
     properties:
@@ -171,6 +161,52 @@ definitions:
         example: pulling
         type: string
     type: object
+  dto.ImageResponse:
+    properties:
+      createdAt:
+        example: "2026-03-20T10:15:00Z"
+        type: string
+      deletedAt:
+        type: string
+      description:
+        example: Prepared image for sales demos and internal QA.
+        type: string
+      error:
+        example: pull access denied
+        type: string
+      id:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        format: uuid
+        type: string
+      isPublic:
+        example: true
+        type: boolean
+      metadata:
+        type: string
+      name:
+        example: dockware/dev
+        type: string
+      owner:
+        $ref: '#/definitions/dto.UserSummary'
+      registryRef:
+        example: dockware/dev
+        type: string
+      status:
+        example: ready
+        type: string
+      tag:
+        example: 6.6.9.0
+        type: string
+      thumbnailUrl:
+        example: https://cdn.example.com/images/shopware-demo.png
+        type: string
+      title:
+        example: Shopware Demo Image
+        type: string
+      updatedAt:
+        example: "2026-03-20T10:20:00Z"
+        type: string
+    type: object
   dto.LoginRequest:
     properties:
       email:
@@ -247,6 +283,68 @@ definitions:
         example: https://sandbox-0b443c82.demo.shopshredder.de
         type: string
     type: object
+  dto.SandboxResponse:
+    properties:
+      clientIp:
+        example: 203.0.113.25
+        type: string
+      containerId:
+        example: 1a2b3c4d5e6f7g8h9i0j
+        type: string
+      containerName:
+        example: sandbox-0b443c82
+        type: string
+      createdAt:
+        example: "2026-03-20T10:15:00Z"
+        type: string
+      deletedAt:
+        type: string
+      displayName:
+        example: My Test Shop
+        type: string
+      expiresAt:
+        example: "2026-03-20T12:00:00Z"
+        type: string
+      guestSessionId:
+        example: db7fcb92-c2ff-4c20-9ac2-5a2504ab6326
+        format: uuid
+        type: string
+      id:
+        example: 0b443c82-d8a3-49a7-b59a-26ce327c7341
+        format: uuid
+        type: string
+      imageId:
+        example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
+        format: uuid
+        type: string
+      lastSeenAt:
+        example: "2026-03-20T10:45:00Z"
+        type: string
+      metadata:
+        type: string
+      owner:
+        $ref: '#/definitions/dto.UserSummary'
+      port:
+        example: 8080
+        type: integer
+      status:
+        allOf:
+        - $ref: '#/definitions/models.SandboxStatus'
+        enum:
+        - starting
+        - running
+        - stopped
+        - expired
+        - deleted
+        - failed
+        example: running
+      updatedAt:
+        example: "2026-03-20T10:20:00Z"
+        type: string
+      url:
+        example: https://sandbox-0b443c82.demo.shopshredder.de
+        type: string
+    type: object
   dto.UpdateImageRequest:
     properties:
       description:
@@ -278,14 +376,20 @@ definitions:
         example: admin
         type: string
     type: object
+  dto.UserSummary:
+    properties:
+      email:
+        example: jane.doe@example.com
+        type: string
+      id:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
+        type: string
+    type: object
   models.Image:
     properties:
       createdAt:
         example: "2026-03-20T10:15:00Z"
-        type: string
-      createdByUserId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
         type: string
       description:
         example: Prepared image for sales demos and internal QA.
@@ -304,6 +408,10 @@ definitions:
         type: string
       name:
         example: dockware/dev
+        type: string
+      ownerId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       registryRef:
         example: dockware/dev
@@ -338,10 +446,6 @@ definitions:
       createdAt:
         example: "2026-03-20T10:15:00Z"
         type: string
-      createdByUserId:
-        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
-        format: uuid
-        type: string
       displayName:
         example: My Test Shop
         type: string
@@ -364,6 +468,10 @@ definitions:
         example: "2026-03-20T10:45:00Z"
         type: string
       metadata:
+        type: string
+      ownerId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
         type: string
       port:
         example: 8080
@@ -850,7 +958,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Image'
+              $ref: '#/definitions/dto.ImageResponse'
             type: array
         "401":
           description: Unauthorized
@@ -1133,7 +1241,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Sandbox'
+              $ref: '#/definitions/dto.SandboxResponse'
             type: array
         "401":
           description: Unauthorized
@@ -1196,7 +1304,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Image'
+              $ref: '#/definitions/dto.ImageResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -1215,7 +1323,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Sandbox'
+              $ref: '#/definitions/dto.SandboxResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -1299,7 +1407,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Sandbox'
+              $ref: '#/definitions/dto.SandboxResponse'
             type: array
         "401":
           description: Unauthorized
@@ -1410,7 +1518,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Sandbox'
+            $ref: '#/definitions/dto.SandboxResponse'
         "400":
           description: Bad Request
           schema:

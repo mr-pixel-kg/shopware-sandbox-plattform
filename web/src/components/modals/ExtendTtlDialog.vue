@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { Loader2 } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { toast } from 'vue-sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -13,8 +13,6 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useSandboxesStore } from '@/stores/sandboxes.store'
-import { getApiErrorMessage } from '@/utils/error'
 
 const props = defineProps<{
   open: boolean
@@ -24,9 +22,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
+  submit: [payload: { sandboxId: string; ttlMinutes: number }, done: (success: boolean) => void]
 }>()
 
-const store = useSandboxesStore()
 const ttlMinutes = ref('60')
 const submitting = ref(false)
 
@@ -38,24 +36,25 @@ const options = [
   { value: '240', label: '+4 Std' },
 ]
 
-async function handleSubmit() {
+function handleSubmit() {
   if (!props.sandboxId || submitting.value) return
   submitting.value = true
-  try {
-    await store.extendTTL(props.sandboxId, Number(ttlMinutes.value))
-    toast.success('Laufzeit wurde verlängert')
-    emit('update:open', false)
-  } catch (e) {
-    toast.error(getApiErrorMessage(e, 'Fehler beim Verlängern der Laufzeit'))
-  } finally {
-    submitting.value = false
-  }
+  emit(
+    'submit',
+    { sandboxId: props.sandboxId, ttlMinutes: Number(ttlMinutes.value) },
+    (success: boolean) => {
+      submitting.value = false
+      if (success) {
+        emit('update:open', false)
+      }
+    },
+  )
 }
 </script>
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[400px]">
+    <DialogContent class="sm:max-w-100">
       <DialogHeader>
         <DialogTitle>Laufzeit verlängern</DialogTitle>
         <DialogDescription>
@@ -72,8 +71,13 @@ async function handleSubmit() {
         </ToggleGroup>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">Abbrechen</Button>
-        <Button :disabled="submitting" @click="handleSubmit">Verlängern</Button>
+        <Button variant="outline" :disabled="submitting" @click="emit('update:open', false)"
+          >Abbrechen</Button
+        >
+        <Button :disabled="submitting" @click="handleSubmit">
+          <Loader2 v-if="submitting" class="mr-1 h-4 w-4 animate-spin" />
+          Verlängern
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

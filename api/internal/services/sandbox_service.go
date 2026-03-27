@@ -111,7 +111,7 @@ func (s *SandboxService) UpdateSandbox(input UpdateSandboxInput) (*models.Sandbo
 		return nil, ErrSandboxNotFound
 	}
 
-	if input.UserID == nil || sandbox.CreatedByUserID == nil || *sandbox.CreatedByUserID != *input.UserID {
+	if input.UserID == nil || sandbox.OwnerID == nil || *sandbox.OwnerID != *input.UserID {
 		return nil, ErrSandboxAccessDenied
 	}
 
@@ -229,19 +229,19 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		displayName = *input.DisplayName
 	}
 	sandbox := &models.Sandbox{
-		ID:              sandboxID,
-		ImageID:         image.ID,
-		CreatedByUserID: input.UserID,
-		GuestSessionID:  input.GuestSessionID,
-		DisplayName:     displayName,
-		Status:          models.SandboxStatusStarting,
-		ContainerID:     container.ID,
-		ContainerName:   container.Name,
-		URL:             container.URL,
-		Port:            container.Port,
-		ClientIP:        input.ClientIP,
-		Metadata:        datatypes.JSON(fieldsJSON),
-		ExpiresAt:       &expiresAt,
+		ID:             sandboxID,
+		ImageID:        image.ID,
+		OwnerID:        input.UserID,
+		GuestSessionID: input.GuestSessionID,
+		DisplayName:    displayName,
+		Status:         models.SandboxStatusStarting,
+		ContainerID:    container.ID,
+		ContainerName:  container.Name,
+		URL:            container.URL,
+		Port:           container.Port,
+		ClientIP:       input.ClientIP,
+		Metadata:       datatypes.JSON(fieldsJSON),
+		ExpiresAt:      &expiresAt,
 	}
 
 	if err := s.repo.Create(sandbox); err != nil {
@@ -639,7 +639,7 @@ func (s *SandboxService) addEvent(sandboxID uuid.UUID, eventType string, metadat
 }
 
 func sandboxActorType(sandbox *models.Sandbox) string {
-	if sandbox.CreatedByUserID != nil {
+	if sandbox.OwnerID != nil {
 		return "user"
 	}
 	return "guest"

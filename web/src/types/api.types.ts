@@ -14,6 +14,11 @@ export interface ManagedUser extends User {
   pending: boolean
 }
 
+export interface UserSummary {
+  id: string
+  email: string
+}
+
 export type ImageStatus = 'pulling' | 'ready' | 'failed'
 
 export type MetadataType = 'field' | 'setting' | 'info' | 'action'
@@ -45,7 +50,7 @@ export interface Image extends BaseModel {
   error?: string
   metadata?: MetadataItem[]
   registryRef?: string
-  createdByUserId?: string
+  owner?: UserSummary | null
 }
 
 export interface PendingPull {
@@ -62,7 +67,7 @@ export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'de
 export interface Sandbox extends BaseModel {
   id: string
   imageId: string
-  createdByUserId?: string
+  owner?: UserSummary | null
   guestSessionId?: string
   displayName: string
   status: SandboxStatus

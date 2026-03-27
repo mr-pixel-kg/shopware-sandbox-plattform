@@ -27,8 +27,16 @@ import { getApiErrorMessage } from '@/utils/error'
 
 import type { Image, MetadataItem } from '@/types'
 
-const { images, pendingPulls, loading, createImage, updateImage, uploadThumbnail, deleteImage } =
-  useImages('all')
+const {
+  images,
+  pendingPulls,
+  loading,
+  createImage,
+  updateImage,
+  uploadThumbnail,
+  deleteImage,
+  busyIds,
+} = useImages('all')
 
 const showAddImage = ref(false)
 const showEditDrawer = ref(false)
@@ -77,17 +85,24 @@ async function handleCreateImage(
   }
 }
 
-async function handleConfirmDelete() {
-  if (!selectedImageId.value) return
+async function handleConfirmDelete(done: (success: boolean) => void) {
+  if (!selectedImageId.value) return done(false)
+  const id = selectedImageId.value
+  busyIds.value.add(id)
   try {
-    await deleteImage(selectedImageId.value)
+    await deleteImage(id)
     toast.success('Vorlage wurde gelöscht')
+    done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Löschen'))
+    done(false)
+  } finally {
+    busyIds.value.delete(id)
   }
 }
 
 async function handleToggleVisibility(image: Image) {
+  busyIds.value.add(image.id)
   try {
     await updateImage(image.id, {
       title: image.title ?? null,
@@ -97,7 +112,13 @@ async function handleToggleVisibility(image: Image) {
     toast.success(image.isPublic ? 'Vorlage ist jetzt privat' : 'Vorlage ist jetzt öffentlich')
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Ändern der Sichtbarkeit'))
+  } finally {
+    busyIds.value.delete(image.id)
   }
+}
+
+function getOwnerLabel(image: Image): string {
+  return image.owner?.email ?? '—'
 }
 </script>
 
@@ -131,10 +152,11 @@ async function handleToggleVisibility(image: Image) {
       <Table class="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead class="w-[35%]">Vorlage</TableHead>
-            <TableHead class="w-[25%]">Image</TableHead>
-            <TableHead class="w-[15%]">Status</TableHead>
-            <TableHead class="w-[15%]">Öffentlich</TableHead>
+            <TableHead class="w-[28%]">Vorlage</TableHead>
+            <TableHead class="w-[20%]">Image</TableHead>
+            <TableHead class="w-[20%]">Besitzer</TableHead>
+            <TableHead class="w-[12%]">Status</TableHead>
+            <TableHead class="w-[10%]">Öffentlich</TableHead>
             <TableHead class="w-[10%] text-right">Aktionen</TableHead>
           </TableRow>
         </TableHeader>
@@ -143,12 +165,13 @@ async function handleToggleVisibility(image: Image) {
             <TableRow v-for="i in 3" :key="i" class="h-13">
               <TableCell><Skeleton class="h-4 w-32" /></TableCell>
               <TableCell><Skeleton class="h-5 w-28 rounded-full" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-28" /></TableCell>
               <TableCell><Skeleton class="h-4 w-16" /></TableCell>
               <TableCell><Skeleton class="h-4 w-8 rounded-full" /></TableCell>
               <TableCell class="text-right"><Skeleton class="ml-auto h-7 w-7" /></TableCell>
             </TableRow>
           </template>
-          <TableEmpty v-else-if="images.length === 0" :colspan="5">
+          <TableEmpty v-else-if="images.length === 0" :colspan="6">
             Keine Vorlagen vorhanden
           </TableEmpty>
           <TableRow v-for="image in images" :key="image.id" class="h-13">
@@ -162,6 +185,9 @@ async function handleToggleVisibility(image: Image) {
             </TableCell>
             <TableCell>
               <Badge variant="secondary">{{ image.name }}:{{ image.tag }}</Badge>
+            </TableCell>
+            <TableCell class="text-muted-foreground text-sm">
+              {{ getOwnerLabel(image) }}
             </TableCell>
             <TableCell>
               <div
@@ -198,6 +224,7 @@ async function handleToggleVisibility(image: Image) {
             <TableCell>
               <Switch
                 :model-value="image.isPublic"
+                :disabled="busyIds.has(image.id)"
                 @update:model-value="handleToggleVisibility(image)"
               />
             </TableCell>
@@ -206,7 +233,12 @@ async function handleToggleVisibility(image: Image) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <Button variant="ghost" size="icon-sm" @click="requestEdit(image)">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        :disabled="busyIds.has(image.id)"
+                        @click="requestEdit(image)"
+                      >
                         <Pencil class="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -220,6 +252,7 @@ async function handleToggleVisibility(image: Image) {
                         variant="ghost"
                         size="icon-sm"
                         class="text-destructive hover:text-destructive"
+                        :disabled="busyIds.has(image.id)"
                         @click="requestDelete(image.id)"
                       >
                         <Trash2 class="h-4 w-4" />

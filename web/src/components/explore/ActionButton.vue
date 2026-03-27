@@ -21,6 +21,7 @@ export interface CardAction {
 
 const props = defineProps<{
   action: CardAction
+  fullWidth?: boolean
 }>()
 
 const showTooltip = computed(() => !!(props.action.tooltip || props.action.size === 'icon'))
@@ -31,17 +32,19 @@ const isLink = computed(
   () => !!(props.action.href && !props.action.loading && !props.action.disabled),
 )
 const isDisabled = computed(() => !!(props.action.loading || props.action.disabled))
+const btnClass = computed(() => (props.fullWidth && !isIconOnly.value ? 'w-full' : ''))
 </script>
 
 <template>
   <TooltipProvider v-if="showTooltip" :delay-duration="200">
     <Tooltip>
       <TooltipTrigger as-child>
-        <span class="inline-flex">
+        <span class="inline-flex" :class="{ 'w-full': fullWidth && !isIconOnly }">
           <Button
             v-if="isLink"
             :size="btnSize"
             :variant="action.variant ?? 'outline'"
+            :class="btnClass"
             as="a"
             :href="action.href"
             target="_blank"
@@ -58,6 +61,7 @@ const isDisabled = computed(() => !!(props.action.loading || props.action.disabl
             v-else
             :size="btnSize"
             :variant="action.variant ?? 'outline'"
+            :class="btnClass"
             :disabled="isDisabled"
             @click="action.onClick?.()"
           >
@@ -86,6 +90,7 @@ const isDisabled = computed(() => !!(props.action.loading || props.action.disabl
     v-else-if="isLink"
     size="sm"
     :variant="action.variant ?? 'outline'"
+    :class="btnClass"
     as="a"
     :href="action.href"
     target="_blank"
@@ -97,6 +102,7 @@ const isDisabled = computed(() => !!(props.action.loading || props.action.disabl
     v-else
     size="sm"
     :variant="action.variant ?? 'outline'"
+    :class="btnClass"
     :disabled="isDisabled"
     @click="action.onClick?.()"
   >

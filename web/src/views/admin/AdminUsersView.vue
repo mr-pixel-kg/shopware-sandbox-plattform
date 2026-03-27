@@ -39,6 +39,7 @@ const {
   updateUser,
   deleteUser,
   deleteInvite,
+  busyIds,
 } = useUsers()
 
 const showInvite = ref(false)
@@ -110,18 +111,24 @@ async function handleEdit(
   }
 }
 
-async function handleDelete() {
-  if (!selectedUserId.value) return
+async function handleDelete(done: (success: boolean) => void) {
+  if (!selectedUserId.value) return done(false)
+  const id = selectedUserId.value
+  busyIds.value.add(id)
   try {
     if (deleteMode.value === 'invite') {
-      await deleteInvite(selectedUserId.value)
+      await deleteInvite(id)
       toast.success('Einladung wurde entfernt')
     } else {
-      await deleteUser(selectedUserId.value)
+      await deleteUser(id)
       toast.success('Benutzer wurde gelöscht')
     }
+    done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Löschen'))
+    done(false)
+  } finally {
+    busyIds.value.delete(id)
   }
 }
 </script>
@@ -203,7 +210,12 @@ async function handleDelete() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon-sm" @click="requestEdit(user)">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            :disabled="busyIds.has(user.id)"
+                            @click="requestEdit(user)"
+                          >
                             <Pencil class="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -218,7 +230,7 @@ async function handleDelete() {
                               variant="ghost"
                               size="icon-sm"
                               class="text-destructive hover:text-destructive"
-                              :disabled="currentUserId === user.id"
+                              :disabled="currentUserId === user.id || busyIds.has(user.id)"
                               @click="requestDelete(user.id, 'user')"
                             >
                               <Trash2 class="h-4 w-4" />
@@ -290,6 +302,7 @@ async function handleDelete() {
                           variant="ghost"
                           size="icon-sm"
                           class="text-destructive hover:text-destructive"
+                          :disabled="busyIds.has(user.id)"
                           @click="requestDelete(user.id, 'invite')"
                         >
                           <Trash2 class="h-4 w-4" />
@@ -307,7 +320,7 @@ async function handleDelete() {
     </Tabs>
 
     <CreateUserDialog v-model:open="showCreateUser" @submit="handleCreate" />
-    <InviteUserDialog v-model:open="showInvite" @invite="handleInvite" />
+    <InviteUserDialog v-model:open="showInvite" @submit="handleInvite" />
     <EditUserDrawer v-model:open="showEditDrawer" :user="selectedUser" @submit="handleEdit" />
 
     <ConfirmDialog

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, Copy, Eye, EyeOff, Package } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
@@ -27,7 +27,7 @@ export interface MetadataGroup {
   fields: MetadataField[]
 }
 
-defineProps<{
+const props = defineProps<{
   sandbox: Sandbox
   title: string
   thumbnailUrl?: string
@@ -35,6 +35,13 @@ defineProps<{
   metadata?: MetadataGroup[]
   statusNote?: string
 }>()
+
+const primaryActions = computed(() =>
+  (props.actions ?? []).filter((a) => a.variant !== 'destructive'),
+)
+const destructiveActions = computed(() =>
+  (props.actions ?? []).filter((a) => a.variant === 'destructive'),
+)
 
 const copiedKey = ref<string>()
 const revealedKeys = ref<Set<string>>(new Set())
@@ -125,8 +132,21 @@ async function copyToClipboard(field: MetadataField) {
         </div>
       </div>
     </CardContent>
-    <CardFooter v-if="actions?.length" class="sandbox-actions flex gap-2 overflow-x-auto">
-      <ActionButton v-for="action in actions" :key="action.label" :action="action" />
+    <CardFooter v-if="actions?.length" class="sandbox-actions flex items-center gap-2">
+      <div class="flex min-w-0 flex-1 gap-2 [&>*]:flex-1">
+        <ActionButton
+          v-for="action in primaryActions"
+          :key="action.label"
+          :action="action"
+          full-width
+        />
+      </div>
+      <ActionButton
+        v-for="action in destructiveActions"
+        :key="action.label"
+        :action="action"
+        class="shrink-0"
+      />
     </CardFooter>
   </Card>
 </template>

@@ -133,16 +133,16 @@ func (s *ImageService) CreateForUser(
 	fullName := name + ":" + tag
 
 	img := &models.Image{
-		ID:              uuid.New(),
-		Name:            name,
-		Tag:             tag,
-		Title:           title,
-		Description:     description,
-		IsPublic:        isPublic,
-		Status:          models.ImageStatusPulling,
-		CreatedByUserID: userID,
-		Metadata:        guardJSON(metadata, []byte("[]")),
-		RegistryRef:     registryRef,
+		ID:          uuid.New(),
+		Name:        name,
+		Tag:         tag,
+		Title:       title,
+		Description: description,
+		IsPublic:    isPublic,
+		Status:      models.ImageStatusPulling,
+		OwnerID:     userID,
+		Metadata:    guardJSON(metadata, []byte("[]")),
+		RegistryRef: registryRef,
 	}
 
 	if err := s.repo.Create(img); err != nil {

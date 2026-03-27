@@ -7,6 +7,7 @@ import type { AuditLog } from '@/types'
 export function useAuditLogs() {
   const allLogs = ref<AuditLog[]>([])
   const loading = ref(false)
+  const initialized = ref(false)
   const error = ref<string | null>(null)
 
   const userFilter = ref<string>('all')
@@ -50,23 +51,19 @@ export function useAuditLogs() {
   const uniqueUsers = computed(() => {
     const users = new Map<string, string>()
     for (const log of allLogs.value) {
-      if (log.user) {
-        users.set(log.user.id, log.user.email)
-      }
+      if (log.user) users.set(log.user.id, log.user.email)
     }
     return [...users.entries()].map(([id, email]) => ({ id, email }))
   })
 
-  const uniqueActions = computed(() => {
-    const actions = new Set(allLogs.value.map((l) => l.action))
-    return [...actions]
-  })
+  const uniqueActions = computed(() => [...new Set(allLogs.value.map((l) => l.action))])
 
   async function fetch() {
-    loading.value = true
+    if (!initialized.value) loading.value = true
     error.value = null
     try {
       allLogs.value = await auditApi.list(500)
+      initialized.value = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
     } finally {
@@ -94,9 +91,7 @@ export function useAuditLogs() {
   }
 
   onMounted(() => {
-    allLogs.value = []
-    loading.value = true
-    fetch()
+    void fetch()
   })
 
   return {

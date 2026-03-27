@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useImagesStore } from '@/stores/images.store'
 import { getApiErrorMessage } from '@/utils/error'
 import { resolveAssetUrl } from '@/utils/formatters'
 import {
@@ -39,8 +38,6 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   saved: []
 }>()
-
-const store = useImagesStore()
 
 const title = ref('')
 const description = ref('')
@@ -151,7 +148,7 @@ async function handleSubmit() {
   try {
     const metadata = collectMetadata(fieldRows.value, actionRows.value)
 
-    await store.updateImage(props.image.id, {
+    await imagesApi.update(props.image.id, {
       title: title.value || null,
       description: description.value || null,
       isPublic: isPublic.value,
@@ -159,9 +156,9 @@ async function handleSubmit() {
     })
 
     if (thumbnailFile.value) {
-      await store.uploadThumbnail(props.image.id, thumbnailFile.value)
+      await imagesApi.uploadThumbnail(props.image.id, thumbnailFile.value)
     } else if (removeThumbnail.value && props.image.thumbnailUrl) {
-      await store.deleteThumbnail(props.image.id)
+      await imagesApi.deleteThumbnail(props.image.id)
     }
 
     toast.success('Vorlage wurde aktualisiert')

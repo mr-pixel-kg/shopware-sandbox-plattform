@@ -2,20 +2,33 @@
 import { Package } from 'lucide-vue-next'
 import { computed } from 'vue'
 
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { resolveAssetUrl } from '@/utils/formatters'
+import { resolveIcon } from '@/utils/icons'
 
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
+import type { MetadataGroup } from './SandboxCard.vue'
 import type { Image } from '@/types'
 
 const props = defineProps<{
   image: Image
   actions: CardAction[]
+  metadata?: MetadataGroup[]
 }>()
 
 const thumbnailSrc = computed(() => resolveAssetUrl(props.image.thumbnailUrl))
+
+const primaryActions = computed(() => props.actions.filter((a) => a.variant !== 'destructive'))
+const destructiveActions = computed(() => props.actions.filter((a) => a.variant === 'destructive'))
 </script>
 
 <template>
@@ -40,8 +53,43 @@ const thumbnailSrc = computed(() => resolveAssetUrl(props.image.thumbnailUrl))
         {{ image.description }}
       </CardDescription>
     </CardHeader>
-    <CardFooter class="mt-auto flex gap-2 overflow-x-auto">
-      <ActionButton v-for="action in actions" :key="action.label" :action="action" />
+    <CardContent v-if="metadata?.length" class="space-y-3 pt-0">
+      <div
+        v-for="group in metadata"
+        :key="group.title"
+        class="bg-muted/50 space-y-1.5 rounded-md border px-3 py-2"
+      >
+        <p class="text-muted-foreground/70 text-[11px] font-medium tracking-wider uppercase">
+          {{ group.title }}
+        </p>
+        <div
+          v-for="field in group.fields"
+          :key="field.label"
+          class="flex items-center justify-between gap-2 text-xs"
+        >
+          <span class="text-muted-foreground flex items-center gap-1">
+            <component :is="resolveIcon(field.icon)" v-if="field.icon" class="h-3 w-3" />
+            {{ field.label }}
+          </span>
+          <span class="font-mono text-[11px]">{{ field.value }}</span>
+        </div>
+      </div>
+    </CardContent>
+    <CardFooter class="mt-auto flex items-center gap-2">
+      <div class="flex min-w-0 flex-1 gap-2 [&>*]:flex-1">
+        <ActionButton
+          v-for="action in primaryActions"
+          :key="action.label"
+          :action="action"
+          full-width
+        />
+      </div>
+      <ActionButton
+        v-for="action in destructiveActions"
+        :key="action.label"
+        :action="action"
+        class="shrink-0"
+      />
     </CardFooter>
   </Card>
 </template>

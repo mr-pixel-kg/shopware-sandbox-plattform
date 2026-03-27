@@ -84,6 +84,6 @@ func (l *GormLogger) Trace(_ context.Context, begin time.Time, fc func() (string
 	case l.slowThreshold != 0 && elapsed > l.slowThreshold && l.logLevel >= gormlogger.Warn:
 		slog.Warn("slow database query", append(fields, "slow_threshold_ms", float64(l.slowThreshold.Nanoseconds())/1e6)...)
 	case l.logLevel >= gormlogger.Info:
-		slog.Info("database query executed", fields...)
+		slog.Debug("database query executed", fields...)
 	}
 }

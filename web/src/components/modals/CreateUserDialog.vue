@@ -77,6 +77,7 @@ function handleSubmit() {
             type="email"
             placeholder="name@example.com"
             required
+            :disabled="busy"
           />
         </div>
         <div class="grid gap-2">
@@ -99,10 +100,16 @@ function handleSubmit() {
             type="password"
             placeholder="Sicheres Passwort vergeben"
             required
+            :disabled="busy"
           />
         </div>
         <DialogFooter class="pt-2">
-          <Button type="button" variant="outline" @click="emit('update:open', false)">
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="busy"
+            @click="emit('update:open', false)"
+          >
             Abbrechen
           </Button>
           <Button type="submit" :disabled="!email || !password || busy">

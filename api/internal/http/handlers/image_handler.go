@@ -39,7 +39,7 @@ func NewImageHandler(images *services.ImageService, audit *services.AuditService
 // @Description  Returns all images marked as public
 // @Tags         Images
 // @Produce      json
-// @Success      200 {array} models.Image
+// @Success      200 {array} dto.ImageResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/public/images [get]
 func (h *ImageHandler) ListPublic(c echo.Context) error {
@@ -49,7 +49,7 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 	}
 	h.enrichMetadata(images)
 	slog.Debug("listed public images", logging.RequestFields(c, "component", "image", "count", len(images))...)
-	return c.JSON(200, images)
+	return c.JSON(200, toImageResponses(images))
 }
 
 // ListAll godoc
@@ -58,7 +58,7 @@ func (h *ImageHandler) ListPublic(c echo.Context) error {
 // @Tags         Images
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200 {array} models.Image
+// @Success      200 {array} dto.ImageResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/images [get]
@@ -69,7 +69,7 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 	}
 	h.enrichMetadata(images)
 	slog.Debug("listed all images", logging.RequestFields(c, "component", "image", "count", len(images))...)
-	return c.JSON(200, images)
+	return c.JSON(200, toImageResponses(images))
 }
 
 // Create godoc
