@@ -44,7 +44,7 @@ images:
       TRUSTED_PROXIES: "{{.TrustedProxies}}"
       SHOP_DOMAIN: "{{.Hostname}}"
       APP_URL: "{{.URL}}"
-      APP_ENV: "{{.Meta.env_mode}}"
+      APP_ENV: "{{.Meta.app_env}}"
     post_start:
       - command: ["bash", "-c", "mkdir -p /var/www/html/config/packages && printf 'framework:\\n    trusted_proxies: \"127.0.0.1,REMOTE_ADDR\"\\n' > /var/www/html/config/packages/framework.yaml"]
         delay: 3s
