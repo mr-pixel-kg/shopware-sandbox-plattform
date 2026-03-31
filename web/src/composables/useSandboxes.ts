@@ -11,6 +11,7 @@ import type {
   CreateSnapshotRequest,
   Image,
   Sandbox,
+  SandboxHealthEvent,
   SandboxStatus,
 } from '@/types'
 
@@ -47,6 +48,7 @@ export function useSandboxes() {
     storeToRefs(store)
 
   const busyIds = ref(new Set<string>())
+  const healthBySandboxId = ref<Record<string, SandboxHealthEvent>>({})
 
   function subscribeSse(id: string) {
     if (sseConnections.has(id)) return
@@ -155,12 +157,25 @@ export function useSandboxes() {
         sandboxes.value = await sandboxesApi.listGuest()
       }
       syncSseSubscriptions()
+      void fetchHealth()
       store.initialized = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
     } finally {
       loading.value = false
     }
+  }
+
+  async function fetchHealth() {
+    const running = sandboxes.value.filter((s) => s.status === 'running' || s.status === 'starting')
+    const results = await Promise.allSettled(running.map((s) => sandboxesApi.getHealth(s.id)))
+    const updated: Record<string, SandboxHealthEvent> = {}
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        updated[result.value.sandboxId] = result.value
+      }
+    }
+    healthBySandboxId.value = updated
   }
 
   function startPolling() {
@@ -244,6 +259,7 @@ export function useSandboxes() {
     loading,
     error,
     busyIds,
+    healthBySandboxId,
     refresh: fetchSandboxes,
     createSandbox,
     createPublicDemo,
