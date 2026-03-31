@@ -213,24 +213,23 @@ func (t *PullTracker) computeProgress(imageID string) PullProgress {
 		return PullProgress{Status: "pulling"}
 	}
 
-	var totalBytes, currentBytes int64
+	if len(state.layers) == 0 {
+		return PullProgress{Status: "pulling"}
+	}
+
+	var completionSum int
 	for _, l := range state.layers {
-		layerTotal := l.downloadTotal + l.extractTotal
-		if layerTotal == 0 {
+		if l.done {
+			completionSum += 100
 			continue
 		}
-		totalBytes += layerTotal
-		if l.done {
-			currentBytes += layerTotal
-		} else {
-			currentBytes += l.downloadCurrent + l.extractCurrent
+		layerTotal := l.downloadTotal + l.extractTotal
+		if layerTotal > 0 {
+			completionSum += int(100 * (l.downloadCurrent + l.extractCurrent) / layerTotal)
 		}
 	}
 
-	var percent int
-	if totalBytes > 0 {
-		percent = int(currentBytes * 100 / totalBytes)
-	}
+	percent := completionSum / len(state.layers)
 	if percent > 99 {
 		percent = 99
 	}
