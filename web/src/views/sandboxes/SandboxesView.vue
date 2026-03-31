@@ -125,11 +125,6 @@ function getLiveHealth(sandbox: Sandbox) {
   return healthBySandboxId.value[sandbox.id]
 }
 
-function isSandboxOffline(sandbox: Sandbox): boolean {
-  const health = getLiveHealth(sandbox)
-  return sandbox.status === 'running' && health?.status === 'offline'
-}
-
 function isSandboxReadyForOpen(sandbox: Sandbox): boolean {
   const health = getLiveHealth(sandbox)
   if (sandbox.status !== 'running') return false

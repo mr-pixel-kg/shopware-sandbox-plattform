@@ -17,7 +17,7 @@ import ConfigTab from './ConfigTab.vue'
 import HealthTab from './HealthTab.vue'
 import OverviewTab from './OverviewTab.vue'
 
-import type { Image, Sandbox, SandboxHealthEvent } from '@/types'
+import type { Image, Sandbox } from '@/types'
 
 const props = defineProps<{
   open: boolean
