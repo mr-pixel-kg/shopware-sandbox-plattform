@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ConfigTab from './ConfigTab.vue'
 import HealthTab from './HealthTab.vue'
 import OverviewTab from './OverviewTab.vue'
+import TerminalTab from './TerminalTab.vue'
 
 import type { Image, Sandbox, SandboxHealthEvent } from '@/types'
 
@@ -31,11 +32,15 @@ const emit = defineEmits<{
 }>()
 
 const configTabRef = ref<InstanceType<typeof ConfigTab> | null>(null)
+const terminalTabRef = ref<InstanceType<typeof TerminalTab> | null>(null)
 
 watch(
   () => props.open,
   (open) => {
-    if (!open) configTabRef.value?.resetRevealed()
+    if (!open) {
+      configTabRef.value?.resetRevealed()
+      terminalTabRef.value?.disconnect()
+    }
   },
 )
 
@@ -54,6 +59,7 @@ const visibleMetadata = computed(() => {
 })
 
 const hasConfigTab = computed(() => visibleMetadata.value.length > 0)
+const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
 </script>
 
 <template>
@@ -77,6 +83,7 @@ const hasConfigTab = computed(() => visibleMetadata.value.length > 0)
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger v-if="hasConfigTab" value="config">Konfiguration</TabsTrigger>
           <TabsTrigger v-if="isActive" value="health">Health</TabsTrigger>
+          <TabsTrigger v-if="hasTerminalTab" value="terminal">Terminal</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" class="flex-1 overflow-y-auto px-6 pt-4 pb-6">
@@ -93,6 +100,14 @@ const hasConfigTab = computed(() => visibleMetadata.value.length > 0)
 
         <TabsContent v-if="isActive" value="health" class="flex-1 overflow-y-auto px-6 pt-4 pb-6">
           <HealthTab :health="health" />
+        </TabsContent>
+
+        <TabsContent
+          v-if="hasTerminalTab"
+          value="terminal"
+          class="min-h-0 flex-1 overflow-hidden px-6 pt-4 pb-6"
+        >
+          <TerminalTab ref="terminalTabRef" :sandbox-id="sandbox!.id" />
         </TabsContent>
       </Tabs>
     </DialogContent>

@@ -103,7 +103,7 @@ export function useSandboxes() {
                   return
                 }
               } catch {
-                /* ignore */
+                continue
               }
             }
 
@@ -166,12 +166,59 @@ export function useSandboxes() {
     }
   }
 
+  async function fetchHealthForSandbox(id: string): Promise<SandboxHealthEvent | null> {
+    const token = getToken()
+    if (!token) return null
+
+    const baseURL = import.meta.env.WEB_API_URL || ''
+    const abort = new AbortController()
+    const timeout = setTimeout(() => abort.abort(), 10_000)
+
+    try {
+      const res = await fetch(`${baseURL}/api/sandboxes/${id}/health`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abort.signal,
+      })
+      if (!res.ok || !res.body) return null
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event: SandboxHealthEvent = JSON.parse(line.slice(6))
+            reader.cancel()
+            return event
+          } catch {
+            continue
+          }
+        }
+      }
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    return null
+  }
+
   async function fetchHealth() {
     const running = sandboxes.value.filter((s) => s.status === 'running' || s.status === 'starting')
-    const results = await Promise.allSettled(running.map((s) => sandboxesApi.getHealth(s.id)))
+    const results = await Promise.allSettled(running.map((s) => fetchHealthForSandbox(s.id)))
     const updated: Record<string, SandboxHealthEvent> = {}
     for (const result of results) {
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && result.value) {
         updated[result.value.sandboxId] = result.value
       }
     }

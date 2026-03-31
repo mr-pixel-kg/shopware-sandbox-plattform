@@ -5,7 +5,6 @@ import type {
   CreateSnapshotRequest,
   Image,
   Sandbox,
-  SandboxHealthEvent,
   UpdateSandboxRequest,
 } from '@/types'
 
@@ -60,11 +59,6 @@ export const sandboxesApi = {
 
   async snapshot(id: string, req: CreateSnapshotRequest): Promise<Image> {
     const { data } = await apiClient.post<Image>(`/api/sandboxes/${id}/snapshot`, req)
-    return data
-  },
-
-  async getHealth(id: string): Promise<SandboxHealthEvent> {
-    const { data } = await apiClient.get<SandboxHealthEvent>(`/api/sandboxes/${id}/health`)
     return data
   },
 }

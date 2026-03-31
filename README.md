@@ -95,6 +95,11 @@ guard:
   max_total_sandboxes: 32
   max_sandboxes_per_ip: 5
   max_sandboxes_per_user: 10
+
+terminal:
+  max_sessions_per_sandbox: 2
+  idle_timeout_minutes: 15
+  max_duration_minutes: 120
 ```
 
 ### Configuration Overview
@@ -134,35 +139,41 @@ guard:
 | guard    | max_total_sandboxes      | int    | 32                      | Maximum number of sandboxes allowed in total.          |
 |          | max_sandboxes_per_ip     | int    | 5                       | Maximum number of concurrent sandboxes per IP address. |
 |          | max_sandboxes_per_user   | int    | 10                      | Maximum number of concurrent sandboxes per user.       |
+| terminal | max_sessions_per_sandbox | int    | 2                       | Maximum concurrent terminal sessions per sandbox.      |
+|          | idle_timeout_minutes     | int    | 15                      | Close terminal after N minutes of inactivity.          |
+|          | max_duration_minutes     | int    | 120                     | Maximum terminal session duration in minutes.          |
 
 ### Overriding Configuration with Environment Variables
 
 The application supports environment variables to override configuration values.
 
-| Environment Variable         | Corresponding Config Key     |
-|------------------------------|------------------------------|
-| LOGGING_LEVEL                | logging.level                |
-| LOGGING_FORMAT               | logging.format               |
-| SERVER_PORT                  | server.port                  |
-| SERVER_APP_URL               | server.app_url               |
-| DATABASE_HOST                | database.host                |
-| DATABASE_PORT                | database.port                |
-| DATABASE_USER                | database.user                |
-| DATABASE_PASSWORD            | database.password            |
-| DATABASE_NAME                | database.name                |
-| DATABASE_SSLMODE             | database.sslmode             |
-| AUTH_JWT_SECRET              | auth.jwt_secret              |
-| AUTH_JWT_TTL_MINUTES         | auth.jwt_ttl_minutes         |
-| SANDBOX_URL_PREFIX           | sandbox.url_prefix           |
-| SANDBOX_URL_SUFFIX           | sandbox.url_suffix           |
-| SANDBOX_DEFAULT_LIFETIME     | sandbox.default_lifetime     |
-| SANDBOX_MAX_LIFETIME         | sandbox.max_lifetime         |
-| DOCKER_MODE                  | docker.mode                  |
-| DOCKER_NETWORK               | docker.network               |
-| DOCKER_TRAEFIK_ENABLE        | docker.traefik_enable        |
-| GUARD_MAX_TOTAL_SANDBOXES    | guard.max_total_sandboxes    |
-| GUARD_MAX_SANDBOXES_PER_IP   | guard.max_sandboxes_per_ip   |
-| GUARD_MAX_SANDBOXES_PER_USER | guard.max_sandboxes_per_user |
+| Environment Variable              | Corresponding Config Key          |
+|-----------------------------------|-----------------------------------|
+| LOGGING_LEVEL                     | logging.level                     |
+| LOGGING_FORMAT                    | logging.format                    |
+| SERVER_PORT                       | server.port                       |
+| SERVER_APP_URL                    | server.app_url                    |
+| DATABASE_HOST                     | database.host                     |
+| DATABASE_PORT                     | database.port                     |
+| DATABASE_USER                     | database.user                     |
+| DATABASE_PASSWORD                 | database.password                 |
+| DATABASE_NAME                     | database.name                     |
+| DATABASE_SSLMODE                  | database.sslmode                  |
+| AUTH_JWT_SECRET                   | auth.jwt_secret                   |
+| AUTH_JWT_TTL_MINUTES              | auth.jwt_ttl_minutes              |
+| SANDBOX_URL_PREFIX                | sandbox.url_prefix                |
+| SANDBOX_URL_SUFFIX                | sandbox.url_suffix                |
+| SANDBOX_DEFAULT_LIFETIME          | sandbox.default_lifetime          |
+| SANDBOX_MAX_LIFETIME              | sandbox.max_lifetime              |
+| DOCKER_MODE                       | docker.mode                       |
+| DOCKER_NETWORK                    | docker.network                    |
+| DOCKER_TRAEFIK_ENABLE             | docker.traefik_enable             |
+| GUARD_MAX_TOTAL_SANDBOXES         | guard.max_total_sandboxes         |
+| GUARD_MAX_SANDBOXES_PER_IP        | guard.max_sandboxes_per_ip        |
+| GUARD_MAX_SANDBOXES_PER_USER      | guard.max_sandboxes_per_user      |
+| TERMINAL_MAX_SESSIONS_PER_SANDBOX | terminal.max_sessions_per_sandbox |
+| TERMINAL_IDLE_TIMEOUT_MINUTES     | terminal.idle_timeout_minutes     |
+| TERMINAL_MAX_DURATION_MINUTES     | terminal.max_duration_minutes     |
 
 ### Docker Compose Environment (`.env`)
 
@@ -230,6 +241,7 @@ If using Docker Desktop on macOS, set your socket path in `.env`:
 ```
 DOCKER_SOCKET_PATH=/Users/<username>/.docker/run/docker.sock
 ```
+
 ```
 DOCKER_HOST=/Users/<username>/.docker/run/docker.sock
 ```
