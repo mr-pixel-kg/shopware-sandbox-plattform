@@ -57,7 +57,7 @@ func NewSandboxHandler(
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes [get]
 func (h *SandboxHandler) List(c echo.Context) error {
-	sandboxes, err := h.sandboxes.ListActive()
+	sandboxes, err := h.sandboxes.ListAll()
 	if err != nil {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load sandboxes").WithCause(err))
 	}
@@ -500,6 +500,43 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		"image", image.FullName(),
 	)...)
 	return c.JSON(201, image)
+}
+
+// Stream godoc
+// @Summary      Stream sandbox state
+// @Description  SSE endpoint streaming real-time state updates for a single sandbox
+// @Tags         Sandboxes
+// @Security     BearerAuth
+// @Produce      text/event-stream
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Success      200 {object} dto.SandboxStreamEvent
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Router       /api/sandboxes/{id}/stream [get]
+func (h *SandboxHandler) Stream(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+	}
+
+	sandbox, err := h.sandboxes.FindByID(id)
+	if err != nil {
+		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
+	}
+
+	writeSSEHeaders(c)
+
+	ctx := c.Request().Context()
+	ch := h.health.WatchStream(ctx, sandbox)
+	for event := range ch {
+		sendSSEEvent(c, dto.SandboxStreamEvent{
+			ID:          event.SandboxID.String(),
+			Status:      event.Status,
+			StateReason: event.StateReason,
+		})
+	}
+	return nil
 }
 
 func mapSandboxError(c echo.Context, err error) error {

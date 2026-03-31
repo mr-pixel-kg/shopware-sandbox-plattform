@@ -47,6 +47,7 @@ type Client interface {
 	CreateContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error)
 	DeleteContainer(ctx context.Context, containerID string) error
 	CommitContainer(ctx context.Context, containerID, targetImage string) error
+	ContainerExists(ctx context.Context, containerID string) bool
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
 }
 
@@ -66,6 +67,11 @@ func NewClient(sdkClient *client.Client, sandboxCfg config.SandboxConfig, docker
 
 func (c *DockerClient) ImageExists(ctx context.Context, imageName string) bool {
 	_, _, err := c.client.ImageInspectWithRaw(ctx, imageName)
+	return err == nil
+}
+
+func (c *DockerClient) ContainerExists(ctx context.Context, containerID string) bool {
+	_, err := c.client.ContainerInspect(ctx, containerID)
 	return err == nil
 }
 
@@ -242,6 +248,8 @@ func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan Sandb
 	args.Add("event", "stop")
 	args.Add("event", "die")
 	args.Add("event", "destroy")
+	args.Add("event", "pause")
+	args.Add("event", "unpause")
 
 	msgs, errs := c.client.Events(ctx, dockerevents.ListOptions{Filters: args})
 

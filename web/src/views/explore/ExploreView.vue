@@ -22,7 +22,6 @@ import type { Image, MetadataItem, Sandbox } from '@/types'
 const { images, loading: imagesLoading } = useImages()
 const {
   activeSandboxes,
-  healthBySandboxId,
   loading: sandboxesLoading,
   busyIds,
   createPublicDemo,
@@ -35,19 +34,13 @@ const shredderRefs = ref<Record<string, InstanceType<typeof ShredderAnimation>>>
 
 const hasActiveSandboxes = computed(() => activeSandboxes.value.length > 0)
 
-function getLiveHealth(sandbox: Sandbox) {
-  return healthBySandboxId.value[sandbox.id]
-}
-
 function isSandboxReachable(sandbox: Sandbox): boolean {
-  const health = getLiveHealth(sandbox)
-  if (sandbox.status !== 'running') return false
-  if (!health) return true
-  return health.ready
+  return sandbox.status === 'running'
 }
 
 function getStatusNote(sandbox: Sandbox): string | undefined {
-  if (sandbox.status === 'running' && !isSandboxReachable(sandbox)) return 'Offline'
+  if (sandbox.status === 'paused') return sandbox.stateReason || 'Pausiert'
+  if (sandbox.status === 'stopping') return sandbox.stateReason || 'Wird beendet'
   return undefined
 }
 

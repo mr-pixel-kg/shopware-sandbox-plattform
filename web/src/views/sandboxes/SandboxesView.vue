@@ -10,7 +10,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
@@ -60,8 +60,8 @@ const { isAdmin } = storeToRefs(authStore)
 
 const {
   activeSandboxes,
-  healthBySandboxId,
   recentSandboxes,
+  allSandboxes,
   loading,
   busyIds,
   createSandbox,
@@ -69,24 +69,15 @@ const {
   updateSandbox,
   extendTTL,
   snapshotSandbox,
-  allSandboxes,
-  allLoading,
-  startAdminPolling,
 } = useSandboxes()
 const { images, uploadThumbnail, trackPendingImage } = useImages()
-
-onMounted(() => {
-  if (isAdmin.value) {
-    startAdminPolling()
-  }
-})
 
 const adminStatusFilter = ref<string>('all')
 
 const filteredAllSandboxes = computed(() => {
   const all = allSandboxes.value
   if (adminStatusFilter.value === 'all') return all
-  const activeStatuses: SandboxStatus[] = ['running', 'starting']
+  const activeStatuses: SandboxStatus[] = ['running', 'starting', 'paused', 'stopping']
   const inactiveStatuses: SandboxStatus[] = ['stopped', 'expired', 'deleted', 'failed']
   if (adminStatusFilter.value === 'active')
     return all.filter((s) => activeStatuses.includes(s.status))
@@ -107,7 +98,7 @@ const hasRecent = computed(() => recentSandboxes.value.length > 0)
 
 const isSelectedActive = computed(() => {
   const s = selectedSandbox.value?.status
-  return s === 'running' || s === 'starting'
+  return s !== undefined && ['running', 'starting', 'paused', 'stopping'].includes(s)
 })
 
 function getImageName(imageId: string): string {
@@ -128,24 +119,8 @@ function getSandboxOwnerLabel(sandbox: Sandbox): string {
 }
 
 function handleOpen(sandbox: Sandbox) {
-  if (!isSandboxReadyForOpen(sandbox)) return
+  if (sandbox.status !== 'running') return
   if (sandbox.url) window.open(sandbox.url, '_blank')
-}
-
-function getLiveHealth(sandbox: Sandbox) {
-  return healthBySandboxId.value[sandbox.id]
-}
-
-function isSandboxOffline(sandbox: Sandbox): boolean {
-  const health = getLiveHealth(sandbox)
-  return sandbox.status === 'running' && health?.status === 'offline'
-}
-
-function isSandboxReadyForOpen(sandbox: Sandbox): boolean {
-  const health = getLiveHealth(sandbox)
-  if (sandbox.status !== 'running') return false
-  if (!health) return true
-  return health.ready
 }
 
 function handleEdit(sandbox: Sandbox) {
@@ -277,10 +252,10 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
           <Table class="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead class="w-[12%]">Status</TableHead>
-                <TableHead class="w-[24%]">Name</TableHead>
-                <TableHead class="w-[24%]">Vorlage</TableHead>
-                <TableHead class="w-[28%]">Verbleibend</TableHead>
+                <TableHead class="w-[14%]">Status</TableHead>
+                <TableHead class="w-[22%]">Name</TableHead>
+                <TableHead class="w-[22%]">Vorlage</TableHead>
+                <TableHead class="w-[30%]">Verbleibend</TableHead>
                 <TableHead class="w-[12%] text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
@@ -297,12 +272,7 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
               <TableEmpty v-else-if="!hasActive" :colspan="5">Keine aktiven Sandboxes</TableEmpty>
               <TableRow v-for="sandbox in activeSandboxes" :key="sandbox.id" class="h-13">
                 <TableCell>
-                  <div class="flex items-center gap-2">
-                    <StatusBadge :status="sandbox.status" />
-                    <Badge v-if="isSandboxOffline(sandbox)" variant="destructive" class="text-xs">
-                      Offline
-                    </Badge>
-                  </div>
+                  <StatusBadge :status="sandbox.status" :state-reason="sandbox.stateReason" />
                 </TableCell>
                 <TableCell>
                   <span class="text-muted-foreground truncate text-sm">{{
@@ -331,7 +301,7 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        :disabled="!isSandboxReadyForOpen(sandbox)"
+                        :disabled="sandbox.status !== 'running'"
                         @click="handleOpen(sandbox)"
                       >
                         <ExternalLink class="mr-2 h-4 w-4" />
@@ -369,9 +339,9 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
           <Table class="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead class="w-[12%]">Status</TableHead>
+                <TableHead class="w-[14%]">Status</TableHead>
                 <TableHead class="w-[22%]">Name</TableHead>
-                <TableHead class="w-[28%]">Vorlage</TableHead>
+                <TableHead class="w-[26%]">Vorlage</TableHead>
                 <TableHead class="w-[26%]">Beendet</TableHead>
                 <TableHead class="w-[12%] text-right">Aktionen</TableHead>
               </TableRow>
@@ -388,7 +358,7 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
               </template>
               <TableRow v-for="sandbox in recentSandboxes" :key="sandbox.id" class="h-13">
                 <TableCell>
-                  <StatusBadge :status="sandbox.status" />
+                  <StatusBadge :status="sandbox.status" :state-reason="sandbox.stateReason" />
                 </TableCell>
                 <TableCell>
                   <span class="text-muted-foreground truncate text-sm">{{
@@ -447,9 +417,9 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
           <Table class="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead class="w-[10%]">Status</TableHead>
-                <TableHead class="w-[16%]">Name</TableHead>
-                <TableHead class="w-[18%]">Vorlage</TableHead>
+                <TableHead class="w-[14%]">Status</TableHead>
+                <TableHead class="w-[14%]">Name</TableHead>
+                <TableHead class="w-[16%]">Vorlage</TableHead>
                 <TableHead class="w-[18%]">Besitzer</TableHead>
                 <TableHead class="w-[14%]">Gestartet</TableHead>
                 <TableHead class="w-[14%]">Läuft ab</TableHead>
@@ -457,7 +427,7 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <template v-if="allLoading">
+              <template v-if="loading">
                 <TableRow v-for="i in 3" :key="i" class="h-13">
                   <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
                   <TableCell><Skeleton class="h-4 w-24" /></TableCell>
@@ -473,7 +443,7 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
               </TableEmpty>
               <TableRow v-for="sandbox in filteredAllSandboxes" :key="sandbox.id" class="h-13">
                 <TableCell>
-                  <StatusBadge :status="sandbox.status" />
+                  <StatusBadge :status="sandbox.status" :state-reason="sandbox.stateReason" />
                 </TableCell>
                 <TableCell>
                   <span class="text-muted-foreground truncate text-sm">{{
@@ -509,8 +479,18 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
                         v-if="sandbox.status === 'running' || sandbox.status === 'starting'"
                       />
                       <DropdownMenuItem class="text-destructive" @click="handleDelete(sandbox)">
-                        <Square class="mr-2 h-4 w-4" />
-                        Beenden
+                        <template
+                          v-if="
+                            ['running', 'starting', 'paused', 'stopping'].includes(sandbox.status)
+                          "
+                        >
+                          <Square class="mr-2 h-4 w-4" />
+                          Beenden
+                        </template>
+                        <template v-else>
+                          <Trash2 class="mr-2 h-4 w-4" />
+                          Entfernen
+                        </template>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

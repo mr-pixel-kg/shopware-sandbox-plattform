@@ -80,6 +80,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 
 	// Sandbox expiration is handled inside the same process on purpose to keep
 	// deployment simple for the single-service architecture.
+	sandboxService.ReconcileOnStartup(context.Background())
 	sandboxService.StartCleanupLoop(context.Background())
 	sandboxService.StartDockerEventLoop(context.Background())
 	sandboxHealthService.StartMonitoringActive()
@@ -126,6 +127,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	private.POST("/auth/logout", authHandler.Logout)
 	private.GET("/me", authHandler.Me)
 	private.GET("/me/sandboxes", sandboxHandler.ListMine)
+	private.GET("/sandboxes/:id/stream", sandboxHandler.Stream)
 	private.GET("/images", imageHandler.ListAll)
 	private.POST("/images", imageHandler.Create)
 	private.PUT("/images/:id", imageHandler.Update)

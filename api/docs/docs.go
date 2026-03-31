@@ -1717,6 +1717,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/sandboxes/{id}/stream": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "SSE endpoint streaming real-time state updates for a single sandbox",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Sandboxes"
+                ],
+                "summary": "Stream sandbox state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Sandbox ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SandboxStreamEvent"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/sandboxes/{id}/ttl": {
             "patch": {
                 "security": [
@@ -2267,10 +2320,16 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8080
                 },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Snapshot wird erstellt"
+                },
                 "status": {
                     "enum": [
                         "starting",
                         "running",
+                        "paused",
+                        "stopping",
                         "stopped",
                         "expired",
                         "deleted",
@@ -2290,6 +2349,23 @@ const docTemplate = `{
                 "url": {
                     "type": "string",
                     "example": "https://sandbox-0b443c82.demo.shopshredder.de"
+                }
+            }
+        },
+        "dto.SandboxStreamEvent": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "0b443c82-d8a3-49a7-b59a-26ce327c7341"
+                },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Container wird gestartet"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "starting"
                 }
             }
         },
@@ -2473,10 +2549,16 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8080
                 },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Snapshot wird erstellt"
+                },
                 "status": {
                     "enum": [
                         "starting",
                         "running",
+                        "paused",
+                        "stopping",
                         "stopped",
                         "expired",
                         "deleted",
@@ -2504,6 +2586,8 @@ const docTemplate = `{
             "enum": [
                 "starting",
                 "running",
+                "paused",
+                "stopping",
                 "stopped",
                 "expired",
                 "deleted",
@@ -2512,6 +2596,8 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "SandboxStatusStarting",
                 "SandboxStatusRunning",
+                "SandboxStatusPaused",
+                "SandboxStatusStopping",
                 "SandboxStatusStopped",
                 "SandboxStatusExpired",
                 "SandboxStatusDeleted",
