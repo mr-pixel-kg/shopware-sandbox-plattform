@@ -152,7 +152,7 @@ definitions:
         example: ok
         type: string
     type: object
-  dto.ImagePullProgressEvent:
+  dto.ImageProgressEvent:
     properties:
       percent:
         example: 75
@@ -219,7 +219,7 @@ definitions:
     - email
     - password
     type: object
-  dto.PendingPullResponse:
+  dto.PendingImageResponse:
     properties:
       id:
         example: 8ae13ed9-cfb1-4941-a248-bc74b9fb6a24
@@ -1086,8 +1086,7 @@ paths:
       - Images
   /api/images/{id}/progress:
     get:
-      description: SSE endpoint streaming pull progress events. Each event is JSON
-        with "percent" (int) and "status" (string) fields.
+      description: SSE endpoint streaming progress events for image operations
       parameters:
       - description: Image ID
         format: uuid
@@ -1101,7 +1100,7 @@ paths:
         "200":
           description: Last emitted SSE event payload
           schema:
-            $ref: '#/definitions/dto.ImagePullProgressEvent'
+            $ref: '#/definitions/dto.ImageProgressEvent'
         "400":
           description: Bad Request
           schema:
@@ -1110,7 +1109,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
-      summary: Stream image pull progress
+      summary: Stream image progress
       tags:
       - Images
   /api/images/{id}/thumbnail:
@@ -1191,9 +1190,10 @@ paths:
       summary: Upload an image thumbnail
       tags:
       - Images
-  /api/images/pulls:
+  /api/images/pending:
     get:
-      description: Returns all images currently being pulled, with progress percentage
+      description: Returns all images with ongoing operations with optional progress
+        percentage
       produces:
       - application/json
       responses:
@@ -1201,7 +1201,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.PendingPullResponse'
+              $ref: '#/definitions/dto.PendingImageResponse'
             type: array
         "401":
           description: Unauthorized
@@ -1209,7 +1209,7 @@ paths:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List ongoing image pulls
+      summary: List pending image operations
       tags:
       - Images
   /api/me:
