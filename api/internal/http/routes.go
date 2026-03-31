@@ -110,11 +110,11 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	// Public routes create or refresh the guest cookie automatically.
 	public.Use(authmw.EnsureGuestSession(guestService, cfg.Auth.GuestCookieName))
 
-	api.GET("/images/:id/progress", imageHandler.PullProgress)
+	api.GET("/images/:id/progress", imageHandler.Progress)
 	api.GET("/registry/lookup", imageHandler.RegistryLookup)
 	api.GET("/sandboxes/:id/health", sandboxHandler.Health)
 
-	private.GET("/images/pulls", imageHandler.ListPulls)
+	private.GET("/images/pending", imageHandler.ListPending)
 	public.GET("/images", imageHandler.ListPublic)
 	public.GET("/sandboxes", sandboxHandler.ListGuest)
 	public.POST("/demos", sandboxHandler.CreatePublicDemo)

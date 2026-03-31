@@ -4,7 +4,7 @@ import type {
   CreateImageRequest,
   Image,
   MetadataItem,
-  PendingPull,
+  PendingImage,
   UpdateImageRequest,
 } from '@/types'
 
@@ -19,8 +19,8 @@ export const imagesApi = {
     return data
   },
 
-  async listPulls(): Promise<PendingPull[]> {
-    const { data } = await apiClient.get<PendingPull[]>('/api/images/pulls')
+  async listPending(): Promise<PendingImage[]> {
+    const { data } = await apiClient.get<PendingImage[]>('/api/images/pending')
     return data
   },
 

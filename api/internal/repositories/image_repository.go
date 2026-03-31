@@ -61,6 +61,12 @@ func (r *ImageRepository) ListByStatus(status string) ([]models.Image, error) {
 	return images, err
 }
 
+func (r *ImageRepository) ListByStatuses(statuses []string) ([]models.Image, error) {
+	var images []models.Image
+	err := r.db.Where("status IN ?", statuses).Order("created_at desc").Find(&images).Error
+	return images, err
+}
+
 func (r *ImageRepository) UpdateStatus(id uuid.UUID, status string, errMsg *string) error {
 	return r.db.Model(&models.Image{}).Where("id = ?", id).Updates(map[string]any{
 		"status": status,

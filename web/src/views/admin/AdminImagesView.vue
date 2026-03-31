@@ -29,7 +29,7 @@ import type { Image, MetadataItem } from '@/types'
 
 const {
   images,
-  pendingPulls,
+  pendingImages,
   loading,
   createImage,
   updateImage,
@@ -133,18 +133,24 @@ function getOwnerLabel(image: Image): string {
       </template>
     </PageHeader>
 
-    <div v-if="pendingPulls.length > 0" class="mb-4 space-y-2">
+    <div v-if="pendingImages.length > 0" class="mb-4 space-y-2">
       <div
-        v-for="pull in pendingPulls"
-        :key="pull.id"
+        v-for="item in pendingImages"
+        :key="item.id"
         class="bg-muted/50 flex items-center gap-3 rounded-md border p-3"
       >
-        <DonutProgress :model-value="pull.percent" class="h-5 w-5" />
+        <DonutProgress v-if="item.percent > 0" :model-value="item.percent" class="h-5 w-5" />
+        <Loader2 v-else class="h-5 w-5 animate-spin text-blue-600" />
         <div class="min-w-0 flex-1">
-          <span class="text-sm font-medium">{{ pull.title || pull.name }}</span>
-          <Badge variant="secondary" class="ml-2 text-xs">{{ pull.name }}:{{ pull.tag }}</Badge>
+          <span class="text-sm font-medium">{{ item.title || item.name }}</span>
+          <Badge variant="secondary" class="ml-2 text-xs">{{ item.name }}:{{ item.tag }}</Badge>
         </div>
-        <span class="text-muted-foreground text-sm tabular-nums">{{ pull.percent }}%</span>
+        <span v-if="item.percent > 0" class="text-muted-foreground text-sm tabular-nums"
+          >{{ item.percent }}%</span
+        >
+        <span v-else class="text-muted-foreground text-sm">{{
+          item.status === 'committing' ? 'Wird erstellt' : 'Wird geladen'
+        }}</span>
       </div>
     </div>
 
@@ -198,11 +204,13 @@ function getOwnerLabel(image: Image): string {
                 <span class="text-sm">Bereit</span>
               </div>
               <div
-                v-else-if="image.status === 'pulling'"
+                v-else-if="image.status === 'pulling' || image.status === 'committing'"
                 class="flex items-center gap-1.5 text-blue-600"
               >
                 <Loader2 class="h-4 w-4 animate-spin" />
-                <span class="text-sm">Wird geladen</span>
+                <span class="text-sm">{{
+                  image.status === 'committing' ? 'Wird erstellt' : 'Wird geladen'
+                }}</span>
               </div>
               <div
                 v-else-if="image.status === 'failed'"

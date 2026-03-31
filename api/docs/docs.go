@@ -697,28 +697,28 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/images/pulls": {
+        "/api/images/pending": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all images currently being pulled, with progress percentage",
+                "description": "Returns all images with ongoing operations with optional progress percentage",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Images"
                 ],
-                "summary": "List ongoing image pulls",
+                "summary": "List pending image operations",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.PendingPullResponse"
+                                "$ref": "#/definitions/dto.PendingImageResponse"
                             }
                         }
                     },
@@ -855,14 +855,14 @@ const docTemplate = `{
         },
         "/api/images/{id}/progress": {
             "get": {
-                "description": "SSE endpoint streaming pull progress events. Each event is JSON with \"percent\" (int) and \"status\" (string) fields.",
+                "description": "SSE endpoint streaming progress events for image operations",
                 "produces": [
                     "text/event-stream"
                 ],
                 "tags": [
                     "Images"
                 ],
-                "summary": "Stream image pull progress",
+                "summary": "Stream image progress",
                 "parameters": [
                     {
                         "type": "string",
@@ -877,7 +877,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Last emitted SSE event payload",
                         "schema": {
-                            "$ref": "#/definitions/dto.ImagePullProgressEvent"
+                            "$ref": "#/definitions/dto.ImageProgressEvent"
                         }
                     },
                     "400": {
@@ -2027,7 +2027,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ImagePullProgressEvent": {
+        "dto.ImageProgressEvent": {
             "type": "object",
             "properties": {
                 "percent": {
@@ -2120,7 +2120,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.PendingPullResponse": {
+        "dto.PendingImageResponse": {
             "type": "object",
             "properties": {
                 "id": {

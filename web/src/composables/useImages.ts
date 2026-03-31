@@ -5,18 +5,19 @@ import { imagesApi } from '@/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { type FetchMode, useImagesStore } from '@/stores/images.store'
 
-import type { CreateImageRequest, Image, PendingPull, UpdateImageRequest } from '@/types'
+import type { CreateImageRequest, Image, PendingImage, UpdateImageRequest } from '@/types'
 
 export function useImages(mode: FetchMode = 'public') {
   const store = useImagesStore()
   const authStore = useAuthStore()
-  const { images, pendingPulls, publicImages, loading, error } = storeToRefs(store)
+  const { images, pendingImages, publicImages, loading, error } = storeToRefs(store)
 
   const busyIds = ref(new Set<string>())
   const sseConnections = new Map<string, EventSource>()
   const effectiveMode = mode === 'all' && authStore.isAuthenticated ? 'all' : 'public'
+  let pendingPollInterval: ReturnType<typeof setInterval> | null = null
 
-  function subscribePull(id: string) {
+  function subscribeProgress(id: string) {
     if (sseConnections.has(id)) return
 
     const baseURL = import.meta.env.WEB_API_URL || ''
@@ -33,7 +34,7 @@ export function useImages(mode: FetchMode = 'public') {
 
       if (data.status === 'ready' || data.status === 'complete') {
         closeSse(id)
-        removePendingPull(id)
+        removePendingImage(id)
         const img = images.value.find((i) => i.id === id)
         if (img) {
           img.status = 'ready'
@@ -45,7 +46,7 @@ export function useImages(mode: FetchMode = 'public') {
 
       if (data.status === 'failed') {
         closeSse(id)
-        removePendingPull(id)
+        removePendingImage(id)
         const img = images.value.find((i) => i.id === id)
         if (img) {
           img.status = 'failed'
@@ -54,7 +55,7 @@ export function useImages(mode: FetchMode = 'public') {
         return
       }
 
-      const pendingItem = pendingPulls.value.find((p) => p.id === id)
+      const pendingItem = pendingImages.value.find((p) => p.id === id)
       if (pendingItem && data.percent !== undefined) {
         pendingItem.percent = Math.max(pendingItem.percent, data.percent)
       }
@@ -62,7 +63,7 @@ export function useImages(mode: FetchMode = 'public') {
 
     es.onerror = () => {
       closeSse(id)
-      removePendingPull(id)
+      removePendingImage(id)
     }
   }
 
@@ -79,8 +80,19 @@ export function useImages(mode: FetchMode = 'public') {
     sseConnections.clear()
   }
 
-  function removePendingPull(id: string) {
-    pendingPulls.value = pendingPulls.value.filter((p) => p.id !== id)
+  function removePendingImage(id: string) {
+    pendingImages.value = pendingImages.value.filter((p) => p.id !== id)
+  }
+
+  function addPendingImage(image: Image) {
+    pendingImages.value.unshift({
+      id: image.id,
+      name: image.name,
+      tag: image.tag,
+      title: image.title,
+      percent: 0,
+      status: image.status,
+    })
   }
 
   async function fetchImages() {
@@ -97,10 +109,48 @@ export function useImages(mode: FetchMode = 'public') {
     }
   }
 
-  async function initPendingPulls() {
-    const pulls = await imagesApi.listPulls().catch(() => [] as PendingPull[])
-    pendingPulls.value = pulls
-    for (const pull of pulls) subscribePull(pull.id)
+  async function initPendingImages() {
+    const pending = await imagesApi.listPending().catch(() => [] as PendingImage[])
+    pendingImages.value = pending
+    for (const item of pending) {
+      if (item.status === 'pulling') {
+        subscribeProgress(item.id)
+      }
+    }
+    if (pending.some((p) => p.status !== 'pulling')) {
+      startPendingPoll()
+    }
+  }
+
+  function startPendingPoll() {
+    if (pendingPollInterval) return
+    pendingPollInterval = setInterval(pollPendingImages, 5_000)
+  }
+
+  function stopPendingPoll() {
+    if (pendingPollInterval) {
+      clearInterval(pendingPollInterval)
+      pendingPollInterval = null
+    }
+  }
+
+  async function pollPendingImages() {
+    const pending = await imagesApi.listPending().catch(() => null)
+    if (!pending) return
+
+    const pendingIds = new Set(pending.map((p) => p.id))
+    const finished = pendingImages.value.filter(
+      (p) => p.status !== 'pulling' && !pendingIds.has(p.id),
+    )
+
+    if (finished.length > 0) {
+      for (const item of finished) removePendingImage(item.id)
+      void fetchImages()
+    }
+
+    if (!pendingImages.value.some((p) => p.status !== 'pulling')) {
+      stopPendingPoll()
+    }
   }
 
   async function createImage(req: CreateImageRequest): Promise<Image> {
@@ -108,18 +158,17 @@ export function useImages(mode: FetchMode = 'public') {
     images.value.unshift(image)
 
     if (image.status === 'pulling') {
-      pendingPulls.value.unshift({
-        id: image.id,
-        name: image.name,
-        tag: image.tag,
-        title: image.title,
-        percent: 0,
-        status: 'pulling',
-      } as PendingPull)
-      subscribePull(image.id)
+      addPendingImage(image)
+      subscribeProgress(image.id)
     }
 
     return image
+  }
+
+  function trackPendingImage(image: Image) {
+    images.value.unshift(image)
+    addPendingImage(image)
+    startPendingPoll()
   }
 
   async function updateImage(id: string, req: UpdateImageRequest): Promise<Image> {
@@ -146,28 +195,30 @@ export function useImages(mode: FetchMode = 'public') {
     closeSse(id)
     await imagesApi.remove(id)
     images.value = images.value.filter((i) => i.id !== id)
-    pendingPulls.value = pendingPulls.value.filter((p) => p.id !== id)
+    pendingImages.value = pendingImages.value.filter((p) => p.id !== id)
   }
 
   onMounted(() => {
     store.fetchMode = effectiveMode
     void fetchImages()
-    if (authStore.isAuthenticated) void initPendingPulls()
+    if (authStore.isAuthenticated) void initPendingImages()
   })
 
   onUnmounted(() => {
     closeAllSse()
+    stopPendingPoll()
   })
 
   return {
     images,
-    pendingPulls,
+    pendingImages,
     publicImages,
     loading,
     error,
     busyIds,
     refresh: fetchImages,
     createImage,
+    trackPendingImage,
     updateImage,
     uploadThumbnail,
     deleteThumbnail,

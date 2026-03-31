@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import type { Image, PendingPull } from '@/types'
+import type { Image, PendingImage } from '@/types'
 
 export type FetchMode = 'public' | 'all'
 
 export const useImagesStore = defineStore('images', () => {
   const images = ref<Image[]>([])
-  const pendingPulls = ref<PendingPull[]>([])
+  const pendingImages = ref<PendingImage[]>([])
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref<string | null>(null)
@@ -17,7 +17,7 @@ export const useImagesStore = defineStore('images', () => {
 
   function $reset() {
     images.value = []
-    pendingPulls.value = []
+    pendingImages.value = []
     loading.value = false
     initialized.value = false
     error.value = null
@@ -25,7 +25,7 @@ export const useImagesStore = defineStore('images', () => {
 
   return {
     images,
-    pendingPulls,
+    pendingImages,
     loading,
     initialized,
     error,

@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	ImageStatusPulling = "pulling"
-	ImageStatusReady   = "ready"
-	ImageStatusFailed  = "failed"
+	ImageStatusPulling    = "pulling"
+	ImageStatusCommitting = "committing"
+	ImageStatusReady      = "ready"
+	ImageStatusFailed     = "failed"
 )
 
 type Image struct {

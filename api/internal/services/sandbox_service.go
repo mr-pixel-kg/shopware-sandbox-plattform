@@ -388,22 +388,13 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, ErrSandboxNotFound
 	}
 
-	// use a separate context so that when docker clinet disconnects because of a timeout it doesnt cancels the potentially long image commit
-	commitCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	if err := s.docker.CommitContainer(commitCtx, sandbox.ContainerID, targetImage); err != nil {
-		return nil, err
-	}
-
 	var registryRef *string
 	if sourceImage, srcErr := s.imageRepo.FindByID(sandbox.ImageID); srcErr == nil {
 		ref := sourceImage.RegistryName()
 		registryRef = &ref
 	}
 
-	image, err := s.images.CreateForUser(
-		ctx,
+	image, err := s.images.CreateForCommit(
 		input.UserID,
 		input.Name,
 		input.Tag,
@@ -417,12 +408,10 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, err
 	}
 
-	if err := s.addEvent(sandbox.ID, "snapshotted", map[string]any{
+	_ = s.addEvent(sandbox.ID, "snapshotted", map[string]any{
 		"targetImage": targetImage,
 		"imageId":     image.ID.String(),
-	}); err != nil {
-		return nil, err
-	}
+	})
 
 	_ = s.audit.Log(input.UserID, "sandbox.snapshotted", input.ClientIP, map[string]any{
 		"sandboxId":   sandbox.ID.String(),
@@ -430,7 +419,16 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		"imageId":     image.ID.String(),
 	})
 
+	go s.commitSnapshot(sandbox.ContainerID, image.ID, targetImage)
+
 	return image, nil
+}
+
+func (s *SandboxService) commitSnapshot(containerID string, imageID uuid.UUID, targetImage string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	s.images.FinishCommit(imageID, s.docker.CommitContainer(ctx, containerID, targetImage))
 }
 
 func (s *SandboxService) StartCleanupLoop(ctx context.Context) {

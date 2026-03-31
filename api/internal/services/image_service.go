@@ -65,16 +65,16 @@ func NewImageService(
 }
 
 func (s *ImageService) ReconcileOnStartup(ctx context.Context) {
-	pulling, err := s.repo.ListByStatus(models.ImageStatusPulling)
+	stale, err := s.repo.ListByStatuses([]string{models.ImageStatusPulling, models.ImageStatusCommitting})
 	if err != nil {
-		slog.Error("reconcile: failed to list pulling images", "component", "image", "error", err.Error())
+		slog.Error("reconcile: failed to list pending images", "component", "image", "error", err.Error())
 	}
-	for _, img := range pulling {
-		errMsg := "pull interrupted by API restart"
+	for _, img := range stale {
+		errMsg := "operation interrupted by API restart"
 		if err := s.repo.UpdateStatus(img.ID, models.ImageStatusFailed, &errMsg); err != nil {
 			slog.Error("reconcile: failed to mark image as failed", "component", "image", "image_id", img.ID.String(), "error", err.Error())
 		} else {
-			slog.Info("reconcile: marked stale pulling image as failed", "component", "image", "image_id", img.ID.String(), "image", img.FullName())
+			slog.Info("reconcile: marked stale image as failed", "component", "image", "image_id", img.ID.String(), "image", img.FullName(), "previous_status", img.Status)
 		}
 	}
 
@@ -119,19 +119,7 @@ func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
 	return s.attachThumbnailURL(image), nil
 }
 
-func (s *ImageService) CreateForUser(
-	ctx context.Context,
-	userID *uuid.UUID,
-	name string,
-	tag string,
-	title *string,
-	description *string,
-	isPublic bool,
-	metadata json.RawMessage,
-	registryRef *string,
-) (*models.Image, error) {
-	fullName := name + ":" + tag
-
+func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, description *string, isPublic bool, metadata json.RawMessage, registryRef *string, status string) (*models.Image, error) {
 	img := &models.Image{
 		ID:          uuid.New(),
 		Name:        name,
@@ -139,7 +127,7 @@ func (s *ImageService) CreateForUser(
 		Title:       title,
 		Description: description,
 		IsPublic:    isPublic,
-		Status:      models.ImageStatusPulling,
+		Status:      status,
 		OwnerID:     userID,
 		Metadata:    guardJSON(metadata, []byte("[]")),
 		RegistryRef: registryRef,
@@ -149,17 +137,34 @@ func (s *ImageService) CreateForUser(
 		return nil, err
 	}
 
+	return s.attachThumbnailURL(img), nil
+}
+
+func (s *ImageService) CreateForUser(
+	ctx context.Context,
+	userID *uuid.UUID,
+	name, tag string,
+	title, description *string,
+	isPublic bool,
+	metadata json.RawMessage,
+	registryRef *string,
+) (*models.Image, error) {
+	img, err := s.createImage(userID, name, tag, title, description, isPublic, metadata, registryRef, models.ImageStatusPulling)
+	if err != nil {
+		return nil, err
+	}
+
+	fullName := name + ":" + tag
 	if s.docker.ImageExists(ctx, fullName) {
 		img.Status = models.ImageStatusReady
 		if err := s.repo.UpdateStatus(img.ID, models.ImageStatusReady, nil); err != nil {
 			slog.Error("failed to mark image as ready", "component", "image", "image_id", img.ID.String(), "error", err.Error())
 		}
-		return s.attachThumbnailURL(img), nil
+		return img, nil
 	}
 
 	s.startPull(img.ID, fullName)
-
-	return s.attachThumbnailURL(img), nil
+	return img, nil
 }
 
 func (s *ImageService) startPull(imageID uuid.UUID, fullName string) {
@@ -300,20 +305,50 @@ func (s *ImageService) IsPulling(imageID string) bool {
 	return ok
 }
 
-func (s *ImageService) ListPullingImages() ([]models.Image, map[string]int) {
-	images, err := s.repo.ListByStatus(models.ImageStatusPulling)
+func (s *ImageService) ListPendingImages() ([]models.Image, map[string]int) {
+	images, err := s.repo.ListByStatuses([]string{models.ImageStatusPulling, models.ImageStatusCommitting})
 	if err != nil {
-		slog.Error("failed to list pulling images", "component", "image", "error", err.Error())
+		slog.Error("failed to list pending images", "component", "image", "error", err.Error())
 		return nil, nil
 	}
 
 	percents := make(map[string]int, len(images))
 	for _, img := range images {
-		progress := s.tracker.Progress(img.ID.String())
-		percents[img.ID.String()] = progress.Percent
+		if img.Status == models.ImageStatusPulling {
+			progress := s.tracker.Progress(img.ID.String())
+			percents[img.ID.String()] = progress.Percent
+		}
 	}
 
 	return s.attachThumbnailURLs(images), percents
+}
+
+func (s *ImageService) CreateForCommit(
+	userID *uuid.UUID,
+	name, tag string,
+	title, description *string,
+	isPublic bool,
+	metadata json.RawMessage,
+	registryRef *string,
+) (*models.Image, error) {
+	return s.createImage(userID, name, tag, title, description, isPublic, metadata, registryRef, models.ImageStatusCommitting)
+}
+
+func (s *ImageService) FinishCommit(imageID uuid.UUID, commitErr error) {
+	idStr := imageID.String()
+	if commitErr != nil {
+		errMsg := commitErr.Error()
+		if err := s.repo.UpdateStatus(imageID, models.ImageStatusFailed, &errMsg); err != nil {
+			slog.Error("failed to update image status", "component", "image", "image_id", idStr, "error", err.Error())
+		}
+		slog.Error("image commit failed", "component", "image", "image_id", idStr, "error", commitErr.Error())
+		return
+	}
+	if err := s.repo.UpdateStatus(imageID, models.ImageStatusReady, nil); err != nil {
+		slog.Error("failed to update image status", "component", "image", "image_id", idStr, "error", err.Error())
+		return
+	}
+	slog.Info("image commit complete", "component", "image", "image_id", idStr)
 }
 
 func (s *ImageService) cancelPull(imageID string) {

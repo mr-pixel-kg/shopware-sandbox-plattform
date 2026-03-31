@@ -79,12 +79,12 @@ type HealthResponse struct {
 	Status string `json:"status" example:"ok"`
 }
 
-type ImagePullProgressEvent struct {
+type ImageProgressEvent struct {
 	Percent int    `json:"percent" example:"75"`
 	Status  string `json:"status" example:"pulling"`
 }
 
-type PendingPullResponse struct {
+type PendingImageResponse struct {
 	ID      string  `json:"id" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
 	Name    string  `json:"name" example:"dockware/shopware"`
 	Tag     string  `json:"tag" example:"6.6.9.0"`

@@ -301,43 +301,43 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 	return c.NoContent(204)
 }
 
-// ListPulls godoc
-// @Summary      List ongoing image pulls
-// @Description  Returns all images currently being pulled, with progress percentage
+// ListPending godoc
+// @Summary      List pending image operations
+// @Description  Returns all images with ongoing operations with optional progress percentage
 // @Tags         Images
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200 {array} dto.PendingPullResponse
+// @Success      200 {array} dto.PendingImageResponse
 // @Failure      401 {object} dto.ErrorResponse
-// @Router       /api/images/pulls [get]
-func (h *ImageHandler) ListPulls(c echo.Context) error {
-	images, percents := h.images.ListPullingImages()
+// @Router       /api/images/pending [get]
+func (h *ImageHandler) ListPending(c echo.Context) error {
+	images, percents := h.images.ListPendingImages()
 
-	out := make([]dto.PendingPullResponse, len(images))
+	out := make([]dto.PendingImageResponse, len(images))
 	for i, img := range images {
-		out[i] = dto.PendingPullResponse{
+		out[i] = dto.PendingImageResponse{
 			ID:      img.ID.String(),
 			Name:    img.Name,
 			Tag:     img.Tag,
 			Title:   img.Title,
 			Percent: percents[img.ID.String()],
-			Status:  "pulling",
+			Status:  img.Status,
 		}
 	}
 	return c.JSON(200, out)
 }
 
-// PullProgress godoc
-// @Summary      Stream image pull progress
-// @Description  SSE endpoint streaming pull progress events. Each event is JSON with "percent" (int) and "status" (string) fields.
+// Progress godoc
+// @Summary      Stream image progress
+// @Description  SSE endpoint streaming progress events for image operations
 // @Tags         Images
 // @Produce      text/event-stream
 // @Param        id path string true "Image ID" format(uuid)
-// @Success      200 {object} dto.ImagePullProgressEvent "Last emitted SSE event payload"
+// @Success      200 {object} dto.ImageProgressEvent "Last emitted SSE event payload"
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/images/{id}/progress [get]
-func (h *ImageHandler) PullProgress(c echo.Context) error {
+func (h *ImageHandler) Progress(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
@@ -388,6 +388,11 @@ func (h *ImageHandler) PullProgress(c echo.Context) error {
 				sendSSEEvent(c, progress)
 			}
 		}
+
+	case models.ImageStatusCommitting:
+		writeSSEHeaders(c)
+		sendSSEEvent(c, map[string]any{"percent": 0, "status": "committing"})
+		return nil
 
 	default:
 		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))

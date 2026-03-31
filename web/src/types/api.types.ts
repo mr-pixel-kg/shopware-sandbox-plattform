@@ -19,7 +19,7 @@ export interface UserSummary {
   email: string
 }
 
-export type ImageStatus = 'pulling' | 'ready' | 'failed'
+export type ImageStatus = 'pulling' | 'committing' | 'ready' | 'failed'
 
 export type MetadataType = 'field' | 'setting' | 'info' | 'action'
 
@@ -53,13 +53,13 @@ export interface Image extends BaseModel {
   owner?: UserSummary | null
 }
 
-export interface PendingPull {
+export interface PendingImage {
   id: string
   name: string
   tag: string
   title?: string
   percent: number
-  status: string
+  status: ImageStatus
 }
 
 export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'deleted' | 'failed'

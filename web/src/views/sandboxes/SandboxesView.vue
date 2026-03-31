@@ -69,12 +69,11 @@ const {
   updateSandbox,
   extendTTL,
   snapshotSandbox,
-  refresh,
   allSandboxes,
   allLoading,
   startAdminPolling,
 } = useSandboxes()
-const { images, uploadThumbnail } = useImages()
+const { images, uploadThumbnail, trackPendingImage } = useImages()
 
 onMounted(() => {
   if (isAdmin.value) {
@@ -208,8 +207,6 @@ async function handleCreateSandbox(
 ) {
   try {
     await createSandbox(payload)
-    toast.success('Sandbox wird gestartet')
-    await refresh()
     done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Starten der Sandbox'))
@@ -232,12 +229,12 @@ async function handleCreateSnapshot(
   if (!selectedSandbox.value) return
   try {
     const image = await snapshotSandbox(selectedSandbox.value.id, payload)
+    trackPendingImage(image)
 
     if (payload.thumbnailFile) {
-      await uploadThumbnail(image.id, payload.thumbnailFile)
+      void uploadThumbnail(image.id, payload.thumbnailFile)
     }
 
-    toast.success('Snapshot wurde erstellt')
     done(true)
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Erstellen des Snapshots'))
