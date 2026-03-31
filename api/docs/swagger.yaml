@@ -327,12 +327,17 @@ definitions:
       port:
         example: 8080
         type: integer
+      stateReason:
+        example: Snapshot wird erstellt
+        type: string
       status:
         allOf:
         - $ref: '#/definitions/models.SandboxStatus'
         enum:
         - starting
         - running
+        - paused
+        - stopping
         - stopped
         - expired
         - deleted
@@ -343,6 +348,18 @@ definitions:
         type: string
       url:
         example: https://sandbox-0b443c82.demo.shopshredder.de
+        type: string
+    type: object
+  dto.SandboxStreamEvent:
+    properties:
+      id:
+        example: 0b443c82-d8a3-49a7-b59a-26ce327c7341
+        type: string
+      stateReason:
+        example: Container wird gestartet
+        type: string
+      status:
+        example: starting
         type: string
     type: object
   dto.UpdateImageRequest:
@@ -476,12 +493,17 @@ definitions:
       port:
         example: 8080
         type: integer
+      stateReason:
+        example: Snapshot wird erstellt
+        type: string
       status:
         allOf:
         - $ref: '#/definitions/models.SandboxStatus'
         enum:
         - starting
         - running
+        - paused
+        - stopping
         - stopped
         - expired
         - deleted
@@ -498,6 +520,8 @@ definitions:
     enum:
     - starting
     - running
+    - paused
+    - stopping
     - stopped
     - expired
     - deleted
@@ -506,6 +530,8 @@ definitions:
     x-enum-varnames:
     - SandboxStatusStarting
     - SandboxStatusRunning
+    - SandboxStatusPaused
+    - SandboxStatusStopping
     - SandboxStatusStopped
     - SandboxStatusExpired
     - SandboxStatusDeleted
@@ -1665,6 +1691,40 @@ paths:
       security:
       - BearerAuth: []
       summary: Create a snapshot image from a sandbox
+      tags:
+      - Sandboxes
+  /api/sandboxes/{id}/stream:
+    get:
+      description: SSE endpoint streaming real-time state updates for a single sandbox
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SandboxStreamEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Stream sandbox state
       tags:
       - Sandboxes
   /api/sandboxes/{id}/ttl:

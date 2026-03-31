@@ -61,7 +61,8 @@ type SandboxResponse struct {
 	Owner          *UserSummary         `json:"owner,omitempty"`
 	GuestSessionID *uuid.UUID           `json:"guestSessionId,omitempty" format:"uuid" example:"db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"`
 	DisplayName    string               `json:"displayName" example:"My Test Shop"`
-	Status         models.SandboxStatus `json:"status" enums:"starting,running,stopped,expired,deleted,failed" example:"running"`
+	Status         models.SandboxStatus `json:"status" enums:"starting,running,paused,stopping,stopped,expired,deleted,failed" example:"running"`
+	StateReason    *string              `json:"stateReason,omitempty" example:"Snapshot wird erstellt"`
 	ContainerID    string               `json:"containerId" example:"1a2b3c4d5e6f7g8h9i0j"`
 	ContainerName  string               `json:"containerName" example:"sandbox-0b443c82"`
 	URL            string               `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
@@ -73,6 +74,12 @@ type SandboxResponse struct {
 	CreatedAt      time.Time            `json:"createdAt" example:"2026-03-20T10:15:00Z"`
 	UpdatedAt      time.Time            `json:"updatedAt" example:"2026-03-20T10:20:00Z"`
 	DeletedAt      *time.Time           `json:"deletedAt,omitempty"`
+}
+
+type SandboxStreamEvent struct {
+	ID          string `json:"id" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
+	Status      string `json:"status" example:"starting"`
+	StateReason string `json:"stateReason,omitempty" example:"Container wird gestartet"`
 }
 
 type HealthResponse struct {

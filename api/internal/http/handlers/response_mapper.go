@@ -52,6 +52,7 @@ func toSandboxResponse(sandbox *models.Sandbox) dto.SandboxResponse {
 		GuestSessionID: sandbox.GuestSessionID,
 		DisplayName:    sandbox.DisplayName,
 		Status:         sandbox.Status,
+		StateReason:    sandbox.StateReason,
 		ContainerID:    sandbox.ContainerID,
 		ContainerName:  sandbox.ContainerName,
 		URL:            sandbox.URL,
