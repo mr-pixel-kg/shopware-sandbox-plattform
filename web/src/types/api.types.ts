@@ -62,7 +62,15 @@ export interface PendingImage {
   status: ImageStatus
 }
 
-export type SandboxStatus = 'starting' | 'running' | 'stopped' | 'expired' | 'deleted' | 'failed'
+export type SandboxStatus =
+  | 'starting'
+  | 'running'
+  | 'paused'
+  | 'stopping'
+  | 'stopped'
+  | 'expired'
+  | 'deleted'
+  | 'failed'
 
 export interface Sandbox extends BaseModel {
   id: string
@@ -71,6 +79,7 @@ export interface Sandbox extends BaseModel {
   guestSessionId?: string
   displayName: string
   status: SandboxStatus
+  stateReason?: string
   containerId: string
   containerName: string
   url: string
@@ -79,18 +88,6 @@ export interface Sandbox extends BaseModel {
   metadata?: MetadataItem[]
   expiresAt?: string
   lastSeenAt?: string
-}
-
-export interface SandboxHealthEvent {
-  sandboxId: string
-  status: string
-  ready: boolean
-  url: string
-  httpStatus?: number
-  latencyMs?: number
-  failureReason?: string
-  message?: string
-  checkedAt: string
 }
 
 export interface AuditLog {
