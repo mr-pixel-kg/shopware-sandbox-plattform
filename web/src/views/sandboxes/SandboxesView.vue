@@ -70,7 +70,7 @@ const {
   extendTTL,
   snapshotSandbox,
 } = useSandboxes()
-const { images, uploadThumbnail, trackPendingImage } = useImages()
+const { images, uploadThumbnail, trackPendingImage } = useImages('all')
 
 const adminStatusFilter = ref<string>('all')
 

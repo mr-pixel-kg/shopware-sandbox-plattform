@@ -127,7 +127,8 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		"image", image.FullName(),
 		"status", image.Status,
 	)...)
-	return c.JSON(201, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(201, toImageResponse(image))
 }
 
 // Update godoc
@@ -177,7 +178,8 @@ func (h *ImageHandler) Update(c echo.Context) error {
 		"has_thumbnail", image.ThumbnailURL != nil,
 	)...)
 	_ = h.audit.Log(&auth.UserID, "image.updated", c.RealIP(), map[string]any{"imageId": image.ID.String()})
-	return c.JSON(http.StatusOK, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(http.StatusOK, toImageResponse(image))
 }
 
 // UploadThumbnail godoc
@@ -235,7 +237,8 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 		"thumbnail_url", image.ThumbnailURL,
 	)...)
 	_ = h.audit.Log(&auth.UserID, "image.thumbnail_uploaded", c.RealIP(), map[string]any{"imageId": image.ID.String()})
-	return c.JSON(http.StatusOK, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(http.StatusOK, toImageResponse(image))
 }
 
 // DeleteThumbnail godoc
