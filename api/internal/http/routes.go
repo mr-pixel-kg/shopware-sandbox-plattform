@@ -86,6 +86,9 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	sandboxHealthService.StartMonitoringActive()
 
 	imageService.ReconcileOnStartup(context.Background())
+	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
+	terminalHandler := handlers.NewTerminalHandler(terminalService, authService, cfg.Server.AllowedOrigins)
+
 	authHandler := handlers.NewAuthHandler(authService, auditService)
 	imageHandler := handlers.NewImageHandler(imageService, auditService, resolver)
 	sandboxHandler := handlers.NewSandboxHandler(
@@ -114,6 +117,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	api.GET("/images/:id/progress", imageHandler.Progress)
 	api.GET("/registry/lookup", imageHandler.RegistryLookup)
 	api.GET("/sandboxes/:id/health", sandboxHandler.Health)
+	api.GET("/sandboxes/:id/terminal", terminalHandler.Connect)
 
 	private.GET("/images/pending", imageHandler.ListPending)
 	public.GET("/images", imageHandler.ListPublic)

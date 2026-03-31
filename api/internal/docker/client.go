@@ -49,6 +49,7 @@ type Client interface {
 	CommitContainer(ctx context.Context, containerID, targetImage string) error
 	ContainerExists(ctx context.Context, containerID string) bool
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
+	CreateExecSession(ctx context.Context, containerID string, opts ExecAttachOptions) (*ExecSession, error)
 }
 
 type DockerClient struct {

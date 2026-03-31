@@ -51,3 +51,8 @@ guard:
   max_total_sandboxes: 32
   max_sandboxes_per_ip: 5
   max_sandboxes_per_user: 10
+
+terminal:
+  max_sessions_per_sandbox: 2
+  idle_timeout_minutes: 15
+  max_duration_minutes: 120

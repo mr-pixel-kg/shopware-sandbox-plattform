@@ -1727,6 +1727,57 @@ paths:
       summary: Stream sandbox state
       tags:
       - Sandboxes
+  /api/sandboxes/{id}/terminal:
+    get:
+      description: Interactive shell (docker exec) into the sandbox container
+      parameters:
+      - description: Sandbox ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Bearer token
+        in: query
+        name: access_token
+        required: true
+        type: string
+      - default: 80
+        description: Initial terminal columns
+        in: query
+        name: cols
+        type: integer
+      - default: 24
+        description: Initial terminal rows
+        in: query
+        name: rows
+        type: integer
+      responses:
+        "101":
+          description: Switching Protocols – WebSocket connection established
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Sandbox not running or session limit reached
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Open interactive terminal session
+      tags:
+      - Sandboxes
   /api/sandboxes/{id}/ttl:
     patch:
       consumes:
