@@ -122,9 +122,9 @@ function handleSubmit() {
         <DialogDescription>Wähle eine Vorlage und konfiguriere die Laufzeit.</DialogDescription>
       </DialogHeader>
 
-      <div class="flex min-h-85 overflow-hidden border-t">
+      <div class="flex h-85 overflow-hidden border-t">
         <div class="w-55 shrink-0 border-r">
-          <ScrollArea class="h-85">
+          <ScrollArea class="h-full">
             <div class="p-2">
               <button
                 v-for="image in images"
