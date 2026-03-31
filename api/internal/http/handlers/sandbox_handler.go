@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -260,12 +259,6 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 	}
 
 	auth := mw.MustAuth(c)
-	var ttl *time.Duration
-	if input.TTLMinutes != nil {
-		duration := time.Duration(*input.TTLMinutes) * time.Minute
-		ttl = &duration
-	}
-
 	slog.Debug("private sandbox creation requested", logging.RequestFields(c,
 		"component", "sandbox",
 		"user_id", auth.UserID.String(),
@@ -276,7 +269,7 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 		ImageID:     imageID,
 		UserID:      &auth.UserID,
 		ClientIP:    c.RealIP(),
-		TTL:         ttl,
+		TTLMinutes:  input.TTLMinutes,
 		DisplayName: input.DisplayName,
 		Metadata:    input.Metadata,
 	})
@@ -367,8 +360,8 @@ func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
 	if err := c.Bind(&input); err != nil {
 		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
 	}
-	if input.TTLMinutes <= 0 {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "ttlMinutes must be greater than 0"))
+	if input.TTLMinutes != nil && *input.TTLMinutes < 0 {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "ttlMinutes must be 0 (unlimited) or greater"))
 	}
 
 	auth := mw.MustAuth(c)

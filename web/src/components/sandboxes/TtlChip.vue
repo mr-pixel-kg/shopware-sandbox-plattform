@@ -14,7 +14,7 @@ const { remainingFormatted, progressPercent, isExpired, isWarning } = useTtlCoun
 </script>
 
 <template>
-  <div v-if="expiresAt" class="flex min-w-[140px] items-center gap-2">
+  <div v-if="expiresAt" class="flex min-w-35 items-center gap-2">
     <div class="flex flex-1 flex-col gap-1">
       <span
         class="font-mono text-xs"
@@ -28,5 +28,8 @@ const { remainingFormatted, progressPercent, isExpired, isWarning } = useTtlCoun
       </span>
       <Progress :model-value="isExpired ? 0 : progressPercent" class="h-1" />
     </div>
+  </div>
+  <div v-else class="flex min-w-35 items-center gap-2">
+    <span class="text-muted-foreground font-mono text-xs">Unbegrenzt</span>
   </div>
 </template>

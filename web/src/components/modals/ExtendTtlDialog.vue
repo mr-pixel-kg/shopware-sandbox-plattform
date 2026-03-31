@@ -34,6 +34,8 @@ const options = [
   { value: '60', label: '+1 Std' },
   { value: '120', label: '+2 Std' },
   { value: '240', label: '+4 Std' },
+  { value: '1440', label: '+24 Std' },
+  { value: 'unlimited', label: 'Unbegrenzt' },
 ]
 
 function handleSubmit() {
@@ -41,7 +43,10 @@ function handleSubmit() {
   submitting.value = true
   emit(
     'submit',
-    { sandboxId: props.sandboxId, ttlMinutes: Number(ttlMinutes.value) },
+    {
+      sandboxId: props.sandboxId,
+      ttlMinutes: ttlMinutes.value === 'unlimited' ? 0 : Number(ttlMinutes.value),
+    },
     (success: boolean) => {
       submitting.value = false
       if (success) {
@@ -62,13 +67,15 @@ function handleSubmit() {
           >.
         </DialogDescription>
       </DialogHeader>
-      <div class="space-y-2 py-4">
+      <div class="grid gap-2 overflow-hidden py-4">
         <Label>Laufzeit</Label>
-        <ToggleGroup v-model="ttlMinutes" type="single" variant="outline" class="justify-start">
-          <ToggleGroupItem v-for="opt in options" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <div class="overflow-x-auto">
+          <ToggleGroup v-model="ttlMinutes" type="single" variant="outline" class="w-max">
+            <ToggleGroupItem v-for="opt in options" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" :disabled="submitting" @click="emit('update:open', false)"

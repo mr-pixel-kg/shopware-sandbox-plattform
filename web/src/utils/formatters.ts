@@ -35,6 +35,7 @@ export function formatTtlRemaining(expiresAt: string): string {
 }
 
 export function ttlMinutesToLabel(minutes: number): string {
+  if (minutes === 0) return 'Unbegrenzt'
   if (minutes < 60) return `${minutes} Minuten`
   const hours = minutes / 60
   return `${hours} Stunde${hours > 1 ? 'n' : ''}`

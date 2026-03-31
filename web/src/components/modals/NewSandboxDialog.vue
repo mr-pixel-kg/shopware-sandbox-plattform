@@ -50,6 +50,8 @@ const ttlOptions = [
   { value: '120', label: '2 Std' },
   { value: '240', label: '4 Std' },
   { value: '480', label: '8 Std' },
+  { value: '1440', label: '24 Std' },
+  { value: 'unlimited', label: 'Unbegrenzt' },
 ]
 
 const selectedImage = computed(() => props.images.find((i) => i.id === selectedImageId.value))
@@ -61,6 +63,16 @@ const readOnlyItems = computed(() =>
   imageMeta.value.filter((m) => m.type === 'setting' || m.type === 'info'),
 )
 
+function populateMetadataDefaults() {
+  const defaults: Record<string, string> = {}
+  for (const item of imageMeta.value) {
+    if (item.type === 'field' || item.type === 'setting') {
+      defaults[item.key] = item.value ?? ''
+    }
+  }
+  metadataValues.value = defaults
+}
+
 watch(
   () => props.open,
   (open) => {
@@ -69,20 +81,12 @@ watch(
       displayName.value = ''
       ttlMinutes.value = '120'
       submitting.value = false
-      metadataValues.value = {}
+      populateMetadataDefaults()
     }
   },
 )
 
-watch(selectedImageId, () => {
-  const defaults: Record<string, string> = {}
-  for (const item of imageMeta.value) {
-    if (item.type === 'field' || item.type === 'setting') {
-      defaults[item.key] = item.value ?? ''
-    }
-  }
-  metadataValues.value = defaults
-})
+watch(selectedImageId, populateMetadataDefaults)
 
 function handleSubmit() {
   if (!selectedImageId.value) return
@@ -96,7 +100,7 @@ function handleSubmit() {
     'submit',
     {
       imageId: selectedImageId.value,
-      ttlMinutes: Number(ttlMinutes.value),
+      ttlMinutes: ttlMinutes.value === 'unlimited' ? 0 : Number(ttlMinutes.value),
       displayName: trimmedName || undefined,
       metadata,
     },
@@ -112,15 +116,15 @@ function handleSubmit() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="gap-0 p-0 sm:max-w-[680px]">
+    <DialogContent class="gap-0 p-0 sm:max-w-170">
       <DialogHeader class="p-6 pb-4">
         <DialogTitle>Neue Sandbox</DialogTitle>
         <DialogDescription>Wähle eine Vorlage und konfiguriere die Laufzeit.</DialogDescription>
       </DialogHeader>
 
-      <div class="flex min-h-[340px] border-t">
-        <div class="w-[220px] border-r">
-          <ScrollArea class="h-[340px]">
+      <div class="flex min-h-85 overflow-hidden border-t">
+        <div class="w-55 shrink-0 border-r">
+          <ScrollArea class="h-85">
             <div class="p-2">
               <button
                 v-for="image in images"
@@ -163,19 +167,21 @@ function handleSubmit() {
               />
             </div>
 
-            <div>
-              <Label class="mb-2 block">Laufzeit</Label>
-              <ToggleGroup
-                v-model="ttlMinutes"
-                type="single"
-                variant="outline"
-                class="justify-start"
-                :disabled="submitting"
-              >
-                <ToggleGroupItem v-for="opt in ttlOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </ToggleGroupItem>
-              </ToggleGroup>
+            <div class="grid gap-2 overflow-hidden">
+              <Label>Laufzeit</Label>
+              <div class="overflow-x-auto">
+                <ToggleGroup
+                  v-model="ttlMinutes"
+                  type="single"
+                  variant="outline"
+                  class="w-max"
+                  :disabled="submitting"
+                >
+                  <ToggleGroupItem v-for="opt in ttlOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
             </div>
 
             <div v-if="editableFields.length > 0" class="space-y-3">

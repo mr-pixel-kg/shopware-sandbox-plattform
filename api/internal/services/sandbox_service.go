@@ -73,7 +73,7 @@ type CreateSandboxInput struct {
 	UserID         *uuid.UUID
 	GuestSessionID *uuid.UUID
 	ClientIP       string
-	TTL            *time.Duration
+	TTLMinutes     *int
 	DisplayName    *string
 	Metadata       map[string]string
 }
@@ -154,17 +154,22 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 
 	sandboxID := uuid.New()
 	containerName := fmt.Sprintf("%s%s", s.cfg.URLPrefix, sandboxID.String())
-	ttl := s.cfg.DefaultTTL
-	if input.TTL != nil {
-		ttl = *input.TTL
-	}
-	// Clamp requested lifetimes to the configured maximum to keep cleanup
-	// predictable even for authenticated users.
-	if ttl > s.cfg.MaxTTL {
-		ttl = s.cfg.MaxTTL
-	}
 
-	expiresAt := time.Now().UTC().Add(ttl)
+	var expiresAt *time.Time
+	var ttl time.Duration
+	if input.TTLMinutes != nil && *input.TTLMinutes == 0 {
+		ttl = 0
+	} else {
+		ttl = s.cfg.DefaultTTL
+		if input.TTLMinutes != nil {
+			ttl = time.Duration(*input.TTLMinutes) * time.Minute
+		}
+		if ttl > s.cfg.MaxTTL {
+			ttl = s.cfg.MaxTTL
+		}
+		t := time.Now().UTC().Add(ttl)
+		expiresAt = &t
+	}
 
 	// builds registry Configuration: env vars, labels, lifecycle hooks etc.
 	var hostname string
@@ -179,9 +184,13 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		hostname = fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	}
 
+	expiresAtStr := ""
+	if expiresAt != nil {
+		expiresAtStr = expiresAt.Format(time.RFC3339)
+	}
 	tmplCtx := s.buildTemplateContext(
 		image.FullName(), containerName, hostname,
-		sandboxID.String(), ttl.String(), expiresAt.Format(time.RFC3339),
+		sandboxID.String(), ttl.String(), expiresAtStr,
 		input.ClientIP, strconv.Itoa(hostPort), input.Metadata,
 	)
 
@@ -241,7 +250,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		Port:           container.Port,
 		ClientIP:       input.ClientIP,
 		Metadata:       datatypes.JSON(fieldsJSON),
-		ExpiresAt:      &expiresAt,
+		ExpiresAt:      expiresAt,
 	}
 
 	if err := s.repo.Create(sandbox); err != nil {
@@ -266,7 +275,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	return sandbox, nil
 }
 
-func (s *SandboxService) ExtendTTL(id uuid.UUID, additionalMinutes int, clientIP string, userID *uuid.UUID) (*models.Sandbox, error) {
+func (s *SandboxService) ExtendTTL(id uuid.UUID, ttlMinutes *int, clientIP string, userID *uuid.UUID) (*models.Sandbox, error) {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, ErrSandboxNotFound
@@ -276,31 +285,34 @@ func (s *SandboxService) ExtendTTL(id uuid.UUID, additionalMinutes int, clientIP
 		return nil, ErrSandboxNotFound
 	}
 
-	if sandbox.ExpiresAt == nil {
-		return nil, ErrSandboxNotFound
+	switch {
+	case ttlMinutes == nil:
+		return sandbox, nil
+	case *ttlMinutes == 0:
+		sandbox.ExpiresAt = nil
+	default:
+		if sandbox.ExpiresAt == nil {
+			return sandbox, nil
+		}
+		newExpiry := sandbox.ExpiresAt.Add(time.Duration(*ttlMinutes) * time.Minute)
+		if maxExpiry := time.Now().UTC().Add(s.cfg.MaxTTL); newExpiry.After(maxExpiry) {
+			newExpiry = maxExpiry
+		}
+		sandbox.ExpiresAt = &newExpiry
 	}
 
-	additional := time.Duration(additionalMinutes) * time.Minute
-	newExpiry := sandbox.ExpiresAt.Add(additional)
-
-	maxExpiry := time.Now().UTC().Add(s.cfg.MaxTTL)
-	if newExpiry.After(maxExpiry) {
-		newExpiry = maxExpiry
-	}
-
-	sandbox.ExpiresAt = &newExpiry
 	if err := s.repo.Update(sandbox); err != nil {
 		return nil, err
 	}
 
-	_ = s.addEvent(sandbox.ID, "extended", map[string]any{
-		"additionalMinutes": additionalMinutes,
-		"newExpiresAt":      newExpiry.Format(time.RFC3339),
-	})
-
+	eventMeta := map[string]any{"ttlMinutes": ttlMinutes}
+	if sandbox.ExpiresAt != nil {
+		eventMeta["newExpiresAt"] = sandbox.ExpiresAt.Format(time.RFC3339)
+	}
+	_ = s.addEvent(sandbox.ID, "extended", eventMeta)
 	_ = s.audit.Log(userID, "sandbox.extended", clientIP, map[string]any{
-		"sandboxId":         sandbox.ID.String(),
-		"additionalMinutes": additionalMinutes,
+		"sandboxId":  sandbox.ID.String(),
+		"ttlMinutes": ttlMinutes,
 	})
 
 	return sandbox, nil

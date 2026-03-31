@@ -12,7 +12,7 @@ type UpdateSandboxRequest struct {
 }
 
 type ExtendTTLRequest struct {
-	TTLMinutes int `json:"ttlMinutes" example:"60"`
+	TTLMinutes *int `json:"ttlMinutes" example:"60"`
 }
 
 type CreateSnapshotRequest struct {
