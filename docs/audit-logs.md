@@ -276,6 +276,51 @@ Frontend-Typen und Anzeige:
 - [web/src/composables/useAuditLogs.ts](/Users/manuel.kienlein/GolandProjects/shopware-testenv-platform/web/src/composables/useAuditLogs.ts)
 - [web/src/views/admin/AdminAuditView.vue](/Users/manuel.kienlein/GolandProjects/shopware-testenv-platform/web/src/views/admin/AdminAuditView.vue)
 
+## Audit-Log-API
+
+Aktueller Endpoint:
+
+- `GET /api/audit-logs`
+
+Die Response bleibt bewusst ein einfaches Array von Audit-Log-Eintraegen, damit bestehende Clients nicht brechen.
+
+### Query-Parameter
+
+- `limit`
+  Standard `50`, maximal `500`
+- `offset`
+  Standard `0`
+- `userId`
+  Filter auf einen konkreten Benutzer
+- `action`
+  Filter auf eine konkrete Action
+- `resourceType`
+  Filter auf einen konkreten Ressourcentyp
+- `resourceId`
+  Filter auf eine konkrete Ressource
+- `clientToken`
+  Filter auf einen konkreten Client-Token
+- `from`
+  RFC3339-Zeitstempel, inklusiver Startzeitpunkt
+- `to`
+  RFC3339-Zeitstempel, inklusiver Endzeitpunkt
+
+Beispiel:
+
+```text
+/api/audit-logs?resourceType=sandbox&action=sandbox.deleted&from=2026-04-01T00:00:00Z&limit=100
+```
+
+### Validierung
+
+Die API liefert `400 VALIDATION_ERROR`, wenn:
+
+- `limit` ausserhalb des erlaubten Bereichs liegt
+- `offset` negativ ist
+- `userId`, `resourceId` oder `clientToken` keine UUID ist
+- `from` oder `to` kein gueltiger RFC3339-Zeitstempel ist
+- `from` spaeter als `to` ist
+
 ## Offene Punkte
 
 ### Client Token

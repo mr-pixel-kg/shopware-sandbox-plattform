@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,18 @@ type AuditLogInput struct {
 	ResourceType *auditcontracts.ResourceType
 	ResourceID   *uuid.UUID
 	Details      map[string]any
+}
+
+type AuditLogListInput struct {
+	Limit        int
+	Offset       int
+	UserID       *uuid.UUID
+	Action       *string
+	ResourceType *string
+	ResourceID   *uuid.UUID
+	ClientToken  *uuid.UUID
+	From         *time.Time
+	To           *time.Time
 }
 
 func NewAuditService(repo *repositories.AuditLogRepository) *AuditService {
@@ -65,6 +78,42 @@ func (s *AuditService) Log(input AuditLogInput) error {
 	})
 }
 
-func (s *AuditService) List(limit int) ([]models.AuditLog, error) {
-	return s.repo.List(limit)
+func (s *AuditService) List(input AuditLogListInput) ([]models.AuditLog, error) {
+	if input.Limit <= 0 {
+		input.Limit = 50
+	}
+	if input.Limit > 500 {
+		input.Limit = 500
+	}
+	if input.Offset < 0 {
+		input.Offset = 0
+	}
+	if input.Action != nil {
+		value := strings.TrimSpace(*input.Action)
+		if value == "" {
+			input.Action = nil
+		} else {
+			input.Action = &value
+		}
+	}
+	if input.ResourceType != nil {
+		value := strings.TrimSpace(*input.ResourceType)
+		if value == "" {
+			input.ResourceType = nil
+		} else {
+			input.ResourceType = &value
+		}
+	}
+
+	return s.repo.List(repositories.AuditLogListOptions{
+		Limit:        input.Limit,
+		Offset:       input.Offset,
+		UserID:       input.UserID,
+		Action:       input.Action,
+		ResourceType: input.ResourceType,
+		ResourceID:   input.ResourceID,
+		ClientToken:  input.ClientToken,
+		From:         input.From,
+		To:           input.To,
+	})
 }

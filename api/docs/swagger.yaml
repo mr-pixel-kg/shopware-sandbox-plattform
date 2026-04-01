@@ -901,6 +901,47 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - description: Offset for pagination
+        example: 0
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      - description: Filter by user ID
+        format: uuid
+        in: query
+        name: userId
+        type: string
+      - description: Filter by action
+        example: '"sandbox.created"'
+        in: query
+        name: action
+        type: string
+      - description: Filter by resource type
+        example: '"sandbox"'
+        in: query
+        name: resourceType
+        type: string
+      - description: Filter by resource ID
+        format: uuid
+        in: query
+        name: resourceId
+        type: string
+      - description: Filter by client token
+        format: uuid
+        in: query
+        name: clientToken
+        type: string
+      - description: Filter from timestamp (inclusive)
+        format: date-time
+        in: query
+        name: from
+        type: string
+      - description: Filter to timestamp (inclusive)
+        format: date-time
+        in: query
+        name: to
+        type: string
       produces:
       - application/json
       responses:
@@ -910,6 +951,10 @@ paths:
             items:
               $ref: '#/definitions/dto.AuditLogResponse'
             type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
