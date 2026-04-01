@@ -41,6 +41,34 @@ type AuditLogResponse struct {
 	Timestamp    time.Time      `json:"timestamp" example:"2026-03-20T10:15:00Z"`
 }
 
+type PaginationMeta struct {
+	Limit   int   `json:"limit" example:"50"`
+	Offset  int   `json:"offset" example:"0"`
+	Count   int   `json:"count" example:"50"`
+	Total   int64 `json:"total" example:"137"`
+	HasMore bool  `json:"hasMore" example:"true"`
+}
+
+type AuditLogListFilters struct {
+	UserID       *uuid.UUID `json:"userId,omitempty" format:"uuid"`
+	Action       *string    `json:"action,omitempty" example:"sandbox.created"`
+	ResourceType *string    `json:"resourceType,omitempty" example:"sandbox"`
+	ResourceID   *uuid.UUID `json:"resourceId,omitempty" format:"uuid"`
+	ClientToken  *uuid.UUID `json:"clientToken,omitempty" format:"uuid"`
+	From         *time.Time `json:"from,omitempty" example:"2026-04-01T00:00:00Z"`
+	To           *time.Time `json:"to,omitempty" example:"2026-04-02T00:00:00Z"`
+}
+
+type AuditLogListMeta struct {
+	Pagination PaginationMeta      `json:"pagination"`
+	Filters    AuditLogListFilters `json:"filters"`
+}
+
+type AuditLogListResponse struct {
+	Data []AuditLogResponse `json:"data"`
+	Meta AuditLogListMeta   `json:"meta"`
+}
+
 type ImageResponse struct {
 	ID           uuid.UUID      `json:"id" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
 	Name         string         `json:"name" example:"dockware/dev"`

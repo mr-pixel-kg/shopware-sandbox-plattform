@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-import type { AuditLog } from '@/types'
+import type { AuditLogListResponse } from '@/types'
 
 export interface AuditLogListParams {
   limit?: number
@@ -15,10 +15,10 @@ export interface AuditLogListParams {
 }
 
 export const auditApi = {
-  async list(params?: number | AuditLogListParams): Promise<AuditLog[]> {
+  async list(params?: number | AuditLogListParams): Promise<AuditLogListResponse> {
     const query = typeof params === 'number' ? { limit: params } : params
 
-    const { data } = await apiClient.get<AuditLog[]>('/api/audit-logs', {
+    const { data } = await apiClient.get<AuditLogListResponse>('/api/audit-logs', {
       params: query,
     })
     return data

@@ -118,6 +118,34 @@ export interface AuditLog {
   timestamp: string
 }
 
+export interface PaginationMeta {
+  limit: number
+  offset: number
+  count: number
+  total: number
+  hasMore: boolean
+}
+
+export interface AuditLogListFilters {
+  userId?: string | null
+  action?: string | null
+  resourceType?: string | null
+  resourceId?: string | null
+  clientToken?: string | null
+  from?: string | null
+  to?: string | null
+}
+
+export interface AuditLogListMeta {
+  pagination: PaginationMeta
+  filters: AuditLogListFilters
+}
+
+export interface AuditLogListResponse {
+  data: AuditLog[]
+  meta: AuditLogListMeta
+}
+
 export interface LoginRequest {
   email: string
   password: string

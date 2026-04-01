@@ -94,6 +94,35 @@ type AuditActor struct {
 }
 ```
 
+## API-Response fuer Listen
+
+Der Endpoint `GET /api/audit-logs` liefert eine Listen-Response mit `data` und `meta`.
+
+`meta` ist absichtlich in zwei Teile getrennt:
+
+- `meta.pagination`
+- `meta.filters`
+
+`pagination` enthaelt die generischen Paging-Daten:
+
+- `limit`
+- `offset`
+- `count`
+- `total`
+- `hasMore`
+
+`filters` enthaelt die auf Audit Logs bezogenen Filter:
+
+- `userId`
+- `action`
+- `resourceType`
+- `resourceId`
+- `clientToken`
+- `from`
+- `to`
+
+Dieses Muster ist bewusst so aufgebaut, dass spaetere Listen-Endpunkte die Pagination-Struktur wiederverwenden koennen, ohne dass fachliche Filter in einer generischen Meta-Struktur vermischt werden.
+
 ## Herkunft des Actor-Kontexts
 
 HTTP-Handler bauen den Audit-Kontext ueber [api/internal/http/handlers/audit_helpers.go](/Users/manuel.kienlein/GolandProjects/shopware-testenv-platform/api/internal/http/handlers/audit_helpers.go).
@@ -284,7 +313,28 @@ Aktueller Endpoint:
 
 - `GET /api/audit-logs`
 
-Die Response bleibt bewusst ein einfaches Array von Audit-Log-Eintraegen, damit bestehende Clients nicht brechen.
+Die Response ist jetzt im `data`/`meta`-Format aufgebaut:
+
+```json
+{
+  "data": [
+    {
+      "id": "…",
+      "action": "sandbox.deleted",
+      "resourceType": "sandbox",
+      "resourceId": "…",
+      "timestamp": "2026-04-01T12:00:00Z"
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "offset": 0,
+    "count": 50,
+    "total": 137,
+    "hasMore": true
+  }
+}
+```
 
 ### Query-Parameter
 
@@ -306,6 +356,29 @@ Die Response bleibt bewusst ein einfaches Array von Audit-Log-Eintraegen, damit 
   RFC3339-Zeitstempel, inklusiver Startzeitpunkt
 - `to`
   RFC3339-Zeitstempel, inklusiver Endzeitpunkt
+
+### Meta-Felder
+
+- `limit`
+  effektiv verwendetes Limit
+- `offset`
+  effektiv verwendeter Offset
+- `count`
+  Anzahl der zurueckgegebenen Eintraege in `data`
+- `total`
+  Gesamtzahl der passenden Eintraege vor Pagination
+- `hasMore`
+  ob hinter dem aktuellen Fenster noch weitere Eintraege existieren
+
+Zusätzlich werden aktive Filter in `meta` zurueckgegeben:
+
+- `userId`
+- `action`
+- `resourceType`
+- `resourceId`
+- `clientToken`
+- `from`
+- `to`
 
 Beispiel:
 

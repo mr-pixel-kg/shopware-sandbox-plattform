@@ -32,12 +32,31 @@ func (r *AuditLogRepository) Create(entry *models.AuditLog) error {
 	return r.db.Create(entry).Error
 }
 
-func (r *AuditLogRepository) List(options AuditLogListOptions) ([]models.AuditLog, error) {
-	var logs []models.AuditLog
+func (r *AuditLogRepository) List(options AuditLogListOptions) ([]models.AuditLog, int64, error) {
+	var (
+		logs  []models.AuditLog
+		total int64
+	)
+
 	query := r.db.Preload("User", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "email")
 	})
 
+	query = applyAuditLogFilters(query, options)
+
+	if err := query.Model(&models.AuditLog{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Order("timestamp desc").
+		Limit(options.Limit).
+		Offset(options.Offset).
+		Find(&logs).Error
+	return logs, total, err
+}
+
+func applyAuditLogFilters(query *gorm.DB, options AuditLogListOptions) *gorm.DB {
 	if options.UserID != nil {
 		query = query.Where("user_id = ?", *options.UserID)
 	}
@@ -60,10 +79,5 @@ func (r *AuditLogRepository) List(options AuditLogListOptions) ([]models.AuditLo
 		query = query.Where("timestamp <= ?", *options.To)
 	}
 
-	err := query.
-		Order("timestamp desc").
-		Limit(options.Limit).
-		Offset(options.Offset).
-		Find(&logs).Error
-	return logs, err
+	return query
 }

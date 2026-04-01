@@ -40,7 +40,7 @@ func NewAuditHandler(audit *services.AuditService) *AuditHandler {
 // @Param        clientToken query string false "Filter by client token" format(uuid)
 // @Param        from query string false "Filter from timestamp (inclusive)" format(date-time)
 // @Param        to query string false "Filter to timestamp (inclusive)" format(date-time)
-// @Success      200 {array} dto.AuditLogResponse
+// @Success      200 {object} dto.AuditLogListResponse
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
@@ -52,14 +52,14 @@ func (h *AuditHandler) List(c echo.Context) error {
 	}
 
 	auth := middleware.MustAuth(c)
-	logs, err := h.audit.List(filters)
+	result, err := h.audit.List(filters)
 	if err != nil {
 		return responses.Error(c, http.StatusInternalServerError, "AUDIT_LOG_LIST_FAILED", "Could not load audit logs")
 	}
-	slog.Debug("audit logs listed", logging.RequestFields(c, "component", "audit", "user_id", auth.UserID.String(), "limit", filters.Limit, "offset", filters.Offset, "count", len(logs))...)
+	slog.Debug("audit logs listed", logging.RequestFields(c, "component", "audit", "user_id", auth.UserID.String(), "limit", filters.Limit, "offset", filters.Offset, "count", len(result.Logs), "total", result.Total)...)
 
-	response := make([]dto.AuditLogResponse, 0, len(logs))
-	for _, logEntry := range logs {
+	response := make([]dto.AuditLogResponse, 0, len(result.Logs))
+	for _, logEntry := range result.Logs {
 		response = append(response, dto.AuditLogResponse{
 			ID:           logEntry.ID,
 			User:         toUserSummary(logEntry.User),
@@ -74,7 +74,27 @@ func (h *AuditHandler) List(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, dto.AuditLogListResponse{
+		Data: response,
+		Meta: dto.AuditLogListMeta{
+			Pagination: dto.PaginationMeta{
+				Limit:   result.Limit,
+				Offset:  result.Offset,
+				Count:   len(response),
+				Total:   result.Total,
+				HasMore: int64(result.Offset+len(response)) < result.Total,
+			},
+			Filters: dto.AuditLogListFilters{
+				UserID:       filters.UserID,
+				Action:       filters.Action,
+				ResourceType: filters.ResourceType,
+				ResourceID:   filters.ResourceID,
+				ClientToken:  filters.ClientToken,
+				From:         filters.From,
+				To:           filters.To,
+			},
+		},
+	})
 }
 
 func parseAuditLogListInput(c echo.Context) (services.AuditLogListInput, error) {

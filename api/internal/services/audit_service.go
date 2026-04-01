@@ -43,6 +43,13 @@ type AuditLogListInput struct {
 	To           *time.Time
 }
 
+type AuditLogListResult struct {
+	Logs   []models.AuditLog
+	Total  int64
+	Limit  int
+	Offset int
+}
+
 func NewAuditService(repo *repositories.AuditLogRepository) *AuditService {
 	return &AuditService{repo: repo}
 }
@@ -78,7 +85,7 @@ func (s *AuditService) Log(input AuditLogInput) error {
 	})
 }
 
-func (s *AuditService) List(input AuditLogListInput) ([]models.AuditLog, error) {
+func (s *AuditService) List(input AuditLogListInput) (*AuditLogListResult, error) {
 	if input.Limit <= 0 {
 		input.Limit = 50
 	}
@@ -105,7 +112,7 @@ func (s *AuditService) List(input AuditLogListInput) ([]models.AuditLog, error) 
 		}
 	}
 
-	return s.repo.List(repositories.AuditLogListOptions{
+	logs, total, err := s.repo.List(repositories.AuditLogListOptions{
 		Limit:        input.Limit,
 		Offset:       input.Offset,
 		UserID:       input.UserID,
@@ -116,4 +123,14 @@ func (s *AuditService) List(input AuditLogListInput) ([]models.AuditLog, error) 
 		From:         input.From,
 		To:           input.To,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuditLogListResult{
+		Logs:   logs,
+		Total:  total,
+		Limit:  input.Limit,
+		Offset: input.Offset,
+	}, nil
 }

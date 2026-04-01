@@ -15,6 +15,46 @@ definitions:
     - email
     - role
     type: object
+  dto.AuditLogListFilters:
+    properties:
+      action:
+        example: sandbox.created
+        type: string
+      clientToken:
+        format: uuid
+        type: string
+      from:
+        example: "2026-04-01T00:00:00Z"
+        type: string
+      resourceId:
+        format: uuid
+        type: string
+      resourceType:
+        example: sandbox
+        type: string
+      to:
+        example: "2026-04-02T00:00:00Z"
+        type: string
+      userId:
+        format: uuid
+        type: string
+    type: object
+  dto.AuditLogListMeta:
+    properties:
+      filters:
+        $ref: '#/definitions/dto.AuditLogListFilters'
+      pagination:
+        $ref: '#/definitions/dto.PaginationMeta'
+    type: object
+  dto.AuditLogListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AuditLogResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/dto.AuditLogListMeta'
+    type: object
   dto.AuditLogResponse:
     properties:
       action:
@@ -241,6 +281,24 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.PaginationMeta:
+    properties:
+      count:
+        example: 50
+        type: integer
+      hasMore:
+        example: true
+        type: boolean
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 137
+        type: integer
     type: object
   dto.PendingImageResponse:
     properties:
@@ -948,9 +1006,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.AuditLogResponse'
-            type: array
+            $ref: '#/definitions/dto.AuditLogListResponse'
         "400":
           description: Bad Request
           schema:

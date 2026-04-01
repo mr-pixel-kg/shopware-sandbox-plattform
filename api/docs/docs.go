@@ -518,10 +518,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.AuditLogResponse"
-                            }
+                            "$ref": "#/definitions/dto.AuditLogListResponse"
                         }
                     },
                     "400": {
@@ -2022,6 +2019,64 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AuditLogListFilters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "sandbox.created"
+                },
+                "clientToken": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "from": {
+                    "type": "string",
+                    "example": "2026-04-01T00:00:00Z"
+                },
+                "resourceId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "resourceType": {
+                    "type": "string",
+                    "example": "sandbox"
+                },
+                "to": {
+                    "type": "string",
+                    "example": "2026-04-02T00:00:00Z"
+                },
+                "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
+        "dto.AuditLogListMeta": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "$ref": "#/definitions/dto.AuditLogListFilters"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dto.PaginationMeta"
+                }
+            }
+        },
+        "dto.AuditLogListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AuditLogResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dto.AuditLogListMeta"
+                }
+            }
+        },
         "dto.AuditLogResponse": {
             "type": "object",
             "properties": {
@@ -2337,6 +2392,31 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "example": "Sup3rS3cret!"
+                }
+            }
+        },
+        "dto.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "hasMore": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 137
                 }
             }
         },

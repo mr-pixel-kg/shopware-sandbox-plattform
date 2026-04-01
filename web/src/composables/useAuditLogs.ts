@@ -2,10 +2,11 @@ import { computed, onMounted, ref } from 'vue'
 
 import { auditApi } from '@/api'
 
-import type { AuditLog } from '@/types'
+import type { AuditLog, AuditLogListMeta } from '@/types'
 
 export function useAuditLogs() {
   const allLogs = ref<AuditLog[]>([])
+  const meta = ref<AuditLogListMeta | null>(null)
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref<string | null>(null)
@@ -62,7 +63,9 @@ export function useAuditLogs() {
     if (!initialized.value) loading.value = true
     error.value = null
     try {
-      allLogs.value = await auditApi.list(500)
+      const response = await auditApi.list(500)
+      allLogs.value = response.data
+      meta.value = response.meta
       initialized.value = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
@@ -111,6 +114,7 @@ export function useAuditLogs() {
   return {
     logs: paginatedLogs,
     allLogs: filteredLogs,
+    meta,
     loading,
     error,
     page,
