@@ -12,11 +12,29 @@ type SandboxStatus string
 const (
 	SandboxStatusStarting SandboxStatus = "starting"
 	SandboxStatusRunning  SandboxStatus = "running"
+	SandboxStatusPaused   SandboxStatus = "paused"
+	SandboxStatusStopping SandboxStatus = "stopping"
 	SandboxStatusStopped  SandboxStatus = "stopped"
 	SandboxStatusExpired  SandboxStatus = "expired"
 	SandboxStatusDeleted  SandboxStatus = "deleted"
 	SandboxStatusFailed   SandboxStatus = "failed"
 )
+
+const (
+	HealthStatusProbing  = "probing"
+	HealthStatusReady    = "ready"
+	HealthStatusOffline  = "offline"
+	HealthStatusNotFound = "not_found"
+)
+
+func (s SandboxStatus) IsTransitional() bool {
+	return s == SandboxStatusStarting || s == SandboxStatusStopping || s == SandboxStatusPaused
+}
+
+func (s SandboxStatus) IsActive() bool {
+	return s == SandboxStatusStarting || s == SandboxStatusRunning ||
+		s == SandboxStatusPaused || s == SandboxStatusStopping
+}
 
 type Sandbox struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
@@ -25,7 +43,8 @@ type Sandbox struct {
 	Owner          *User          `gorm:"foreignKey:OwnerID;references:ID" json:"-" swaggerignore:"true"`
 	GuestSessionID *uuid.UUID     `gorm:"type:uuid;index" json:"guestSessionId,omitempty" format:"uuid" example:"db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"`
 	DisplayName    string         `gorm:"size:255;default:''" json:"displayName" example:"My Test Shop"`
-	Status         SandboxStatus  `gorm:"size:32;not null;index" json:"status" enums:"starting,running,stopped,expired,deleted,failed" example:"running"`
+	Status         SandboxStatus  `gorm:"size:32;not null;index" json:"status" enums:"starting,running,paused,stopping,stopped,expired,deleted,failed" example:"running"`
+	StateReason    *string        `gorm:"size:512" json:"stateReason,omitempty" example:"Snapshot wird erstellt"`
 	ContainerID    string         `gorm:"size:255;not null;uniqueIndex" json:"containerId" example:"1a2b3c4d5e6f7g8h9i0j"`
 	ContainerName  string         `gorm:"size:255;not null;uniqueIndex" json:"containerName" example:"sandbox-0b443c82"`
 	URL            string         `gorm:"size:1024;not null;uniqueIndex" json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`

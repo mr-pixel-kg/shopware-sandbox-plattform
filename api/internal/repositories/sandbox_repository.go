@@ -8,6 +8,13 @@ import (
 	"gorm.io/gorm"
 )
 
+var activeStatuses = []models.SandboxStatus{
+	models.SandboxStatusStarting,
+	models.SandboxStatusRunning,
+	models.SandboxStatusPaused,
+	models.SandboxStatusStopping,
+}
+
 type SandboxRepository struct {
 	db *gorm.DB
 }
@@ -20,6 +27,10 @@ func (r *SandboxRepository) withOwner(db *gorm.DB) *gorm.DB {
 	return db.Preload("Owner", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "email")
 	})
+}
+
+func (r *SandboxRepository) whereActive(db *gorm.DB) *gorm.DB {
+	return db.Where("status IN ?", activeStatuses)
 }
 
 func (r *SandboxRepository) Create(sandbox *models.Sandbox) error {
@@ -47,41 +58,13 @@ func (r *SandboxRepository) FindByContainerID(containerID string) (*models.Sandb
 }
 
 func (r *SandboxRepository) ListAllActive() ([]models.Sandbox, error) {
-	var sandboxes []models.Sandbox
-	err := r.withOwner(r.db).
-		Where("status IN ?", []models.SandboxStatus{
-			models.SandboxStatusStarting,
-			models.SandboxStatusRunning,
-		}).
-		Order("created_at desc").
-		Find(&sandboxes).Error
-	return sandboxes, err
-}
-
-func (r *SandboxRepository) ListActiveByUser(userID uuid.UUID) ([]models.Sandbox, error) {
-	var sandboxes []models.Sandbox
-	err := r.withOwner(r.db).
-		Where("owner_id = ?", userID).
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
-		Order("created_at desc").
-		Find(&sandboxes).Error
-	return sandboxes, err
+	return r.ListByStatuses(activeStatuses)
 }
 
 func (r *SandboxRepository) ListAllByUser(userID uuid.UUID) ([]models.Sandbox, error) {
 	var sandboxes []models.Sandbox
 	err := r.withOwner(r.db).
 		Where("owner_id = ?", userID).
-		Order("created_at desc").
-		Find(&sandboxes).Error
-	return sandboxes, err
-}
-
-func (r *SandboxRepository) ListActiveByGuestSession(sessionID uuid.UUID) ([]models.Sandbox, error) {
-	var sandboxes []models.Sandbox
-	err := r.withOwner(r.db).
-		Where("guest_session_id = ?", sessionID).
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
 		Order("created_at desc").
 		Find(&sandboxes).Error
 	return sandboxes, err
@@ -98,27 +81,24 @@ func (r *SandboxRepository) ListAllByGuestSession(sessionID uuid.UUID) ([]models
 
 func (r *SandboxRepository) CountActiveByUser(userID uuid.UUID) (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Sandbox{}).
+	err := r.whereActive(r.db.Model(&models.Sandbox{})).
 		Where("owner_id = ?", userID).
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
 		Count(&count).Error
 	return count, err
 }
 
 func (r *SandboxRepository) CountActiveByIP(ip string) (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Sandbox{}).
+	err := r.whereActive(r.db.Model(&models.Sandbox{})).
 		Where("client_ip = ?", ip).
 		Where("owner_id IS NULL").
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
 		Count(&count).Error
 	return count, err
 }
 
 func (r *SandboxRepository) CountActiveTotal() (int64, error) {
 	var count int64
-	err := r.db.Model(&models.Sandbox{}).
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
+	err := r.whereActive(r.db.Model(&models.Sandbox{})).
 		Count(&count).Error
 	return count, err
 }
@@ -129,16 +109,30 @@ func (r *SandboxRepository) ListByImageID(imageID uuid.UUID) ([]models.Sandbox, 
 	return sandboxes, err
 }
 
+func (r *SandboxRepository) ListByStatuses(statuses []models.SandboxStatus) ([]models.Sandbox, error) {
+	var sandboxes []models.Sandbox
+	err := r.withOwner(r.db).
+		Where("status IN ?", statuses).
+		Order("created_at desc").
+		Find(&sandboxes).Error
+	return sandboxes, err
+}
+
+func (r *SandboxRepository) ListAll() ([]models.Sandbox, error) {
+	var sandboxes []models.Sandbox
+	err := r.withOwner(r.db).Order("created_at desc").Find(&sandboxes).Error
+	return sandboxes, err
+}
+
 func (r *SandboxRepository) DeleteByID(id uuid.UUID) error {
 	return r.db.Unscoped().Delete(&models.Sandbox{}, "id = ?", id).Error
 }
 
 func (r *SandboxRepository) FindExpired(now time.Time) ([]models.Sandbox, error) {
 	var sandboxes []models.Sandbox
-	err := r.db.
+	err := r.whereActive(r.db).
 		Where("expires_at IS NOT NULL").
 		Where("expires_at <= ?", now).
-		Where("status IN ?", []models.SandboxStatus{models.SandboxStatusStarting, models.SandboxStatusRunning}).
 		Find(&sandboxes).Error
 	return sandboxes, err
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"github.com/manuel/shopware-testenv-platform/api/internal/sshproxy"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"gorm.io/gorm"
 )
@@ -28,9 +29,44 @@ type Server struct {
 	cfg  config.Config
 }
 
+type runtimeServices struct {
+	auth          *services.AuthService
+	guest         *services.GuestSessionService
+	audit         *services.AuditService
+	user          *services.UserService
+	image         *services.ImageService
+	sandbox       *services.SandboxService
+	sandboxHealth *services.SandboxHealthService
+	terminal      *services.TerminalService
+	resolver      *registry.Resolver
+	userRepo      *repositories.UserRepository
+	dockerSDK     *client.Client
+}
+
 func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
+	e := newEcho(cfg)
+
+	runtime, err := buildRuntimeServices(cfg, db)
+	if err != nil {
+		return nil, err
+	}
+
+	startBackgroundJobs(cfg, runtime)
+	registerRoutes(e, cfg, runtime)
+
+	slog.Debug("http routes registered",
+		"component", "http",
+		"guest_cookie_name", cfg.Auth.GuestCookieName,
+		"thumbnail_dir", cfg.Storage.ThumbnailDir,
+	)
+
+	return &Server{echo: e, cfg: cfg}, nil
+}
+
+func newEcho(cfg config.Config) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
+	e.Validator = NewValidator()
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
 	e.Use(logging.EchoRequestLogger())
@@ -39,9 +75,10 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
+	return e
+}
 
-	// Repositories stay close to persistence concerns, while services own the
-	// business rules built on top of them.
+func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, error) {
 	userRepo := repositories.NewUserRepository(db)
 	sessionRepo := repositories.NewSessionRepository(db)
 	imageRepo := repositories.NewImageRepository(db)
@@ -55,6 +92,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	authService := services.NewAuthService(userRepo, sessionRepo, passwordService, tokenService, cfg.Registration)
 	userService := services.NewUserService(userRepo, passwordService)
 	guestService := services.NewGuestSessionService(sessionRepo, tokenService)
+
 	reg, err := registry.Load(cfg.RegistryPath)
 	if err != nil {
 		return nil, fmt.Errorf("load image registry: %w", err)
@@ -63,6 +101,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compile image registry: %w", err)
 	}
+
 	// FIXME NewClientWithOpts ide says: Potential resource leak: ensure the resource is closed on all execution paths
 	sdkClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -71,50 +110,100 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	if _, err := sdkClient.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("docker daemon not reachable: %w", err)
 	}
+
 	dockerClient := docker.NewClient(sdkClient, cfg.Sandbox, cfg.Docker)
 	executor := &registry.Executor{Client: sdkClient}
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker, cfg.Server.BaseURL, cfg.Storage.ThumbnailDir)
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor)
 	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver)
+	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
 
-	// Sandbox expiration is handled inside the same process on purpose to keep
-	// deployment simple for the single-service architecture.
-	sandboxService.StartCleanupLoop(context.Background())
-	sandboxService.StartDockerEventLoop(context.Background())
-	sandboxHealthService.StartMonitoringActive()
+	return &runtimeServices{
+		auth:          authService,
+		guest:         guestService,
+		audit:         auditService,
+		user:          userService,
+		image:         imageService,
+		sandbox:       sandboxService,
+		sandboxHealth: sandboxHealthService,
+		terminal:      terminalService,
+		resolver:      resolver,
+		userRepo:      userRepo,
+		dockerSDK:     sdkClient,
+	}, nil
+}
 
-	imageService.ReconcileOnStartup(context.Background())
-	authHandler := handlers.NewAuthHandler(authService, auditService)
-	imageHandler := handlers.NewImageHandler(imageService, auditService, resolver)
+func startBackgroundJobs(cfg config.Config, runtime *runtimeServices) {
+	runtime.sandbox.ReconcileOnStartup(context.Background())
+	runtime.sandbox.StartCleanupLoop(context.Background())
+	runtime.sandbox.StartDockerEventLoop(context.Background())
+	runtime.sandboxHealth.StartMonitoringActive()
+	runtime.image.ReconcileOnStartup(context.Background())
+
+	if cfg.SSH.Enabled {
+		srv := sshproxy.NewServer(
+			fmt.Sprintf(":%d", cfg.SSH.Port),
+			"",
+			cfg.Sandbox.URLPrefix,
+			runtime.dockerSDK,
+			cfg.Docker.Network,
+		)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil {
+				slog.Error("SSH proxy server failed", "error", err)
+			}
+		}()
+	}
+}
+
+func registerRoutes(e *echo.Echo, cfg config.Config, runtime *runtimeServices) {
+	authHandler := handlers.NewAuthHandler(runtime.auth, runtime.audit)
+	imageHandler := handlers.NewImageHandler(runtime.image, runtime.audit, runtime.resolver)
 	sandboxHandler := handlers.NewSandboxHandler(
-		sandboxService,
-		imageService,
-		resolver,
-		sandboxHealthService,
-		authService,
-		guestService,
+		runtime.sandbox,
+		runtime.image,
+		runtime.resolver,
+		runtime.sandboxHealth,
+		runtime.auth,
+		runtime.guest,
 		cfg.Auth.GuestCookieName,
+		cfg.SSH,
 	)
-	auditHandler := handlers.NewAuditHandler(auditService)
-	userHandler := handlers.NewUserHandler(userService, auditService)
-	whitelistHandler := handlers.NewWhitelistHandler(userRepo, auditService)
+	auditHandler := handlers.NewAuditHandler(runtime.audit)
+	userHandler := handlers.NewUserHandler(runtime.user, runtime.audit)
+	whitelistHandler := handlers.NewWhitelistHandler(runtime.userRepo, runtime.audit)
+	terminalHandler := handlers.NewTerminalHandler(runtime.terminal, runtime.auth, cfg.Server.AllowedOrigins)
 
 	e.GET("/health", healthCheck)
+	registerAPIRoutes(e, cfg, runtime, authHandler, imageHandler, sandboxHandler, auditHandler, userHandler, whitelistHandler, terminalHandler)
+	registerDocumentationRoutes(e, cfg)
+}
 
+func registerAPIRoutes(
+	e *echo.Echo,
+	cfg config.Config,
+	runtime *runtimeServices,
+	authHandler *handlers.AuthHandler,
+	imageHandler *handlers.ImageHandler,
+	sandboxHandler *handlers.SandboxHandler,
+	auditHandler *handlers.AuditHandler,
+	userHandler *handlers.UserHandler,
+	whitelistHandler *handlers.WhitelistHandler,
+	terminalHandler *handlers.TerminalHandler,
+) {
 	api := e.Group("/api")
 	public := api.Group("/public")
 	auth := api.Group("/auth")
 	private := api.Group("")
-	private.Use(authmw.Auth(authService))
-	// Public routes create or refresh the guest cookie automatically.
-	public.Use(authmw.EnsureGuestSession(guestService, cfg.Auth.GuestCookieName))
+	private.Use(authmw.Auth(runtime.auth))
+	public.Use(authmw.EnsureGuestSession(runtime.guest, cfg.Auth.GuestCookieName))
 
 	api.GET("/images/:id/progress", imageHandler.Progress)
 	api.GET("/registry/lookup", imageHandler.RegistryLookup)
 	api.GET("/sandboxes/:id/health", sandboxHandler.Health)
+	api.GET("/sandboxes/:id/terminal", terminalHandler.Connect)
 
-	private.GET("/images/pending", imageHandler.ListPending)
 	public.GET("/images", imageHandler.ListPublic)
 	public.GET("/sandboxes", sandboxHandler.ListGuest)
 	public.POST("/demos", sandboxHandler.CreatePublicDemo)
@@ -126,7 +215,9 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	private.POST("/auth/logout", authHandler.Logout)
 	private.GET("/me", authHandler.Me)
 	private.GET("/me/sandboxes", sandboxHandler.ListMine)
+	private.GET("/sandboxes/:id/stream", sandboxHandler.Stream)
 	private.GET("/images", imageHandler.ListAll)
+	private.GET("/images/pending", imageHandler.ListPending)
 	private.POST("/images", imageHandler.Create)
 	private.PUT("/images/:id", imageHandler.Update)
 	private.DELETE("/images/:id", imageHandler.Delete)
@@ -151,20 +242,14 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 	admin.GET("/whitelist", whitelistHandler.List)
 	admin.POST("/whitelist", whitelistHandler.Add)
 	admin.DELETE("/whitelist/:id", whitelistHandler.Remove)
+}
 
+func registerDocumentationRoutes(e *echo.Echo, cfg config.Config) {
 	e.GET("/docs", func(c echo.Context) error {
 		return c.Redirect(http.StatusMovedPermanently, "/docs/index.html")
 	})
 	e.Static(services.ThumbnailPublicBasePath, cfg.Storage.ThumbnailDir)
 	e.GET("/docs/*", echoSwagger.WrapHandler)
-
-	slog.Debug("http routes registered",
-		"component", "http",
-		"guest_cookie_name", cfg.Auth.GuestCookieName,
-		"thumbnail_dir", cfg.Storage.ThumbnailDir,
-	)
-
-	return &Server{echo: e, cfg: cfg}, nil
 }
 
 // healthCheck godoc

@@ -35,8 +35,8 @@ func NewAuthHandler(auth *services.AuthService, audit *services.AuditService) *A
 // @Router       /api/auth/register [post]
 func (h *AuthHandler) Register(c echo.Context) error {
 	var input dto.RegisterRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("register request received", logging.RequestFields(c, "component", "auth", "email", logging.MaskEmail(input.Email))...)
@@ -70,8 +70,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 // @Router       /api/auth/login [post]
 func (h *AuthHandler) Login(c echo.Context) error {
 	var input dto.LoginRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("login request received", logging.RequestFields(c, "component", "auth", "email", logging.MaskEmail(input.Email))...)

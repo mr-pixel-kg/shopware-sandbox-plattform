@@ -19,6 +19,7 @@ services:
     image: mpxsandbox-api:local
     ports:
       - "8080:8080"
+      - "2222:2222"
     environment:
       DATABASE_HOST: ${DATABASE_HOST:-database}
       DATABASE_PORT: ${DATABASE_PORT:-5432}
@@ -31,6 +32,8 @@ services:
       SERVER_APP_URL: ${SERVER_APP_URL:-http://localhost:8080}
       SANDBOX_URL_PREFIX: ${SANDBOX_URL_PREFIX:-sandbox-}
       SANDBOX_URL_SUFFIX: ${SANDBOX_URL_SUFFIX:-.localhost}
+      SSH_ENABLED: "true"
+      SSH_PORT: "2222"
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - ./api/storage:/app/storage

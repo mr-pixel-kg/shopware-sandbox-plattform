@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -44,31 +45,13 @@ func (r *Resolver) Resolve(imageName string, ctx TemplateContext) (*ResolvedImag
 	return nil, fmt.Errorf("no registry entry matches image %q", imageName)
 }
 
-func (r *Resolver) ResolveMetadata(imageName string) []MetadataItem {
+func (r *Resolver) ResolveEntry(imageName string) *ImageEntry {
 	nameOnly := stripTag(imageName)
-
 	for _, ce := range r.entries {
-		if !ce.glob.Match(imageName) && !ce.glob.Match(nameOnly) {
-			continue
+		if ce.glob.Match(imageName) || ce.glob.Match(nameOnly) {
+			return &ce.entry
 		}
-		result := make([]MetadataItem, len(ce.entry.Metadata))
-		copy(result, ce.entry.Metadata)
-		return result
 	}
-
-	return []MetadataItem{}
-}
-
-func (r *Resolver) ResolveHealthCheck(imageName string) *HealthCheckConfig {
-	nameOnly := stripTag(imageName)
-
-	for _, ce := range r.entries {
-		if !ce.glob.Match(imageName) && !ce.glob.Match(nameOnly) {
-			continue
-		}
-		return ce.entry.HealthCheck
-	}
-
 	return nil
 }
 
@@ -88,6 +71,12 @@ func stripTag(image string) string {
 }
 
 func renderEntry(entry ImageEntry, ctx TemplateContext) (*ResolvedImage, error) {
+	if entry.SSH != nil {
+		ctx.SSHPort = strconv.Itoa(entry.SSH.Port)
+		ctx.SSHUsername = entry.SSH.Username
+		ctx.SSHPassword = entry.SSH.Password
+	}
+
 	resolved := &ResolvedImage{
 		HealthCheck: entry.HealthCheck,
 	}
@@ -136,6 +125,8 @@ func renderEntry(entry ImageEntry, ctx TemplateContext) (*ResolvedImage, error) 
 		}
 		resolved.PreStop = append(resolved.PreStop, rendered)
 	}
+
+	resolved.SSH = entry.SSH
 
 	return resolved, nil
 }

@@ -20,6 +20,8 @@ type Config struct {
 	Docker       DockerConfig
 	Storage      StorageConfig
 	Guard        GuardConfig
+	Terminal     TerminalConfig
+	SSH          SSHConfig
 	RegistryPath string
 }
 
@@ -116,6 +118,18 @@ type GuardConfig struct {
 	MaxActivePerUser    int
 }
 
+type TerminalConfig struct {
+	MaxSessionsPerSandbox int
+	IdleTimeoutMinutes    int
+	MaxDurationMinutes    int
+}
+
+type SSHConfig struct {
+	Enabled bool
+	Port    int
+	Host    string
+}
+
 func MustLoad() Config {
 	_ = godotenv.Load("../.env")
 
@@ -187,6 +201,16 @@ func MustLoad() Config {
 			MaxActiveTotal:      v.GetInt("guard.max_total_sandboxes"),
 			MaxPublicDemosPerIP: v.GetInt("guard.max_sandboxes_per_ip"),
 			MaxActivePerUser:    v.GetInt("guard.max_sandboxes_per_user"),
+		},
+		Terminal: TerminalConfig{
+			MaxSessionsPerSandbox: v.GetInt("terminal.max_sessions_per_sandbox"),
+			IdleTimeoutMinutes:    v.GetInt("terminal.idle_timeout_minutes"),
+			MaxDurationMinutes:    v.GetInt("terminal.max_duration_minutes"),
+		},
+		SSH: SSHConfig{
+			Enabled: v.GetBool("ssh.enabled"),
+			Port:    v.GetInt("ssh.port"),
+			Host:    v.GetString("ssh.host"),
 		},
 		RegistryPath: v.GetString("registry_path"),
 	}
@@ -267,6 +291,19 @@ func MustLoad() Config {
 	if cfg.Storage.ThumbnailDir == "" {
 		cfg.Storage.ThumbnailDir = "storage/thumbnails"
 	}
+	if cfg.Terminal.MaxSessionsPerSandbox == 0 {
+		cfg.Terminal.MaxSessionsPerSandbox = 2
+	}
+	if cfg.Terminal.IdleTimeoutMinutes == 0 {
+		cfg.Terminal.IdleTimeoutMinutes = 15
+	}
+	if cfg.Terminal.MaxDurationMinutes == 0 {
+		cfg.Terminal.MaxDurationMinutes = 120
+	}
+	if cfg.SSH.Port == 0 {
+		cfg.SSH.Port = 2222
+	}
+
 	if cfg.RegistryPath == "" {
 		cfg.RegistryPath = "registry.yml"
 	}

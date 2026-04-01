@@ -84,8 +84,8 @@ func (h *UserHandler) Get(c echo.Context) error {
 // @Router       /api/admin/users [post]
 func (h *UserHandler) Create(c echo.Context) error {
 	var input dto.CreateUserRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	user, err := h.users.Create(input.Email, input.Role, input.Password)
@@ -133,8 +133,8 @@ func (h *UserHandler) Update(c echo.Context) error {
 	}
 
 	var input dto.UpdateUserRequest
-	if bindErr := c.Bind(&input); bindErr != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	user, updateErr := h.users.Update(id, input.Email, input.Role, input.Password)
@@ -204,10 +204,5 @@ func (h *UserHandler) Delete(c echo.Context) error {
 }
 
 func parseUserID(c echo.Context) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return uuid.Nil, responses.FromAppError(c, apperror.BadRequest("INVALID_ID", "Invalid UUID"))
-	}
-
-	return id, nil
+	return parseUUIDParam(c, "id", "INVALID_ID", "Invalid UUID")
 }

@@ -26,7 +26,7 @@ func TestAuthFlow_RegisterLoginMeAndLogout(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := echo.New()
+	router := newIntegrationRouter()
 	authService, auditService := newTestAuthServices(db)
 	authHandler := handlers.NewAuthHandler(authService, auditService)
 
@@ -68,7 +68,7 @@ func TestProtectedRouteRejectsMissingAuthorizationHeader(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := echo.New()
+	router := newIntegrationRouter()
 	authService, auditService := newTestAuthServices(db)
 	authHandler := handlers.NewAuthHandler(authService, auditService)
 
@@ -121,4 +121,10 @@ func performJSONRequest(t *testing.T, e *echo.Echo, method, target string, body 
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	return rec
+}
+
+func newIntegrationRouter() *echo.Echo {
+	router := echo.New()
+	router.Validator = NewValidator()
+	return router
 }

@@ -25,6 +25,7 @@ type ContainerCreateRequest struct {
 	Env           []string
 	Labels        map[string]string
 	InternalPort  int
+	SSHPort       int
 }
 
 type SandboxContainer struct {
@@ -47,7 +48,9 @@ type Client interface {
 	CreateContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error)
 	DeleteContainer(ctx context.Context, containerID string) error
 	CommitContainer(ctx context.Context, containerID, targetImage string) error
+	ContainerExists(ctx context.Context, containerID string) bool
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
+	CreateExecSession(ctx context.Context, containerID string, opts ExecAttachOptions) (*ExecSession, error)
 }
 
 type DockerClient struct {
@@ -66,6 +69,11 @@ func NewClient(sdkClient *client.Client, sandboxCfg config.SandboxConfig, docker
 
 func (c *DockerClient) ImageExists(ctx context.Context, imageName string) bool {
 	_, _, err := c.client.ImageInspectWithRaw(ctx, imageName)
+	return err == nil
+}
+
+func (c *DockerClient) ContainerExists(ctx context.Context, containerID string) bool {
+	_, err := c.client.ContainerInspect(ctx, containerID)
 	return err == nil
 }
 
@@ -145,6 +153,14 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 		},
 	}
 
+	if request.SSHPort > 0 {
+		sshPort := nat.Port(strconv.Itoa(request.SSHPort) + "/tcp")
+		containerConfig.ExposedPorts[sshPort] = struct{}{}
+		hostConfig.PortBindings[sshPort] = []nat.PortBinding{
+			{HostIP: "0.0.0.0", HostPort: "0"},
+		}
+	}
+
 	resp, err := c.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, request.ContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
@@ -179,7 +195,20 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Conta
 		}
 	}
 
-	resp, err := c.client.ContainerCreate(ctx, containerConfig, nil, networkingConfig, nil, request.ContainerName)
+	var hostConfig *container.HostConfig
+	if request.SSHPort > 0 {
+		sshPort := nat.Port(strconv.Itoa(request.SSHPort) + "/tcp")
+		containerConfig.ExposedPorts = nat.PortSet{sshPort: struct{}{}}
+		hostConfig = &container.HostConfig{
+			PortBindings: nat.PortMap{
+				sshPort: []nat.PortBinding{
+					{HostIP: "0.0.0.0", HostPort: "0"},
+				},
+			},
+		}
+	}
+
+	resp, err := c.client.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, nil, request.ContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
 	}
@@ -242,6 +271,8 @@ func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan Sandb
 	args.Add("event", "stop")
 	args.Add("event", "die")
 	args.Add("event", "destroy")
+	args.Add("event", "pause")
+	args.Add("event", "unpause")
 
 	msgs, errs := c.client.Events(ctx, dockerevents.ListOptions{Filters: args})
 

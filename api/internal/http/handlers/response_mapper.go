@@ -1,8 +1,16 @@
 package handlers
 
 import (
+	"bytes"
+	"fmt"
+	"net/url"
+	"strings"
+	"text/template"
+
+	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
+	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 )
 
 func toUserSummary(user *models.User) *dto.UserSummary {
@@ -52,6 +60,7 @@ func toSandboxResponse(sandbox *models.Sandbox) dto.SandboxResponse {
 		GuestSessionID: sandbox.GuestSessionID,
 		DisplayName:    sandbox.DisplayName,
 		Status:         sandbox.Status,
+		StateReason:    sandbox.StateReason,
 		ContainerID:    sandbox.ContainerID,
 		ContainerName:  sandbox.ContainerName,
 		URL:            sandbox.URL,
@@ -72,4 +81,60 @@ func toSandboxResponses(sandboxes []models.Sandbox) []dto.SandboxResponse {
 		out[i] = toSandboxResponse(&sandboxes[i])
 	}
 	return out
+}
+
+func buildSSHInfo(sandbox *models.Sandbox, sshCfg config.SSHConfig, sshEntry *registry.SSHEntry) *dto.SSHConnectionInfo {
+	if !sshCfg.Enabled || sshEntry == nil || !sandbox.Status.IsActive() {
+		return nil
+	}
+	host := resolveSSHHost(sshCfg.Host, sandbox)
+	username := sshEntry.Username + "+" + sandbox.ID.String()
+	return &dto.SSHConnectionInfo{
+		Host:     host,
+		Port:     sshCfg.Port,
+		Username: username,
+		Password: sshEntry.Password,
+		Command:  fmt.Sprintf("ssh %s@%s -p %d", username, host, sshCfg.Port),
+	}
+}
+
+func resolveSSHHost(hostTemplate string, sandbox *models.Sandbox) string {
+	if hostTemplate == "" {
+		return extractHostname(sandbox.URL)
+	}
+	if !strings.Contains(hostTemplate, "{{") {
+		return hostTemplate
+	}
+	tmpl, err := template.New("ssh_host").Parse(hostTemplate)
+	if err != nil {
+		return extractHostname(sandbox.URL)
+	}
+	shortID := sandbox.ContainerID
+	if len(shortID) > 12 {
+		shortID = shortID[:12]
+	}
+	data := struct {
+		ContainerName    string
+		ContainerID      string
+		ContainerShortID string
+		SandboxID        string
+	}{
+		ContainerName:    sandbox.ContainerName,
+		ContainerID:      sandbox.ContainerID,
+		ContainerShortID: shortID,
+		SandboxID:        sandbox.ID.String(),
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return extractHostname(sandbox.URL)
+	}
+	return buf.String()
+}
+
+func extractHostname(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "localhost"
+	}
+	return u.Hostname()
 }

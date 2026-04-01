@@ -85,6 +85,10 @@ type UpdateSandboxInput struct {
 	ClientIP    string
 }
 
+func (s *SandboxService) ListAll() ([]models.Sandbox, error) {
+	return s.repo.ListAll()
+}
+
 func (s *SandboxService) ListActive() ([]models.Sandbox, error) {
 	return s.repo.ListAllActive()
 }
@@ -146,7 +150,11 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, fmt.Errorf("image is still being pulled")
 	}
 	if image.Status == models.ImageStatusFailed {
-		return nil, fmt.Errorf("image pull failed: %s", ptrStr(image.Error))
+		errMsg := ""
+		if image.Error != nil {
+			errMsg = *image.Error
+		}
+		return nil, fmt.Errorf("image pull failed: %s", errMsg)
 	}
 	if err := s.docker.EnsureImage(ctx, image.FullName()); err != nil {
 		return nil, err
@@ -216,6 +224,14 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		}
 	}
 
+	sshPort := 0
+	if resolved.SSH != nil {
+		sshPort = resolved.SSH.Port
+		labels["sandbox_ssh_port"] = strconv.Itoa(resolved.SSH.Port)
+		labels["sandbox_ssh_username"] = resolved.SSH.Username
+		labels["sandbox_ssh_password"] = resolved.SSH.Password
+	}
+
 	container, err := s.docker.CreateContainer(ctx, docker.ContainerCreateRequest{
 		ImageName:     image.FullName(),
 		ContainerName: containerName,
@@ -223,6 +239,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		Env:           resolved.Env,
 		Labels:        labels,
 		InternalPort:  internalPort,
+		SSHPort:       sshPort,
 	})
 	if err != nil {
 		return nil, err
@@ -237,6 +254,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if input.DisplayName != nil {
 		displayName = *input.DisplayName
 	}
+	startingReason := "Container wird gestartet"
 	sandbox := &models.Sandbox{
 		ID:             sandboxID,
 		ImageID:        image.ID,
@@ -244,6 +262,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		GuestSessionID: input.GuestSessionID,
 		DisplayName:    displayName,
 		Status:         models.SandboxStatusStarting,
+		StateReason:    &startingReason,
 		ContainerID:    container.ID,
 		ContainerName:  container.Name,
 		URL:            container.URL,
@@ -324,35 +343,32 @@ func (s *SandboxService) Delete(ctx context.Context, id uuid.UUID, clientIP stri
 		return ErrSandboxNotFound
 	}
 
-	isActive := sandbox.Status == models.SandboxStatusRunning || sandbox.Status == models.SandboxStatusStarting
-
-	if isActive {
-		s.runPreStop(ctx, sandbox.ContainerID, sandbox.ImageID)
-
-		if err := s.docker.DeleteContainer(ctx, sandbox.ContainerID); err != nil {
-			return err
-		}
-
-		sandbox.Status = models.SandboxStatusDeleted
-		if err := s.repo.Update(sandbox); err != nil {
-			return err
-		}
-
-		if err := s.addEvent(sandbox.ID, "deleted", map[string]any{}); err != nil {
-			return err
-		}
-	} else {
-		// Hard delete: permanently remove from history.
-		if err := s.repo.DeleteByID(sandbox.ID); err != nil {
-			return err
-		}
-	}
-
 	_ = s.audit.Log(userID, "sandbox.deleted", clientIP, map[string]any{
 		"sandboxId": sandbox.ID.String(),
 	})
 
-	return nil
+	if sandbox.Status.IsActive() {
+		_ = s.setStatus(sandbox, models.SandboxStatusStopping, strPtr("Container wird beendet"))
+		go s.deleteContainerAsync(sandbox.ID, sandbox.ContainerID, sandbox.ImageID)
+		return nil
+	}
+
+	return s.repo.DeleteByID(sandbox.ID)
+}
+
+func (s *SandboxService) deleteContainerAsync(sandboxID uuid.UUID, containerID string, imageID uuid.UUID) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	s.runPreStop(ctx, containerID, imageID)
+
+	if err := s.docker.DeleteContainer(ctx, containerID); err != nil {
+		_ = s.setStatusByID(sandboxID, models.SandboxStatusFailed, strPtr(fmt.Sprintf("Fehler beim Beenden: %v", err)))
+		return
+	}
+
+	_ = s.setStatusByID(sandboxID, models.SandboxStatusDeleted, nil)
+	_ = s.addEvent(sandboxID, "deleted", map[string]any{})
 }
 
 func (s *SandboxService) DeleteForGuest(ctx context.Context, id uuid.UUID, guestSessionID uuid.UUID, clientIP string) error {
@@ -408,6 +424,8 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		return nil, err
 	}
 
+	_ = s.setStatus(sandbox, models.SandboxStatusPaused, strPtr("Snapshot wird erstellt"))
+
 	_ = s.addEvent(sandbox.ID, "snapshotted", map[string]any{
 		"targetImage": targetImage,
 		"imageId":     image.ID.String(),
@@ -419,16 +437,39 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		"imageId":     image.ID.String(),
 	})
 
-	go s.commitSnapshot(sandbox.ContainerID, image.ID, targetImage)
+	go s.commitSnapshot(sandbox.ID, sandbox.ContainerID, image.ID, targetImage)
 
 	return image, nil
 }
 
-func (s *SandboxService) commitSnapshot(containerID string, imageID uuid.UUID, targetImage string) {
+func (s *SandboxService) commitSnapshot(sandboxID uuid.UUID, containerID string, imageID uuid.UUID, targetImage string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	s.images.FinishCommit(imageID, s.docker.CommitContainer(ctx, containerID, targetImage))
+	commitErr := s.docker.CommitContainer(ctx, containerID, targetImage)
+	s.images.FinishCommit(imageID, commitErr)
+
+	_ = s.setStatusByID(sandboxID, models.SandboxStatusRunning, nil)
+}
+
+func (s *SandboxService) ReconcileOnStartup(ctx context.Context) {
+	stale, err := s.repo.ListByStatuses([]models.SandboxStatus{
+		models.SandboxStatusStopping,
+		models.SandboxStatusPaused,
+	})
+	if err != nil {
+		slog.Error("reconcile: failed to list stale sandboxes", "component", "reconcile", "error", err.Error())
+		return
+	}
+	for _, sb := range stale {
+		if s.docker.ContainerExists(ctx, sb.ContainerID) {
+			_ = s.setStatusByID(sb.ID, models.SandboxStatusRunning, nil)
+			slog.Info("reconcile: restored sandbox to running", "component", "reconcile", "sandbox_id", sb.ID.String())
+		} else {
+			_ = s.setStatusByID(sb.ID, models.SandboxStatusFailed, strPtr("Vorgang durch API-Neustart unterbrochen"))
+			slog.Info("reconcile: marked sandbox as failed", "component", "reconcile", "sandbox_id", sb.ID.String())
+		}
+	}
 }
 
 func (s *SandboxService) StartCleanupLoop(ctx context.Context) {
@@ -509,7 +550,9 @@ func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 		}
 
 		now := time.Now().UTC()
+		expiredReason := "Laufzeit abgelaufen"
 		sandbox.Status = models.SandboxStatusExpired
+		sandbox.StateReason = &expiredReason
 		sandbox.DeletedAt = &now
 		if err := s.repo.Update(&sandbox); err != nil {
 			slog.Error("update expired sandbox failed",
@@ -544,7 +587,9 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 	switch event.Action {
 	case "start":
 		if sandbox.Status == models.SandboxStatusStopped {
+			reason := "Container wird gestartet"
 			sandbox.Status = models.SandboxStatusStarting
+			sandbox.StateReason = &reason
 			if err := s.repo.Update(sandbox); err != nil {
 				return err
 			}
@@ -555,12 +600,36 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 		}
 		return nil
 
+	case "pause":
+		if sandbox.Status == models.SandboxStatusRunning {
+			sandbox.Status = models.SandboxStatusPaused
+			if sandbox.StateReason == nil {
+				sandbox.StateReason = strPtr("Container pausiert")
+			}
+			if err := s.repo.Update(sandbox); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case "unpause":
+		if sandbox.Status == models.SandboxStatusPaused {
+			sandbox.Status = models.SandboxStatusRunning
+			sandbox.StateReason = nil
+			if err := s.repo.Update(sandbox); err != nil {
+				return err
+			}
+		}
+		return nil
+
 	case "stop", "die":
-		if sandbox.Status == models.SandboxStatusDeleted || sandbox.Status == models.SandboxStatusExpired {
+		if sandbox.Status == models.SandboxStatusDeleted || sandbox.Status == models.SandboxStatusExpired ||
+			sandbox.Status == models.SandboxStatusStopping || sandbox.Status == models.SandboxStatusStarting {
 			return nil
 		}
 		if sandbox.Status != models.SandboxStatusStopped {
 			sandbox.Status = models.SandboxStatusStopped
+			sandbox.StateReason = nil
 			if err := s.repo.Update(sandbox); err != nil {
 				return err
 			}
@@ -576,6 +645,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 			return nil
 		}
 		sandbox.Status = models.SandboxStatusDeleted
+		sandbox.StateReason = nil
 		now := time.Now().UTC()
 		sandbox.DeletedAt = &now
 		if err := s.repo.Update(sandbox); err != nil {
@@ -626,11 +696,22 @@ func (s *SandboxService) enforceLimits(input CreateSandboxInput) error {
 	return nil
 }
 
-func ptrStr(s *string) string {
-	if s == nil {
-		return ""
+func strPtr(s string) *string {
+	return &s
+}
+
+func (s *SandboxService) setStatus(sandbox *models.Sandbox, status models.SandboxStatus, reason *string) error {
+	sandbox.Status = status
+	sandbox.StateReason = reason
+	return s.repo.Update(sandbox)
+}
+
+func (s *SandboxService) setStatusByID(id uuid.UUID, status models.SandboxStatus, reason *string) error {
+	sandbox, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
 	}
-	return *s
+	return s.setStatus(sandbox, status, reason)
 }
 
 func (s *SandboxService) addEvent(sandboxID uuid.UUID, eventType string, metadata map[string]any) error {

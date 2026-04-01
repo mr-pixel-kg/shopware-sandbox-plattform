@@ -1717,6 +1717,134 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/sandboxes/{id}/stream": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "SSE endpoint streaming real-time state updates for a single sandbox",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Sandboxes"
+                ],
+                "summary": "Stream sandbox state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Sandbox ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SandboxStreamEvent"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sandboxes/{id}/terminal": {
+            "get": {
+                "description": "Interactive shell (docker exec) into the sandbox container",
+                "tags": [
+                    "Sandboxes"
+                ],
+                "summary": "Open interactive terminal session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Sandbox ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "access_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 80,
+                        "description": "Initial terminal columns",
+                        "name": "cols",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Initial terminal rows",
+                        "name": "rows",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols – WebSocket connection established"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Sandbox not running or session limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/sandboxes/{id}/ttl": {
             "patch": {
                 "security": [
@@ -1929,6 +2057,7 @@ const docTemplate = `{
                 },
                 "ttlMinutes": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 120
                 }
             }
@@ -1970,6 +2099,10 @@ const docTemplate = `{
         },
         "dto.CreateUserRequest": {
             "type": "object",
+            "required": [
+                "email",
+                "role"
+            ],
             "properties": {
                 "email": {
                     "type": "string",
@@ -1977,10 +2110,15 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
+                    "minLength": 8,
                     "example": "Sup3rS3cret!"
                 },
                 "role": {
                     "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
                     "example": "user"
                 }
             }
@@ -2014,6 +2152,7 @@ const docTemplate = `{
             "properties": {
                 "ttlMinutes": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 60
                 }
             }
@@ -2167,6 +2306,31 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.SSHConnectionInfo": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "example": "ssh sandbox-883990ba@host -p 2222"
+                },
+                "host": {
+                    "type": "string",
+                    "example": "sandbox-abc.zion.mr-pixel.de"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "dockware"
+                },
+                "port": {
+                    "type": "integer",
+                    "example": 2222
+                },
+                "username": {
+                    "type": "string",
+                    "example": "sandbox-883990ba-7f3d-4156-9c5b-f878143f1273"
+                }
+            }
+        },
         "dto.SandboxHealthEvent": {
             "type": "object",
             "properties": {
@@ -2267,10 +2431,19 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8080
                 },
+                "ssh": {
+                    "$ref": "#/definitions/dto.SSHConnectionInfo"
+                },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Snapshot wird erstellt"
+                },
                 "status": {
                     "enum": [
                         "starting",
                         "running",
+                        "paused",
+                        "stopping",
                         "stopped",
                         "expired",
                         "deleted",
@@ -2290,6 +2463,23 @@ const docTemplate = `{
                 "url": {
                     "type": "string",
                     "example": "https://sandbox-0b443c82.demo.shopshredder.de"
+                }
+            }
+        },
+        "dto.SandboxStreamEvent": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "0b443c82-d8a3-49a7-b59a-26ce327c7341"
+                },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Container wird gestartet"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "starting"
                 }
             }
         },
@@ -2324,6 +2514,10 @@ const docTemplate = `{
         },
         "dto.UpdateUserRequest": {
             "type": "object",
+            "required": [
+                "email",
+                "role"
+            ],
             "properties": {
                 "email": {
                     "type": "string",
@@ -2331,10 +2525,15 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
+                    "minLength": 8,
                     "example": "N3wSup3rS3cret!"
                 },
                 "role": {
                     "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
                     "example": "admin"
                 }
             }
@@ -2473,10 +2672,16 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8080
                 },
+                "stateReason": {
+                    "type": "string",
+                    "example": "Snapshot wird erstellt"
+                },
                 "status": {
                     "enum": [
                         "starting",
                         "running",
+                        "paused",
+                        "stopping",
                         "stopped",
                         "expired",
                         "deleted",
@@ -2504,6 +2709,8 @@ const docTemplate = `{
             "enum": [
                 "starting",
                 "running",
+                "paused",
+                "stopping",
                 "stopped",
                 "expired",
                 "deleted",
@@ -2512,6 +2719,8 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "SandboxStatusStarting",
                 "SandboxStatusRunning",
+                "SandboxStatusPaused",
+                "SandboxStatusStopping",
                 "SandboxStatusStopped",
                 "SandboxStatusExpired",
                 "SandboxStatusDeleted",

@@ -1,6 +1,10 @@
 
 images:
   - match: "dockware/*"
+    ssh:
+      port: 22
+      username: "dockware"
+      password: "dockware"
     internal_port: 80
     metadata:
       - key: "admin_user"

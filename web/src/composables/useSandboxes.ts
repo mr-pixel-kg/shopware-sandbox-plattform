@@ -15,101 +15,149 @@ import type {
   SandboxStatus,
 } from '@/types'
 
+const TRANSITIONAL_STATUSES = new Set<string>(['starting', 'stopping', 'paused'])
+const TERMINAL_STATUSES = new Set<string>(['running', 'stopped', 'failed', 'deleted', 'expired'])
+
+const KNOWN_SSE_STATUSES: Record<string, SandboxStatus> = {
+  probing: 'starting',
+  ready: 'running',
+  starting: 'starting',
+  running: 'running',
+  paused: 'paused',
+  stopping: 'stopping',
+  stopped: 'stopped',
+  expired: 'expired',
+  deleted: 'deleted',
+  failed: 'failed',
+}
+
+interface SseEvent {
+  id: string
+  status: string
+  stateReason?: string
+}
+
+let pollInterval: ReturnType<typeof setInterval> | null = null
+let pollConsumers = 0
+const sseConnections = new Map<string, AbortController>()
+
 export function useSandboxes() {
   const store = useSandboxesStore()
   const authStore = useAuthStore()
-  const { sandboxes, activeSandboxes, recentSandboxes, loading, error, healthBySandboxId } =
+  const { sandboxes, activeSandboxes, recentSandboxes, allSandboxes, loading, error } =
     storeToRefs(store)
 
   const busyIds = ref(new Set<string>())
-  const healthConnections = new Map<string, EventSource>()
-  let pollInterval: ReturnType<typeof setInterval> | null = null
+  const healthBySandboxId = ref<Record<string, SandboxHealthEvent>>({})
 
-  function buildHealthStreamUrl(id: string): string {
-    const base = import.meta.env.WEB_API_URL || window.location.origin
-    const url = new URL(`/api/sandboxes/${id}/health`, base)
+  function subscribeSse(id: string) {
+    if (sseConnections.has(id)) return
+
     const token = getToken()
-    if (token) url.searchParams.set('access_token', token)
-    return url.toString()
+    if (!token) return
+
+    const abort = new AbortController()
+    sseConnections.set(id, abort)
+
+    const baseURL = import.meta.env.WEB_API_URL || ''
+    fetch(`${baseURL}/api/sandboxes/${id}/stream`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: abort.signal,
+    })
+      .then((res) => {
+        if (!res.ok || !res.body) {
+          closeSse(id)
+          return
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        function read(): Promise<void> {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              closeSse(id)
+              void fetchSandboxes()
+              return
+            }
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              try {
+                const data: SseEvent = JSON.parse(line.slice(6))
+                const mapped = KNOWN_SSE_STATUSES[data.status] ?? 'failed'
+                const sandbox = sandboxes.value.find((s) => s.id === id)
+                if (sandbox) {
+                  sandbox.status = mapped
+                  sandbox.stateReason = data.stateReason ?? undefined
+                }
+
+                if (TERMINAL_STATUSES.has(mapped)) {
+                  closeSse(id)
+                  void fetchSandboxes()
+                  return
+                }
+              } catch {
+                continue
+              }
+            }
+
+            return read()
+          })
+        }
+
+        return read()
+      })
+      .catch(() => {
+        closeSse(id)
+      })
   }
 
-  function closeHealthStream(id: string) {
-    const es = healthConnections.get(id)
-    if (es) {
-      es.close()
-      healthConnections.delete(id)
+  function closeSse(id: string) {
+    const abort = sseConnections.get(id)
+    if (abort) {
+      abort.abort()
+      sseConnections.delete(id)
     }
   }
 
-  function closeAllHealthStreams() {
-    for (const [, es] of healthConnections) es.close()
-    healthConnections.clear()
+  function closeAllSse() {
+    for (const [, abort] of sseConnections) abort.abort()
+    sseConnections.clear()
   }
 
-  function updateSandboxStatus(id: string, status: SandboxStatus) {
-    const sandbox = sandboxes.value.find((s) => s.id === id)
-    if (sandbox) sandbox.status = status
-  }
-
-  function applyHealthEvent(event: SandboxHealthEvent) {
-    healthBySandboxId.value = { ...healthBySandboxId.value, [event.sandboxId]: event }
-
-    if (event.ready) {
-      updateSandboxStatus(event.sandboxId, 'running')
-      return
-    }
-
-    if (['deleted', 'expired', 'failed', 'stopped'].includes(event.status)) {
-      updateSandboxStatus(event.sandboxId, event.status as SandboxStatus)
-      closeHealthStream(event.sandboxId)
-    }
-  }
-
-  function subscribeHealth(id: string) {
-    if (healthConnections.has(id)) return
-
-    const es = new EventSource(buildHealthStreamUrl(id), { withCredentials: true })
-    healthConnections.set(id, es)
-
-    es.onmessage = (message) => {
-      let parsed: SandboxHealthEvent
-      try {
-        parsed = JSON.parse(message.data)
-      } catch {
-        return
+  function syncSseSubscriptions() {
+    for (const sandbox of sandboxes.value) {
+      if (TRANSITIONAL_STATUSES.has(sandbox.status)) {
+        subscribeSse(sandbox.id)
       }
-      applyHealthEvent(parsed)
     }
-
-    es.onerror = () => {
+    for (const [id] of sseConnections) {
       const sandbox = sandboxes.value.find((s) => s.id === id)
-      if (!sandbox || (sandbox.status !== 'starting' && sandbox.status !== 'running')) {
-        closeHealthStream(id)
+      if (!sandbox || !TRANSITIONAL_STATUSES.has(sandbox.status)) {
+        closeSse(id)
       }
     }
   }
 
-  function syncHealthSubscriptions() {
-    const activeIds = new Set(
-      sandboxes.value
-        .filter((s) => s.status === 'starting' || s.status === 'running')
-        .map((s) => s.id),
-    )
-
-    for (const id of activeIds) subscribeHealth(id)
-    for (const [id] of healthConnections) {
-      if (!activeIds.has(id)) closeHealthStream(id)
-    }
-  }
-
-  async function fetch() {
+  async function fetchSandboxes() {
     if (!store.initialized) loading.value = true
     error.value = null
     try {
-      sandboxes.value = authStore.isAuthenticated
-        ? await sandboxesApi.listMine()
-        : await sandboxesApi.listGuest()
-      syncHealthSubscriptions()
+      if (authStore.isAdmin) {
+        sandboxes.value = await sandboxesApi.list()
+      } else if (authStore.isAuthenticated) {
+        sandboxes.value = await sandboxesApi.listMine()
+      } else {
+        sandboxes.value = await sandboxesApi.listGuest()
+      }
+      syncSseSubscriptions()
+      void fetchHealth()
       store.initialized = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
@@ -118,17 +166,92 @@ export function useSandboxes() {
     }
   }
 
+  async function fetchHealthForSandbox(id: string): Promise<SandboxHealthEvent | null> {
+    const token = getToken()
+    if (!token) return null
+
+    const baseURL = import.meta.env.WEB_API_URL || ''
+    const abort = new AbortController()
+    const timeout = setTimeout(() => abort.abort(), 10_000)
+
+    try {
+      const res = await fetch(`${baseURL}/api/sandboxes/${id}/health`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abort.signal,
+      })
+      if (!res.ok || !res.body) return null
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event: SandboxHealthEvent = JSON.parse(line.slice(6))
+            reader.cancel()
+            return event
+          } catch {
+            continue
+          }
+        }
+      }
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    return null
+  }
+
+  async function fetchHealth() {
+    const running = sandboxes.value.filter((s) => s.status === 'running' || s.status === 'starting')
+    const results = await Promise.allSettled(running.map((s) => fetchHealthForSandbox(s.id)))
+    const updated: Record<string, SandboxHealthEvent> = {}
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        updated[result.value.sandboxId] = result.value
+      }
+    }
+    healthBySandboxId.value = updated
+  }
+
+  function startPolling() {
+    pollConsumers++
+    if (pollInterval) return
+    pollInterval = setInterval(fetchSandboxes, 5_000)
+  }
+
+  function stopPolling() {
+    pollConsumers--
+    if (pollConsumers <= 0) {
+      pollConsumers = 0
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+  }
+
   async function createSandbox(req: CreateSandboxRequest): Promise<Sandbox> {
     const sandbox = await sandboxesApi.create(req)
     sandboxes.value.unshift(sandbox)
-    syncHealthSubscriptions()
+    void fetchSandboxes()
     return sandbox
   }
 
   async function createPublicDemo(req: CreateSandboxRequest): Promise<Sandbox> {
     const sandbox = await sandboxesApi.createPublicDemo(req)
     sandboxes.value.unshift(sandbox)
-    syncHealthSubscriptions()
     return sandbox
   }
 
@@ -136,6 +259,7 @@ export function useSandboxes() {
     const updated = await sandboxesApi.update(id, req)
     const idx = sandboxes.value.findIndex((s) => s.id === id)
     if (idx !== -1) sandboxes.value[idx] = updated
+    void fetchSandboxes()
     return updated
   }
 
@@ -143,75 +267,52 @@ export function useSandboxes() {
     const updated = await sandboxesApi.extendTTL(id, ttlMinutes)
     const idx = sandboxes.value.findIndex((s) => s.id === id)
     if (idx !== -1) sandboxes.value[idx] = updated
+    void fetchSandboxes()
     return updated
   }
 
   async function deleteSandbox(id: string, guest = false) {
-    closeHealthStream(id)
+    closeSse(id)
     if (guest) {
       await sandboxesApi.removeGuest(id)
+      sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
     } else {
       await sandboxesApi.remove(id)
+      void fetchSandboxes()
     }
-    sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
   }
 
   async function snapshotSandbox(id: string, req: CreateSnapshotRequest): Promise<Image> {
-    return sandboxesApi.snapshot(id, req)
-  }
-
-  const allSandboxes = ref<Sandbox[]>([])
-  const allLoading = ref(false)
-  let allInitialized = false
-  let adminPollInterval: ReturnType<typeof setInterval> | null = null
-
-  async function fetchAllInstances() {
-    if (!allInitialized) allLoading.value = true
-    try {
-      allSandboxes.value = await sandboxesApi.list()
-      allInitialized = true
-    } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
-    } finally {
-      allLoading.value = false
-    }
-  }
-
-  function startAdminPolling() {
-    void fetchAllInstances()
-    adminPollInterval = setInterval(fetchAllInstances, 10_000)
+    const image = await sandboxesApi.snapshot(id, req)
+    void fetchSandboxes()
+    return image
   }
 
   onMounted(() => {
-    store.$reset()
-    closeAllHealthStreams()
-    void fetch()
-    pollInterval = setInterval(fetch, 10_000)
+    void fetchSandboxes()
+    startPolling()
   })
 
   onUnmounted(() => {
-    if (pollInterval) clearInterval(pollInterval)
-    if (adminPollInterval) clearInterval(adminPollInterval)
-    closeAllHealthStreams()
+    stopPolling()
+    if (pollConsumers <= 0) closeAllSse()
   })
 
   return {
     sandboxes,
     activeSandboxes,
     recentSandboxes,
+    allSandboxes,
     loading,
     error,
-    healthBySandboxId,
     busyIds,
-    refresh: fetch,
+    healthBySandboxId,
+    refresh: fetchSandboxes,
     createSandbox,
     createPublicDemo,
     updateSandbox,
     extendTTL,
     deleteSandbox,
     snapshotSandbox,
-    allSandboxes,
-    allLoading,
-    startAdminPolling,
   }
 }

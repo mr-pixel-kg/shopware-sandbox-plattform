@@ -22,7 +22,6 @@ import type { Image, MetadataItem, Sandbox } from '@/types'
 const { images, loading: imagesLoading } = useImages()
 const {
   activeSandboxes,
-  healthBySandboxId,
   loading: sandboxesLoading,
   busyIds,
   createPublicDemo,
@@ -35,20 +34,8 @@ const shredderRefs = ref<Record<string, InstanceType<typeof ShredderAnimation>>>
 
 const hasActiveSandboxes = computed(() => activeSandboxes.value.length > 0)
 
-function getLiveHealth(sandbox: Sandbox) {
-  return healthBySandboxId.value[sandbox.id]
-}
-
 function isSandboxReachable(sandbox: Sandbox): boolean {
-  const health = getLiveHealth(sandbox)
-  if (sandbox.status !== 'running') return false
-  if (!health) return true
-  return health.ready
-}
-
-function getStatusNote(sandbox: Sandbox): string | undefined {
-  if (sandbox.status === 'running' && !isSandboxReachable(sandbox)) return 'Offline'
-  return undefined
+  return sandbox.status === 'running'
 }
 
 function getImageForSandbox(sandbox: Sandbox): Image | undefined {
@@ -302,7 +289,7 @@ async function handleDemo(imageId: string) {
               :thumbnail-url="getImageThumbnail(sandbox)"
               :actions="sandboxActionsMap[sandbox.id]"
               :metadata="sandboxMetadataMap[sandbox.id]"
-              :status-note="getStatusNote(sandbox)"
+              :state-reason="sandbox.stateReason"
             />
           </ShredderAnimation>
         </div>

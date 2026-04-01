@@ -26,7 +26,7 @@ func TestAdminUsersCRUD(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := echo.New()
+	router := newIntegrationRouter()
 	authService, auditService := newTestAuthServices(db)
 	userService := services.NewUserService(repositories.NewUserRepository(db), services.NewPasswordService())
 	authHandler := handlers.NewAuthHandler(authService, auditService)

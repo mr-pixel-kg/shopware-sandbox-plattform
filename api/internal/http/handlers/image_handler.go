@@ -27,7 +27,7 @@ type ImageHandler struct {
 }
 
 type RegistryResolver interface {
-	ResolveMetadata(imageName string) []registry.MetadataItem
+	ResolveEntry(imageName string) *registry.ImageEntry
 }
 
 func NewImageHandler(images *services.ImageService, audit *services.AuditService, resolver RegistryResolver) *ImageHandler {
@@ -86,8 +86,8 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 // @Router       /api/images [post]
 func (h *ImageHandler) Create(c echo.Context) error {
 	var input dto.CreateImageRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -127,7 +127,8 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		"image", image.FullName(),
 		"status", image.Status,
 	)...)
-	return c.JSON(201, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(201, toImageResponse(image))
 }
 
 // Update godoc
@@ -147,14 +148,14 @@ func (h *ImageHandler) Create(c echo.Context) error {
 // @Router       /api/images/{id} [put]
 func (h *ImageHandler) Update(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	var input dto.UpdateImageRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("image update requested", logging.RequestFields(c,
@@ -177,7 +178,8 @@ func (h *ImageHandler) Update(c echo.Context) error {
 		"has_thumbnail", image.ThumbnailURL != nil,
 	)...)
 	_ = h.audit.Log(&auth.UserID, "image.updated", c.RealIP(), map[string]any{"imageId": image.ID.String()})
-	return c.JSON(http.StatusOK, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(http.StatusOK, toImageResponse(image))
 }
 
 // UploadThumbnail godoc
@@ -197,9 +199,9 @@ func (h *ImageHandler) Update(c echo.Context) error {
 // @Router       /api/images/{id}/thumbnail [post]
 func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	fileHeader, err := c.FormFile("thumbnail")
@@ -235,7 +237,8 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 		"thumbnail_url", image.ThumbnailURL,
 	)...)
 	_ = h.audit.Log(&auth.UserID, "image.thumbnail_uploaded", c.RealIP(), map[string]any{"imageId": image.ID.String()})
-	return c.JSON(http.StatusOK, image)
+	h.enrichMetadata([]models.Image{*image})
+	return c.JSON(http.StatusOK, toImageResponse(image))
 }
 
 // DeleteThumbnail godoc
@@ -252,9 +255,9 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 // @Router       /api/images/{id}/thumbnail [delete]
 func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("thumbnail deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
@@ -286,9 +289,9 @@ func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 // @Router       /api/images/{id} [delete]
 func (h *ImageHandler) Delete(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("image deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
@@ -338,9 +341,9 @@ func (h *ImageHandler) ListPending(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/images/{id}/progress [get]
 func (h *ImageHandler) Progress(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	idStr := id.String()
@@ -431,13 +434,23 @@ func (h *ImageHandler) RegistryLookup(c echo.Context) error {
 		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "name or id query parameter is required"))
 	}
 
-	meta := h.resolver.ResolveMetadata(name)
+	entry := h.resolver.ResolveEntry(name)
+	if entry == nil {
+		return c.JSON(http.StatusOK, []registry.MetadataItem{})
+	}
+	meta := make([]registry.MetadataItem, len(entry.Metadata))
+	copy(meta, entry.Metadata)
 	return c.JSON(http.StatusOK, meta)
 }
 
 func (h *ImageHandler) enrichMetadata(images []models.Image) {
 	for i := range images {
-		reg := h.resolver.ResolveMetadata(images[i].RegistryName())
+		entry := h.resolver.ResolveEntry(images[i].RegistryName())
+		if entry == nil {
+			continue
+		}
+		reg := make([]registry.MetadataItem, len(entry.Metadata))
+		copy(reg, entry.Metadata)
 		merged := mergeRegistryAndDB(reg, images[i].Metadata)
 		data, _ := json.Marshal(merged)
 		images[i].Metadata = datatypes.JSON(data)

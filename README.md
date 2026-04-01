@@ -29,6 +29,7 @@ This starts the database via Docker, then runs the API and web frontend dev serv
 
 - **Web Frontend:** http://localhost:5173
 - **API:** http://localhost:8080
+- **SSH Proxy:** port 2222 (when `ssh.enabled: true`)
 
 ## Architecture
 
@@ -95,74 +96,126 @@ guard:
   max_total_sandboxes: 32
   max_sandboxes_per_ip: 5
   max_sandboxes_per_user: 10
+
+terminal:
+  max_sessions_per_sandbox: 2
+  idle_timeout_minutes: 15
+  max_duration_minutes: 120
+
+ssh:
+  enabled: true
+  port: 2222
+  host: ""
 ```
 
 ### Configuration Overview
 
-| Section  | Key                      | Type   | Default                 | Description                                            |
-|----------|--------------------------|--------|-------------------------|--------------------------------------------------------|
-| logging  | level                    | string | "info"                  | Log level: debug, info, warn, error.                   |
-|          | format                   | string | "json"                  | Log format: json (production) or text (colorized dev). |
-| server   | port                     | int    | 8080                    | The port on which the server runs.                     |
-|          | app_url                  | string | "http://localhost:8080" | The base URL of the application.                       |
-|          | allowed_origins          | array  | []                      | List of allowed CORS origins.                          |
-| database | host                     | string | "localhost"             | Database host address.                                 |
-|          | port                     | int    | 5432                    | Database port.                                         |
-|          | user                     | string | "mrpix_sandbox"         | Database username.                                     |
-|          | password                 | string | "sandXbox_mrpix2025"    | Database password.                                     |
-|          | name                     | string | "mrpix_sandbox"         | Database name.                                         |
-|          | sslmode                  | string | "disable"               | PostgreSQL SSL mode.                                   |
-| auth     | jwt_secret               | string | "local-dev-secret"      | JWT signing secret.                                    |
-|          | jwt_ttl_minutes          | int    | 480                     | JWT token TTL in minutes.                              |
-|          | guest_jwt_ttl_minutes    | int    | 43200                   | Guest JWT token TTL in minutes.                        |
-|          | guest_cookie_name        | string | "shopshredder_guest"    | Cookie name for guest tokens.                          |
-| sandbox  | url_prefix               | string | "sandbox-"              | Prefix for sandbox URLs.                               |
-|          | url_suffix               | string | ".localhost"            | Suffix for sandbox URLs.                               |
-|          | default_lifetime         | int    | 60                      | Default sandbox lifetime in minutes.                   |
-|          | max_lifetime             | int    | 1440                    | Maximum sandbox lifetime in minutes.                   |
-|          | cleanup_interval_seconds | int    | 60                      | Interval between cleanup runs in seconds.              |
-|          | internal_port            | int    | 80                      | Internal container port.                               |
-| docker   | mode                     | string | "port"                  | Docker mode ("port" or "traefik").                     |
-|          | network                  | string | "internal"              | Docker network name.                                   |
-|          | traefik_enable           | bool   | false                   | Enable Traefik integration.                            |
-|          | traefik_entrypoints      | string | "websecure"             | Traefik entrypoints.                                   |
-|          | traefik_certresolver     | string | "production"            | Traefik certificate resolver.                          |
-|          | traefik_middlewares      | string | ""                      | Traefik middlewares (comma-separated).                 |
-|          | snapshot_author          | string | "shopshredder-api"      | Author for container snapshots.                        |
-|          | snapshot_comment         | string | ""                      | Comment for container snapshots.                       |
-| storage  | thumbnail_dir            | string | "storage/thumbnails"    | Directory for image thumbnail files.                   |
-| guard    | max_total_sandboxes      | int    | 32                      | Maximum number of sandboxes allowed in total.          |
-|          | max_sandboxes_per_ip     | int    | 5                       | Maximum number of concurrent sandboxes per IP address. |
-|          | max_sandboxes_per_user   | int    | 10                      | Maximum number of concurrent sandboxes per user.       |
+| Section  | Key                      | Type   | Default                 | Description                                                                                                                                                           |
+|----------|--------------------------|--------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| logging  | level                    | string | "info"                  | Log level: debug, info, warn, error.                                                                                                                                  |
+|          | format                   | string | "json"                  | Log format: json (production) or text (colorized dev).                                                                                                                |
+| server   | port                     | int    | 8080                    | The port on which the server runs.                                                                                                                                    |
+|          | app_url                  | string | "http://localhost:8080" | The base URL of the application.                                                                                                                                      |
+|          | allowed_origins          | array  | []                      | List of allowed CORS origins.                                                                                                                                         |
+| database | host                     | string | "localhost"             | Database host address.                                                                                                                                                |
+|          | port                     | int    | 5432                    | Database port.                                                                                                                                                        |
+|          | user                     | string | "mrpix_sandbox"         | Database username.                                                                                                                                                    |
+|          | password                 | string | "sandXbox_mrpix2025"    | Database password.                                                                                                                                                    |
+|          | name                     | string | "mrpix_sandbox"         | Database name.                                                                                                                                                        |
+|          | sslmode                  | string | "disable"               | PostgreSQL SSL mode.                                                                                                                                                  |
+| auth     | jwt_secret               | string | "local-dev-secret"      | JWT signing secret.                                                                                                                                                   |
+|          | jwt_ttl_minutes          | int    | 480                     | JWT token TTL in minutes.                                                                                                                                             |
+|          | guest_jwt_ttl_minutes    | int    | 43200                   | Guest JWT token TTL in minutes.                                                                                                                                       |
+|          | guest_cookie_name        | string | "shopshredder_guest"    | Cookie name for guest tokens.                                                                                                                                         |
+| sandbox  | url_prefix               | string | "sandbox-"              | Prefix for sandbox URLs.                                                                                                                                              |
+|          | url_suffix               | string | ".localhost"            | Suffix for sandbox URLs.                                                                                                                                              |
+|          | default_lifetime         | int    | 60                      | Default sandbox lifetime in minutes.                                                                                                                                  |
+|          | max_lifetime             | int    | 1440                    | Maximum sandbox lifetime in minutes.                                                                                                                                  |
+|          | cleanup_interval_seconds | int    | 60                      | Interval between cleanup runs in seconds.                                                                                                                             |
+|          | internal_port            | int    | 80                      | Internal container port.                                                                                                                                              |
+| docker   | mode                     | string | "port"                  | Docker mode ("port" or "traefik").                                                                                                                                    |
+|          | network                  | string | "internal"              | Docker network name.                                                                                                                                                  |
+|          | traefik_enable           | bool   | false                   | Enable Traefik integration.                                                                                                                                           |
+|          | traefik_entrypoints      | string | "websecure"             | Traefik entrypoints.                                                                                                                                                  |
+|          | traefik_certresolver     | string | "production"            | Traefik certificate resolver.                                                                                                                                         |
+|          | traefik_middlewares      | string | ""                      | Traefik middlewares (comma-separated).                                                                                                                                |
+|          | snapshot_author          | string | "shopshredder-api"      | Author for container snapshots.                                                                                                                                       |
+|          | snapshot_comment         | string | ""                      | Comment for container snapshots.                                                                                                                                      |
+| storage  | thumbnail_dir            | string | "storage/thumbnails"    | Directory for image thumbnail files.                                                                                                                                  |
+| guard    | max_total_sandboxes      | int    | 32                      | Maximum number of sandboxes allowed in total.                                                                                                                         |
+|          | max_sandboxes_per_ip     | int    | 5                       | Maximum number of concurrent sandboxes per IP address.                                                                                                                |
+|          | max_sandboxes_per_user   | int    | 10                      | Maximum number of concurrent sandboxes per user.                                                                                                                      |
+| terminal | max_sessions_per_sandbox | int    | 2                       | Maximum concurrent terminal sessions per sandbox.                                                                                                                     |
+|          | idle_timeout_minutes     | int    | 15                      | Close terminal after N minutes of inactivity.                                                                                                                         |
+|          | max_duration_minutes     | int    | 120                     | Maximum terminal session duration in minutes.                                                                                                                         |
+| ssh      | enabled                  | bool   | false                   | Enable the built-in SSH proxy server.                                                                                                                                 |
+|          | port                     | int    | 2222                    | Port the SSH proxy listens on.                                                                                                                                        |
+|          | host                     | string | ""                      | SSH host shown to clients. Supports templates: `{{.SandboxID}}`, `{{.ContainerName}}`, `{{.ContainerID}}`, `{{.ContainerShortID}}`. Empty = derived from sandbox URL. |
 
 ### Overriding Configuration with Environment Variables
 
 The application supports environment variables to override configuration values.
 
-| Environment Variable         | Corresponding Config Key     |
-|------------------------------|------------------------------|
-| LOGGING_LEVEL                | logging.level                |
-| LOGGING_FORMAT               | logging.format               |
-| SERVER_PORT                  | server.port                  |
-| SERVER_APP_URL               | server.app_url               |
-| DATABASE_HOST                | database.host                |
-| DATABASE_PORT                | database.port                |
-| DATABASE_USER                | database.user                |
-| DATABASE_PASSWORD            | database.password            |
-| DATABASE_NAME                | database.name                |
-| DATABASE_SSLMODE             | database.sslmode             |
-| AUTH_JWT_SECRET              | auth.jwt_secret              |
-| AUTH_JWT_TTL_MINUTES         | auth.jwt_ttl_minutes         |
-| SANDBOX_URL_PREFIX           | sandbox.url_prefix           |
-| SANDBOX_URL_SUFFIX           | sandbox.url_suffix           |
-| SANDBOX_DEFAULT_LIFETIME     | sandbox.default_lifetime     |
-| SANDBOX_MAX_LIFETIME         | sandbox.max_lifetime         |
-| DOCKER_MODE                  | docker.mode                  |
-| DOCKER_NETWORK               | docker.network               |
-| DOCKER_TRAEFIK_ENABLE        | docker.traefik_enable        |
-| GUARD_MAX_TOTAL_SANDBOXES    | guard.max_total_sandboxes    |
-| GUARD_MAX_SANDBOXES_PER_IP   | guard.max_sandboxes_per_ip   |
-| GUARD_MAX_SANDBOXES_PER_USER | guard.max_sandboxes_per_user |
+| Environment Variable              | Corresponding Config Key          |
+|-----------------------------------|-----------------------------------|
+| LOGGING_LEVEL                     | logging.level                     |
+| LOGGING_FORMAT                    | logging.format                    |
+| SERVER_PORT                       | server.port                       |
+| SERVER_APP_URL                    | server.app_url                    |
+| DATABASE_HOST                     | database.host                     |
+| DATABASE_PORT                     | database.port                     |
+| DATABASE_USER                     | database.user                     |
+| DATABASE_PASSWORD                 | database.password                 |
+| DATABASE_NAME                     | database.name                     |
+| DATABASE_SSLMODE                  | database.sslmode                  |
+| AUTH_JWT_SECRET                   | auth.jwt_secret                   |
+| AUTH_JWT_TTL_MINUTES              | auth.jwt_ttl_minutes              |
+| SANDBOX_URL_PREFIX                | sandbox.url_prefix                |
+| SANDBOX_URL_SUFFIX                | sandbox.url_suffix                |
+| SANDBOX_DEFAULT_LIFETIME          | sandbox.default_lifetime          |
+| SANDBOX_MAX_LIFETIME              | sandbox.max_lifetime              |
+| DOCKER_MODE                       | docker.mode                       |
+| DOCKER_NETWORK                    | docker.network                    |
+| DOCKER_TRAEFIK_ENABLE             | docker.traefik_enable             |
+| GUARD_MAX_TOTAL_SANDBOXES         | guard.max_total_sandboxes         |
+| GUARD_MAX_SANDBOXES_PER_IP        | guard.max_sandboxes_per_ip        |
+| GUARD_MAX_SANDBOXES_PER_USER      | guard.max_sandboxes_per_user      |
+| TERMINAL_MAX_SESSIONS_PER_SANDBOX | terminal.max_sessions_per_sandbox |
+| TERMINAL_IDLE_TIMEOUT_MINUTES     | terminal.idle_timeout_minutes     |
+| TERMINAL_MAX_DURATION_MINUTES     | terminal.max_duration_minutes     |
+| SSH_ENABLED                       | ssh.enabled                       |
+| SSH_PORT                          | ssh.port                          |
+| SSH_HOST                          | ssh.host                          |
+
+### SSH Proxy
+
+The api includes a built in SSH proxy that routes ssh connections to sandbox containers. Clients connect using the sandbox id encoded in the ssh username:
+
+```bash
+ssh <username-in-registry-ssh.username>+<sandboxID>@<host> -p <ssh.port>
+```
+
+The proxy splits the username on `+`: the left part is forwarded as the ssh login user to the container, the right part identifies the sandbox. Credentials (username + password) are forwarded transparently to the container's sshd
+
+SSH credentials per image are defined in the registry (`api/registry.yml`):
+
+```yaml
+images:
+  - match: "dockware/*"
+    ssh:
+      port: 22
+      username: "dockware"
+      password: "dockware"
+```
+
+Images without an `ssh` block will not have ssh access. The `ssh.host` config supports templates for dynamic hostnames:
+
+| Template Variable       | Example                         |
+|-------------------------|---------------------------------|
+| `{{.SandboxID}}`        | `d3bb39e0-d352-493d-...`        |
+| `{{.ContainerName}}`    | `sandbox-d3bb39e0-d352-...`     |
+| `{{.ContainerID}}`      | `7df8f332e210a4b...` (64 chars) |
+| `{{.ContainerShortID}}` | `7df8f332e210` (12 chars)       |
 
 ### Docker Compose Environment (`.env`)
 
@@ -230,6 +283,7 @@ If using Docker Desktop on macOS, set your socket path in `.env`:
 ```
 DOCKER_SOCKET_PATH=/Users/<username>/.docker/run/docker.sock
 ```
+
 ```
 DOCKER_HOST=/Users/<username>/.docker/run/docker.sock
 ```

@@ -31,6 +31,7 @@ type SandboxHealthEvent struct {
 	LatencyMs     int64     `json:"latencyMs,omitempty"`
 	FailureReason string    `json:"failureReason,omitempty"`
 	Message       string    `json:"message,omitempty"`
+	StateReason   string    `json:"stateReason,omitempty"`
 	CheckedAt     time.Time `json:"checkedAt"`
 }
 
@@ -41,7 +42,7 @@ type sandboxHealthState struct {
 }
 
 type HealthCheckResolver interface {
-	ResolveHealthCheck(imageName string) *registry.HealthCheckConfig
+	ResolveEntry(imageName string) *registry.ImageEntry
 }
 
 type SandboxHealthService struct {
@@ -102,7 +103,10 @@ func (s *SandboxHealthService) StartMonitoringActive() {
 	}
 
 	for _, sandbox := range sandboxes {
-		s.StartMonitoring(sandbox.ID)
+		switch sandbox.Status {
+		case models.SandboxStatusStarting, models.SandboxStatusRunning:
+			s.StartMonitoring(sandbox.ID)
+		}
 	}
 }
 
@@ -164,7 +168,7 @@ func (s *SandboxHealthService) runProbe(sandboxID uuid.UUID) bool {
 	if err != nil {
 		s.broadcastFinal(sandboxID, SandboxHealthEvent{
 			SandboxID: sandboxID,
-			Status:    "not_found",
+			Status:    models.HealthStatusNotFound,
 			Ready:     false,
 			Message:   "Sandbox not found",
 			CheckedAt: time.Now().UTC(),
@@ -177,21 +181,29 @@ func (s *SandboxHealthService) runProbe(sandboxID uuid.UUID) bool {
 		event := s.probeSandbox(sandbox, false)
 		if event.Ready {
 			sandbox.Status = models.SandboxStatusRunning
+			sandbox.StateReason = nil
 			if err := s.repo.Update(sandbox); err != nil {
 				event.Ready = false
 				event.Status = "error"
-				event.FailureReason = "status_update_failed"
 				event.Message = fmt.Sprintf("Could not persist running state: %v", err)
 				s.broadcast(sandboxID, event)
 				return false
 			}
-			event.Status = "ready"
+			event.Status = models.HealthStatusReady
+			event.StateReason = ""
+		} else {
+			event.StateReason = stateReasonFromProbe(event)
 		}
 		s.broadcast(sandboxID, event)
 		return false
 
 	case models.SandboxStatusRunning:
-		s.broadcast(sandboxID, s.probeSandbox(sandbox, true))
+		event := s.probeSandbox(sandbox, true)
+		if !event.Ready {
+			event.Status = models.HealthStatusOffline
+			event.StateReason = stateReasonFromProbe(event)
+		}
+		s.broadcast(sandboxID, event)
 		return false
 
 	default:
@@ -214,7 +226,9 @@ func (s *SandboxHealthService) getHealthConfig(sandbox *models.Sandbox) *registr
 
 	img, err := s.imgRepo.FindByID(sandbox.ImageID)
 	if err == nil && s.resolver != nil {
-		hc = s.resolver.ResolveHealthCheck(img.RegistryName())
+		if entry := s.resolver.ResolveEntry(img.RegistryName()); entry != nil {
+			hc = entry.HealthCheck
+		}
 	}
 
 	s.mu.Lock()
@@ -224,9 +238,9 @@ func (s *SandboxHealthService) getHealthConfig(sandbox *models.Sandbox) *registr
 }
 
 func (s *SandboxHealthService) probeSandbox(sandbox *models.Sandbox, wasReady bool) SandboxHealthEvent {
-	status := "probing"
+	status := models.HealthStatusProbing
 	if wasReady || sandbox.Status == models.SandboxStatusRunning {
-		status = "offline"
+		status = models.HealthStatusOffline
 	}
 
 	probeURL := sandbox.URL
@@ -279,7 +293,7 @@ func (s *SandboxHealthService) probeSandbox(sandbox *models.Sandbox, wasReady bo
 
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest {
 		event.Ready = true
-		event.Status = "ready"
+		event.Status = models.HealthStatusReady
 		event.Message = "Sandbox URL is reachable"
 		return event
 	}
@@ -368,18 +382,122 @@ func sandboxHealthEventFromStatus(sandbox *models.Sandbox) SandboxHealthEvent {
 		CheckedAt: time.Now().UTC(),
 	}
 
+	if sandbox.StateReason != nil {
+		event.StateReason = *sandbox.StateReason
+	}
+
 	switch sandbox.Status {
 	case models.SandboxStatusRunning:
-		event.Status = "ready"
+		event.Status = models.HealthStatusReady
 		event.Message = "Sandbox URL is reachable"
 	case models.SandboxStatusStarting:
-		event.Status = "probing"
+		event.Status = models.HealthStatusProbing
 		event.Message = "Sandbox is still starting"
 	default:
 		event.Message = fmt.Sprintf("Sandbox is %s", sandbox.Status)
 	}
 
 	return event
+}
+
+type SandboxStreamEvent struct {
+	SandboxID   uuid.UUID
+	Status      string
+	StateReason string
+}
+
+func (s *SandboxHealthService) WatchStream(ctx context.Context, sandbox *models.Sandbox) <-chan SandboxStreamEvent {
+	out := make(chan SandboxStreamEvent, 8)
+
+	switch sandbox.Status {
+	case models.SandboxStatusStarting, models.SandboxStatusRunning:
+		go s.streamFromHealth(ctx, sandbox, out)
+	default:
+		go s.streamFromDB(ctx, sandbox.ID, out)
+	}
+
+	return out
+}
+
+func (s *SandboxHealthService) streamFromHealth(ctx context.Context, sandbox *models.Sandbox, out chan<- SandboxStreamEvent) {
+	defer close(out)
+
+	ch, cancel := s.Watch(sandbox)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			status := event.Status
+			if event.Ready {
+				status = string(models.SandboxStatusRunning)
+			}
+			select {
+			case out <- SandboxStreamEvent{
+				SandboxID:   event.SandboxID,
+				Status:      status,
+				StateReason: event.StateReason,
+			}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+}
+
+func (s *SandboxHealthService) streamFromDB(ctx context.Context, id uuid.UUID, out chan<- SandboxStreamEvent) {
+	defer close(out)
+
+	send := func() bool {
+		sandbox, err := s.repo.FindByID(id)
+		if err != nil {
+			select {
+			case out <- SandboxStreamEvent{SandboxID: id, Status: string(models.SandboxStatusFailed)}:
+			case <-ctx.Done():
+			}
+			return true
+		}
+		reason := ""
+		if sandbox.StateReason != nil {
+			reason = *sandbox.StateReason
+		}
+		select {
+		case out <- SandboxStreamEvent{SandboxID: sandbox.ID, Status: string(sandbox.Status), StateReason: reason}:
+		case <-ctx.Done():
+			return true
+		}
+		return !sandbox.Status.IsTransitional()
+	}
+
+	if send() {
+		return
+	}
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if send() {
+				return
+			}
+		}
+	}
+}
+
+func stateReasonFromProbe(event SandboxHealthEvent) string {
+	if event.FailureReason != "" {
+		return "Nicht erreichbar"
+	}
+	return "Warte auf HTTP-Bereitschaft"
 }
 
 func classifyProbeError(err error) string {

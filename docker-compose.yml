@@ -4,6 +4,8 @@ services:
     restart: always
     expose:
       - 8080
+    ports:
+      - "${SSH_PORT:-2222}:${SSH_PORT:-2222}"
     environment:
       CONFIG_PATH: /app/config.yml
       DOCKER_HOST: unix:///var/run/docker.sock
