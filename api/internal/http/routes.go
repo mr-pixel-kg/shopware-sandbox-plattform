@@ -67,12 +67,13 @@ func newEcho(cfg config.Config) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.Validator = NewValidator()
+	e.Use(authmw.EnsureClientToken())
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
 	e.Use(logging.EchoRequestLogger())
 	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
 		AllowOrigins:     cfg.Server.AllowedOrigins,
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Client-Token"},
 		AllowCredentials: true,
 	}))
 	return e
@@ -223,14 +224,15 @@ func registerAPIRoutes(
 	private.DELETE("/images/:id", imageHandler.Delete)
 	private.POST("/images/:id/thumbnail", imageHandler.UploadThumbnail)
 	private.DELETE("/images/:id/thumbnail", imageHandler.DeleteThumbnail)
-	private.GET("/sandboxes", sandboxHandler.List)
+	private.GET("/sandboxes", sandboxHandler.List, authmw.RequireAdmin())
 	private.GET("/sandboxes/:id", sandboxHandler.Get)
 	private.POST("/sandboxes", sandboxHandler.CreatePrivateSandbox)
 	private.DELETE("/sandboxes/:id", sandboxHandler.Delete)
 	private.PATCH("/sandboxes/:id", sandboxHandler.Update)
 	private.PATCH("/sandboxes/:id/ttl", sandboxHandler.ExtendTTL)
 	private.POST("/sandboxes/:id/snapshot", sandboxHandler.Snapshot)
-	private.GET("/audit-logs", auditHandler.List)
+	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
 
 	admin := private.Group("/admin")
 	admin.Use(authmw.RequireAdmin())
