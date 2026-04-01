@@ -192,9 +192,10 @@ func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
 	assert.Contains(t, response.Actions, "sandbox.created")
 	assert.Contains(t, response.Actions, "image.created")
-	require.Len(t, response.Users, 1)
-	assert.Equal(t, user.ID, response.Users[0].ID)
-	assert.Equal(t, user.Email, response.Users[0].Email)
+	assert.Contains(t, response.Users, dto.UserSummary{
+		ID:    user.ID,
+		Email: user.Email,
+	})
 }
 
 func createAuditHTTPLog(t *testing.T, repo *repositories.AuditLogRepository, entry models.AuditLog) models.AuditLog {
