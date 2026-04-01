@@ -13,7 +13,12 @@ import (
 )
 
 type AuditService struct {
-	repo *repositories.AuditLogRepository
+	repo auditLogStore
+}
+
+type auditLogStore interface {
+	Create(entry *models.AuditLog) error
+	List(options repositories.AuditLogListOptions) ([]models.AuditLog, int64, error)
 }
 
 type AuditActor struct {
@@ -50,7 +55,7 @@ type AuditLogListResult struct {
 	Offset int
 }
 
-func NewAuditService(repo *repositories.AuditLogRepository) *AuditService {
+func NewAuditService(repo auditLogStore) *AuditService {
 	return &AuditService{repo: repo}
 }
 
