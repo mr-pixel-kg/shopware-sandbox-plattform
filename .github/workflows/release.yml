@@ -31,7 +31,7 @@ jobs:
 
       - name: Build WEB Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }} -f web/Dockerfile --build-arg VITE_BACKEND_URL=https://shopschredder-api.zion.mr-pixel.de ./web
+          docker build -t ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }} -f web/Dockerfile ./web
           docker tag ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:${{ env.TAG }} ghcr.io/${{ github.repository_owner }}/mpxsandbox-web:latest
 
       - name: Push Docker Image

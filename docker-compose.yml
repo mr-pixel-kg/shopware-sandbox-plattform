@@ -38,6 +38,7 @@ services:
       - "traefik.http.routers.sandbox-api.rule=Host(`${API_DOMAIN}`)"
       - "traefik.http.routers.sandbox-api.tls=true"
       - "traefik.http.routers.sandbox-api.tls.certresolver=production"
+      - "traefik.http.services.sandbox-api.loadbalancer.server.port=8080"
 
   web:
     image: ghcr.io/mr-pixel-kg/mpxsandbox-web:latest
