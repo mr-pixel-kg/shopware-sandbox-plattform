@@ -262,6 +262,24 @@ definitions:
     - email
     - password
     type: object
+  dto.SSHConnectionInfo:
+    properties:
+      command:
+        example: ssh sandbox-883990ba@host -p 2222
+        type: string
+      host:
+        example: sandbox-abc.zion.mr-pixel.de
+        type: string
+      password:
+        example: dockware
+        type: string
+      port:
+        example: 2222
+        type: integer
+      username:
+        example: sandbox-883990ba-7f3d-4156-9c5b-f878143f1273
+        type: string
+    type: object
   dto.SandboxHealthEvent:
     properties:
       checkedAt:
@@ -336,6 +354,8 @@ definitions:
       port:
         example: 8080
         type: integer
+      ssh:
+        $ref: '#/definitions/dto.SSHConnectionInfo'
       stateReason:
         example: Snapshot wird erstellt
         type: string

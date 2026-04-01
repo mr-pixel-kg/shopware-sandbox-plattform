@@ -27,7 +27,7 @@ type ImageHandler struct {
 }
 
 type RegistryResolver interface {
-	ResolveMetadata(imageName string) []registry.MetadataItem
+	ResolveEntry(imageName string) *registry.ImageEntry
 }
 
 func NewImageHandler(images *services.ImageService, audit *services.AuditService, resolver RegistryResolver) *ImageHandler {
@@ -434,13 +434,23 @@ func (h *ImageHandler) RegistryLookup(c echo.Context) error {
 		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "name or id query parameter is required"))
 	}
 
-	meta := h.resolver.ResolveMetadata(name)
+	entry := h.resolver.ResolveEntry(name)
+	if entry == nil {
+		return c.JSON(http.StatusOK, []registry.MetadataItem{})
+	}
+	meta := make([]registry.MetadataItem, len(entry.Metadata))
+	copy(meta, entry.Metadata)
 	return c.JSON(http.StatusOK, meta)
 }
 
 func (h *ImageHandler) enrichMetadata(images []models.Image) {
 	for i := range images {
-		reg := h.resolver.ResolveMetadata(images[i].RegistryName())
+		entry := h.resolver.ResolveEntry(images[i].RegistryName())
+		if entry == nil {
+			continue
+		}
+		reg := make([]registry.MetadataItem, len(entry.Metadata))
+		copy(reg, entry.Metadata)
 		merged := mergeRegistryAndDB(reg, images[i].Metadata)
 		data, _ := json.Marshal(merged)
 		images[i].Metadata = datatypes.JSON(data)

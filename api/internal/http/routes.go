@@ -19,6 +19,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/repositories"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"github.com/manuel/shopware-testenv-platform/api/internal/sshproxy"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"gorm.io/gorm"
 )
@@ -39,6 +40,7 @@ type runtimeServices struct {
 	terminal      *services.TerminalService
 	resolver      *registry.Resolver
 	userRepo      *repositories.UserRepository
+	dockerSDK     *client.Client
 }
 
 func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
@@ -49,7 +51,7 @@ func NewServer(cfg config.Config, db *gorm.DB) (*Server, error) {
 		return nil, err
 	}
 
-	startBackgroundJobs(runtime)
+	startBackgroundJobs(cfg, runtime)
 	registerRoutes(e, cfg, runtime)
 
 	slog.Debug("http routes registered",
@@ -128,15 +130,31 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 		terminal:      terminalService,
 		resolver:      resolver,
 		userRepo:      userRepo,
+		dockerSDK:     sdkClient,
 	}, nil
 }
 
-func startBackgroundJobs(runtime *runtimeServices) {
+func startBackgroundJobs(cfg config.Config, runtime *runtimeServices) {
 	runtime.sandbox.ReconcileOnStartup(context.Background())
 	runtime.sandbox.StartCleanupLoop(context.Background())
 	runtime.sandbox.StartDockerEventLoop(context.Background())
 	runtime.sandboxHealth.StartMonitoringActive()
 	runtime.image.ReconcileOnStartup(context.Background())
+
+	if cfg.SSH.Enabled {
+		srv := sshproxy.NewServer(
+			fmt.Sprintf(":%d", cfg.SSH.Port),
+			"",
+			cfg.Sandbox.URLPrefix,
+			runtime.dockerSDK,
+			cfg.Docker.Network,
+		)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil {
+				slog.Error("SSH proxy server failed", "error", err)
+			}
+		}()
+	}
 }
 
 func registerRoutes(e *echo.Echo, cfg config.Config, runtime *runtimeServices) {
@@ -150,6 +168,7 @@ func registerRoutes(e *echo.Echo, cfg config.Config, runtime *runtimeServices) {
 		runtime.auth,
 		runtime.guest,
 		cfg.Auth.GuestCookieName,
+		cfg.SSH,
 	)
 	auditHandler := handlers.NewAuditHandler(runtime.audit)
 	userHandler := handlers.NewUserHandler(runtime.user, runtime.audit)

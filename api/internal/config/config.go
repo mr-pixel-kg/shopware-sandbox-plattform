@@ -21,6 +21,7 @@ type Config struct {
 	Storage      StorageConfig
 	Guard        GuardConfig
 	Terminal     TerminalConfig
+	SSH          SSHConfig
 	RegistryPath string
 }
 
@@ -123,6 +124,12 @@ type TerminalConfig struct {
 	MaxDurationMinutes    int
 }
 
+type SSHConfig struct {
+	Enabled bool
+	Port    int
+	Host    string
+}
+
 func MustLoad() Config {
 	_ = godotenv.Load("../.env")
 
@@ -199,6 +206,11 @@ func MustLoad() Config {
 			MaxSessionsPerSandbox: v.GetInt("terminal.max_sessions_per_sandbox"),
 			IdleTimeoutMinutes:    v.GetInt("terminal.idle_timeout_minutes"),
 			MaxDurationMinutes:    v.GetInt("terminal.max_duration_minutes"),
+		},
+		SSH: SSHConfig{
+			Enabled: v.GetBool("ssh.enabled"),
+			Port:    v.GetInt("ssh.port"),
+			Host:    v.GetString("ssh.host"),
 		},
 		RegistryPath: v.GetString("registry_path"),
 	}
@@ -288,6 +300,10 @@ func MustLoad() Config {
 	if cfg.Terminal.MaxDurationMinutes == 0 {
 		cfg.Terminal.MaxDurationMinutes = 120
 	}
+	if cfg.SSH.Port == 0 {
+		cfg.SSH.Port = 2222
+	}
+
 	if cfg.RegistryPath == "" {
 		cfg.RegistryPath = "registry.yml"
 	}

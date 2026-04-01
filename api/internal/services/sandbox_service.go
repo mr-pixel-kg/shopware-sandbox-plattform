@@ -224,6 +224,14 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		}
 	}
 
+	sshPort := 0
+	if resolved.SSH != nil {
+		sshPort = resolved.SSH.Port
+		labels["sandbox_ssh_port"] = strconv.Itoa(resolved.SSH.Port)
+		labels["sandbox_ssh_username"] = resolved.SSH.Username
+		labels["sandbox_ssh_password"] = resolved.SSH.Password
+	}
+
 	container, err := s.docker.CreateContainer(ctx, docker.ContainerCreateRequest{
 		ImageName:     image.FullName(),
 		ContainerName: containerName,
@@ -231,6 +239,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		Env:           resolved.Env,
 		Labels:        labels,
 		InternalPort:  internalPort,
+		SSHPort:       sshPort,
 	})
 	if err != nil {
 		return nil, err

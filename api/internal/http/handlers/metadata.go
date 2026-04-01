@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"gorm.io/datatypes"
@@ -40,48 +41,63 @@ func mergeRegistryAndDB(reg []registry.MetadataItem, dbJSON datatypes.JSON) []re
 	return merged
 }
 
-func (h *SandboxHandler) enrichSandboxMetadata(sandboxes []models.Sandbox) {
-	imageCache := make(map[uuid.UUID][]registry.MetadataItem)
+func (h *SandboxHandler) enrichSandboxes(sandboxes []models.Sandbox, responses []dto.SandboxResponse) {
+	type cachedEntry struct {
+		metadata []registry.MetadataItem
+		ssh      *registry.SSHEntry
+	}
+	cache := make(map[uuid.UUID]*cachedEntry)
 
 	for idx := range sandboxes {
 		sb := &sandboxes[idx]
-		imgMeta, ok := imageCache[sb.ImageID]
+
+		entry, ok := cache[sb.ImageID]
 		if !ok {
 			img, err := h.images.FindByID(sb.ImageID)
 			if err != nil {
-				slog.Warn("enrich sandbox metadata: image not found", "image_id", sb.ImageID)
-				imageCache[sb.ImageID] = nil
-			} else {
-				reg := h.resolver.ResolveMetadata(img.RegistryName())
-				imgMeta = mergeRegistryAndDB(reg, img.Metadata)
-				imageCache[sb.ImageID] = imgMeta
+				slog.Warn("enrich sandbox: image not found", "image_id", sb.ImageID)
+				cache[sb.ImageID] = nil
+				continue
 			}
+			regEntry := h.resolver.ResolveEntry(img.RegistryName())
+			if regEntry != nil {
+				meta := mergeRegistryAndDB(regEntry.Metadata, img.Metadata)
+				entry = &cachedEntry{metadata: meta, ssh: regEntry.SSH}
+			}
+			cache[sb.ImageID] = entry
 		}
 
-		if imgMeta == nil {
+		if entry == nil {
 			continue
 		}
 
-		var values map[string]string
-		if len(sb.Metadata) > 0 {
-			_ = json.Unmarshal(sb.Metadata, &values)
-		}
-
-		enriched := make([]registry.MetadataItem, len(imgMeta))
-		copy(enriched, imgMeta)
-		for j := range enriched {
-			if v, exists := values[enriched[j].Key]; exists {
-				enriched[j].Value = v
+		if len(entry.metadata) > 0 {
+			var values map[string]string
+			if len(sb.Metadata) > 0 {
+				_ = json.Unmarshal(sb.Metadata, &values)
 			}
+			enriched := make([]registry.MetadataItem, len(entry.metadata))
+			copy(enriched, entry.metadata)
+			for j := range enriched {
+				if v, exists := values[enriched[j].Key]; exists {
+					enriched[j].Value = v
+				}
+			}
+			data, _ := json.Marshal(enriched)
+			sb.Metadata = datatypes.JSON(data)
 		}
 
-		data, _ := json.Marshal(enriched)
-		sb.Metadata = datatypes.JSON(data)
+		// Enrich SSH
+		if h.sshCfg.Enabled {
+			responses[idx].SSH = buildSSHInfo(sb, h.sshCfg, entry.ssh)
+		}
 	}
 }
 
-func (h *SandboxHandler) enrichSandbox(sandbox *models.Sandbox) {
+func (h *SandboxHandler) enrichSandbox(sandbox *models.Sandbox) dto.SandboxResponse {
 	sl := []models.Sandbox{*sandbox}
-	h.enrichSandboxMetadata(sl)
+	resp := []dto.SandboxResponse{toSandboxResponse(sandbox)}
+	h.enrichSandboxes(sl, resp)
 	*sandbox = sl[0]
+	return resp[0]
 }

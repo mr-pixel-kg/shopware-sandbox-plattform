@@ -42,7 +42,7 @@ type sandboxHealthState struct {
 }
 
 type HealthCheckResolver interface {
-	ResolveHealthCheck(imageName string) *registry.HealthCheckConfig
+	ResolveEntry(imageName string) *registry.ImageEntry
 }
 
 type SandboxHealthService struct {
@@ -226,7 +226,9 @@ func (s *SandboxHealthService) getHealthConfig(sandbox *models.Sandbox) *registr
 
 	img, err := s.imgRepo.FindByID(sandbox.ImageID)
 	if err == nil && s.resolver != nil {
-		hc = s.resolver.ResolveHealthCheck(img.RegistryName())
+		if entry := s.resolver.ResolveEntry(img.RegistryName()); entry != nil {
+			hc = entry.HealthCheck
+		}
 	}
 
 	s.mu.Lock()

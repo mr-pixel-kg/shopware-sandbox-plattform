@@ -2306,6 +2306,31 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.SSHConnectionInfo": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "example": "ssh sandbox-883990ba@host -p 2222"
+                },
+                "host": {
+                    "type": "string",
+                    "example": "sandbox-abc.zion.mr-pixel.de"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "dockware"
+                },
+                "port": {
+                    "type": "integer",
+                    "example": 2222
+                },
+                "username": {
+                    "type": "string",
+                    "example": "sandbox-883990ba-7f3d-4156-9c5b-f878143f1273"
+                }
+            }
+        },
         "dto.SandboxHealthEvent": {
             "type": "object",
             "properties": {
@@ -2405,6 +2430,9 @@ const docTemplate = `{
                 "port": {
                     "type": "integer",
                     "example": 8080
+                },
+                "ssh": {
+                    "$ref": "#/definitions/dto.SSHConnectionInfo"
                 },
                 "stateReason": {
                     "type": "string",

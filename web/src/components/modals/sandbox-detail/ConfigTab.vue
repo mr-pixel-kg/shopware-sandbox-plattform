@@ -28,7 +28,7 @@ function toggleReveal(key: string) {
 function displayValue(item: MetadataItem): string {
   const val = item.value || '—'
   if (!isSecret(item) || revealedKeys.value.has(item.key)) return val
-  return '•'.repeat(Math.min(val.length, 16))
+  return '•'.repeat(Math.min(val.length, 12))
 }
 
 defineExpose({ resetRevealed: () => revealedKeys.value.clear() })

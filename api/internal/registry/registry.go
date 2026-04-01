@@ -24,6 +24,12 @@ type ImageRegistry struct {
 	Images []ImageEntry `yaml:"images"`
 }
 
+type SSHEntry struct {
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
 type ImageEntry struct {
 	Match        string             `yaml:"match"`
 	InternalPort *int               `yaml:"internal_port,omitempty"`
@@ -32,6 +38,7 @@ type ImageEntry struct {
 	PreStop      []ExecCommand      `yaml:"pre_stop,omitempty"`
 	HealthCheck  *HealthCheckConfig `yaml:"health_check,omitempty"`
 	Labels       map[string]string  `yaml:"labels,omitempty"`
+	SSH          *SSHEntry          `yaml:"ssh,omitempty"`
 	Metadata     []MetadataItem     `yaml:"metadata,omitempty"`
 }
 
@@ -69,6 +76,9 @@ type TemplateContext struct {
 	URL            string
 	Scheme         string
 	Port           string
+	SSHPort        string
+	SSHUsername    string
+	SSHPassword    string
 	ContainerName  string
 	TrustedProxies string
 	DockerMode     string
@@ -92,4 +102,5 @@ type ResolvedImage struct {
 	PreStop      []ExecCommand
 	HealthCheck  *HealthCheckConfig
 	Labels       map[string]string
+	SSH          *SSHEntry
 }

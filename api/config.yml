@@ -53,3 +53,8 @@ terminal:
   max_sessions_per_sandbox: 2
   idle_timeout_minutes: 15
   max_duration_minutes: 120
+
+ssh:
+  enabled: true
+  port: 2222
+  host: "{{.SandboxID}}.ssh.shopshredder.de"

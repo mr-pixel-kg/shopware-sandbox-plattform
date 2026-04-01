@@ -67,6 +67,7 @@ type SandboxResponse struct {
 	ContainerName  string               `json:"containerName" example:"sandbox-0b443c82"`
 	URL            string               `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
 	Port           *int                 `json:"port,omitempty" example:"8080"`
+	SSH            *SSHConnectionInfo   `json:"ssh,omitempty"`
 	ClientIP       string               `json:"clientIp" example:"203.0.113.25"`
 	Metadata       datatypes.JSON       `json:"metadata,omitempty" swaggertype:"string"`
 	ExpiresAt      *time.Time           `json:"expiresAt,omitempty" example:"2026-03-20T12:00:00Z"`
@@ -74,6 +75,14 @@ type SandboxResponse struct {
 	CreatedAt      time.Time            `json:"createdAt" example:"2026-03-20T10:15:00Z"`
 	UpdatedAt      time.Time            `json:"updatedAt" example:"2026-03-20T10:20:00Z"`
 	DeletedAt      *time.Time           `json:"deletedAt,omitempty"`
+}
+
+type SSHConnectionInfo struct {
+	Host     string `json:"host" example:"sandbox-abc.zion.mr-pixel.de"`
+	Port     int    `json:"port" example:"2222"`
+	Username string `json:"username" example:"sandbox-883990ba-7f3d-4156-9c5b-f878143f1273"`
+	Password string `json:"password" example:"dockware"`
+	Command  string `json:"command" example:"ssh sandbox-883990ba@host -p 2222"`
 }
 
 type SandboxStreamEvent struct {
