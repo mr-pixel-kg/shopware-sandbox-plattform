@@ -38,12 +38,6 @@ function isSandboxReachable(sandbox: Sandbox): boolean {
   return sandbox.status === 'running'
 }
 
-function getStatusNote(sandbox: Sandbox): string | undefined {
-  if (sandbox.status === 'paused') return sandbox.stateReason || 'Pausiert'
-  if (sandbox.status === 'stopping') return sandbox.stateReason || 'Wird beendet'
-  return undefined
-}
-
 function getImageForSandbox(sandbox: Sandbox): Image | undefined {
   return images.value.find((i) => i.id === sandbox.imageId)
 }
@@ -295,7 +289,7 @@ async function handleDemo(imageId: string) {
               :thumbnail-url="getImageThumbnail(sandbox)"
               :actions="sandboxActionsMap[sandbox.id]"
               :metadata="sandboxMetadataMap[sandbox.id]"
-              :status-note="getStatusNote(sandbox)"
+              :state-reason="sandbox.stateReason"
             />
           </ShredderAnimation>
         </div>

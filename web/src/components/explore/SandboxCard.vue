@@ -4,7 +4,6 @@ import { computed, ref } from 'vue'
 
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { resolveIcon } from '@/utils/icons'
@@ -33,7 +32,7 @@ const props = defineProps<{
   thumbnailUrl?: string
   actions?: CardAction[]
   metadata?: MetadataGroup[]
-  statusNote?: string
+  stateReason?: string
 }>()
 
 const primaryActions = computed(() =>
@@ -70,10 +69,7 @@ async function copyToClipboard(field: MetadataField) {
       <div class="flex items-start justify-between gap-2">
         <CardTitle class="truncate text-sm">{{ title }}</CardTitle>
         <div class="flex items-center gap-2">
-          <StatusBadge :status="sandbox.status" />
-          <Badge v-if="statusNote" variant="destructive" class="text-xs">
-            {{ statusNote }}
-          </Badge>
+          <StatusBadge :status="sandbox.status" :state-reason="stateReason" />
         </div>
       </div>
     </CardHeader>
