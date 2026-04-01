@@ -16,6 +16,7 @@ import (
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	"github.com/manuel/shopware-testenv-platform/api/internal/docker"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
+	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
@@ -81,14 +82,14 @@ func (h *TerminalHandler) checkOrigin(r *http.Request) bool {
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/terminal [get]
 func (h *TerminalHandler) Connect(c echo.Context) error {
-	sandboxID, err := uuid.Parse(c.Param("id"))
+	sandboxID, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	token := c.QueryParam("access_token")
 	if token == "" {
-		if t, ok := parseAuthorizationHeader(c.Request().Header.Get(echo.HeaderAuthorization)); ok {
+		if t, ok := mw.ParseAuthorizationHeader(c.Request().Header.Get(echo.HeaderAuthorization)); ok {
 			token = t
 		}
 	}
@@ -101,28 +102,20 @@ func (h *TerminalHandler) Connect(c echo.Context) error {
 		return responses.FromAppError(c, apperror.Unauthorized("Invalid or expired token"))
 	}
 
-	sandbox, err := h.terminals.ValidateAccess(sandboxID, user)
+	sandbox, err := h.terminals.ValidateAccess(services.ValidateTerminalAccessInput{
+		SandboxID: sandboxID,
+		UserID:    user.ID,
+		IsAdmin:   user.IsAdmin(),
+	})
 	if err != nil {
-		switch {
-		case errors.Is(err, services.ErrSandboxNotFound):
-			return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found"))
-		case errors.Is(err, services.ErrTerminalNotRunning):
-			return responses.FromAppError(c, apperror.Conflict("SANDBOX_NOT_RUNNING", "Sandbox is not running"))
-		case errors.Is(err, services.ErrTerminalAccessDenied):
-			return responses.FromAppError(c, apperror.New(http.StatusForbidden, "TERMINAL_ACCESS_DENIED", "Terminal access denied"))
-		default:
-			return responses.FromAppError(c, apperror.Internal("TERMINAL_ERROR", "Terminal error").WithCause(err))
-		}
+		return mapTerminalError(c, err)
 	}
 
 	cols, rows := parseTerminalSize(c)
 
 	execSession, err := h.terminals.OpenSession(c.Request().Context(), sandbox, cols, rows)
 	if err != nil {
-		if errors.Is(err, services.ErrTerminalSessionLimit) {
-			return responses.FromAppError(c, apperror.Conflict("TERMINAL_SESSION_LIMIT", "Too many active terminal sessions"))
-		}
-		return responses.FromAppError(c, apperror.Internal("TERMINAL_EXEC_FAILED", "Failed to create terminal session").WithCause(err))
+		return mapTerminalError(c, err)
 	}
 
 	ws, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
@@ -139,6 +132,21 @@ func (h *TerminalHandler) Connect(c echo.Context) error {
 
 	slog.Info("terminal session ended", "sandbox_id", sandboxID, "user_id", user.ID)
 	return nil
+}
+
+func mapTerminalError(c echo.Context, err error) error {
+	switch {
+	case errors.Is(err, services.ErrSandboxNotFound):
+		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found"))
+	case errors.Is(err, services.ErrTerminalNotRunning):
+		return responses.FromAppError(c, apperror.Conflict("SANDBOX_NOT_RUNNING", "Sandbox is not running"))
+	case errors.Is(err, services.ErrTerminalAccessDenied):
+		return responses.FromAppError(c, apperror.New(http.StatusForbidden, "TERMINAL_ACCESS_DENIED", "Terminal access denied"))
+	case errors.Is(err, services.ErrTerminalSessionLimit):
+		return responses.FromAppError(c, apperror.Conflict("TERMINAL_SESSION_LIMIT", "Too many active terminal sessions"))
+	default:
+		return responses.FromAppError(c, apperror.Internal("TERMINAL_ERROR", "Terminal error").WithCause(err))
+	}
 }
 
 func (h *TerminalHandler) bridgeConnection(ws *websocket.Conn, exec *docker.ExecSession, sandboxID uuid.UUID) {

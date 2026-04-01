@@ -56,12 +56,8 @@ func (h *WhitelistHandler) List(c echo.Context) error {
 // @Router       /api/admin/whitelist [post]
 func (h *WhitelistHandler) Add(c echo.Context) error {
 	var input dto.AddWhitelistRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
-	}
-
-	if input.Role != models.RoleAdmin && input.Role != models.RoleUser {
-		return responses.FromAppError(c, apperror.BadRequest("INVALID_ROLE", "Role must be 'admin' or 'user'"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -95,9 +91,9 @@ func (h *WhitelistHandler) Add(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/admin/whitelist/{id} [delete]
 func (h *WhitelistHandler) Remove(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "INVALID_ID", "Invalid UUID")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("INVALID_ID", "Invalid UUID"))
+		return responses.FromError(c, err)
 	}
 
 	user, err := h.users.FindByID(id)

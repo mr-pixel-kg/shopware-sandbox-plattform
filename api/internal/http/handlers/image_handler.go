@@ -86,8 +86,8 @@ func (h *ImageHandler) ListAll(c echo.Context) error {
 // @Router       /api/images [post]
 func (h *ImageHandler) Create(c echo.Context) error {
 	var input dto.CreateImageRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -148,14 +148,14 @@ func (h *ImageHandler) Create(c echo.Context) error {
 // @Router       /api/images/{id} [put]
 func (h *ImageHandler) Update(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	var input dto.UpdateImageRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("image update requested", logging.RequestFields(c,
@@ -199,9 +199,9 @@ func (h *ImageHandler) Update(c echo.Context) error {
 // @Router       /api/images/{id}/thumbnail [post]
 func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	fileHeader, err := c.FormFile("thumbnail")
@@ -255,9 +255,9 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 // @Router       /api/images/{id}/thumbnail [delete]
 func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("thumbnail deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
@@ -289,9 +289,9 @@ func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 // @Router       /api/images/{id} [delete]
 func (h *ImageHandler) Delete(c echo.Context) error {
 	auth := mw.MustAuth(c)
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	slog.Debug("image deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
@@ -341,9 +341,9 @@ func (h *ImageHandler) ListPending(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/images/{id}/progress [get]
 func (h *ImageHandler) Progress(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, err)
 	}
 
 	idStr := id.String()

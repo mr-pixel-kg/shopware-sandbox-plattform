@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"log/slog"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -120,9 +119,9 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id} [get]
 func (h *SandboxHandler) Get(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	sandbox, err := h.sandboxes.FindByID(id)
@@ -148,9 +147,9 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/health [get]
 func (h *SandboxHandler) Health(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	sandbox, err := h.sandboxes.FindByID(id)
@@ -195,13 +194,13 @@ func (h *SandboxHandler) Health(c echo.Context) error {
 // @Router       /api/public/demos [post]
 func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 	var input dto.CreateSandboxRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	imageID, err := uuid.Parse(input.ImageID)
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, validationError("Invalid image id"))
 	}
 
 	guest := mw.MustGuest(c)
@@ -249,13 +248,13 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 // @Router       /api/sandboxes [post]
 func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 	var input dto.CreateSandboxRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	imageID, err := uuid.Parse(input.ImageID)
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+		return responses.FromError(c, validationError("Invalid image id"))
 	}
 
 	auth := mw.MustAuth(c)
@@ -305,14 +304,14 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id} [patch]
 func (h *SandboxHandler) Update(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	var input dto.UpdateSandboxRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -351,17 +350,14 @@ func (h *SandboxHandler) Update(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/ttl [patch]
 func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	var input dto.ExtendTTLRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
-	}
-	if input.TTLMinutes != nil && *input.TTLMinutes < 0 {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "ttlMinutes must be 0 (unlimited) or greater"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -399,9 +395,9 @@ func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id} [delete]
 func (h *SandboxHandler) Delete(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -426,9 +422,9 @@ func (h *SandboxHandler) Delete(c echo.Context) error {
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/public/sandboxes/{id} [delete]
 func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	guest := mw.MustGuest(c)
@@ -457,14 +453,14 @@ func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/snapshot [post]
 func (h *SandboxHandler) Snapshot(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	var input dto.CreateSnapshotRequest
-	if err := c.Bind(&input); err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid request body"))
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
 	}
 
 	auth := mw.MustAuth(c)
@@ -515,9 +511,9 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 // @Failure      404 {object} dto.ErrorResponse
 // @Router       /api/sandboxes/{id}/stream [get]
 func (h *SandboxHandler) Stream(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid sandbox id"))
+		return responses.FromError(c, err)
 	}
 
 	sandbox, err := h.sandboxes.FindByID(id)
@@ -556,7 +552,7 @@ func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.S
 	userToken := c.QueryParam("access_token")
 	if userToken == "" {
 		authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
-		if token, ok := parseAuthorizationHeader(authHeader); ok {
+		if token, ok := mw.ParseAuthorizationHeader(authHeader); ok {
 			userToken = token
 		}
 	}
@@ -593,22 +589,4 @@ func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.S
 	}
 
 	return nil
-}
-
-func parseAuthorizationHeader(authHeader string) (string, bool) {
-	parts := strings.Fields(authHeader)
-	switch len(parts) {
-	case 1:
-		if parts[0] == "" || strings.EqualFold(parts[0], "Bearer") {
-			return "", false
-		}
-		return parts[0], true
-	case 2:
-		if !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
-			return "", false
-		}
-		return parts[1], true
-	default:
-		return "", false
-	}
 }

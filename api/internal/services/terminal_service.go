@@ -27,6 +27,12 @@ type TerminalService struct {
 	sessions sync.Map
 }
 
+type ValidateTerminalAccessInput struct {
+	SandboxID uuid.UUID
+	UserID    uuid.UUID
+	IsAdmin   bool
+}
+
 func NewTerminalService(
 	cfg config.TerminalConfig,
 	dockerClient docker.Client,
@@ -43,8 +49,8 @@ func (s *TerminalService) Config() config.TerminalConfig {
 	return s.cfg
 }
 
-func (s *TerminalService) ValidateAccess(sandboxID uuid.UUID, user *models.User) (*models.Sandbox, error) {
-	sandbox, err := s.repo.FindByID(sandboxID)
+func (s *TerminalService) ValidateAccess(input ValidateTerminalAccessInput) (*models.Sandbox, error) {
+	sandbox, err := s.repo.FindByID(input.SandboxID)
 	if err != nil {
 		return nil, ErrSandboxNotFound
 	}
@@ -53,11 +59,11 @@ func (s *TerminalService) ValidateAccess(sandboxID uuid.UUID, user *models.User)
 		return nil, ErrTerminalNotRunning
 	}
 
-	if user.IsAdmin() {
+	if input.IsAdmin {
 		return sandbox, nil
 	}
 
-	if sandbox.OwnerID == nil || *sandbox.OwnerID != user.ID {
+	if sandbox.OwnerID == nil || *sandbox.OwnerID != input.UserID {
 		return nil, ErrTerminalAccessDenied
 	}
 

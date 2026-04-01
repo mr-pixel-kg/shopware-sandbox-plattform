@@ -26,7 +26,7 @@ func Auth(authService *services.AuthService) echo.MiddlewareFunc {
 				return responses.FromAppError(c, apperror.Unauthorized("Missing bearer token"))
 			}
 
-			token, ok := parseAuthorizationHeader(authHeader)
+			token, ok := ParseAuthorizationHeader(authHeader)
 			if !ok {
 				slog.Warn("invalid authorization header format", logging.RequestFields(c, "component", "auth")...)
 				return responses.FromAppError(c, apperror.Unauthorized("Invalid authorization header"))
@@ -65,6 +65,10 @@ func RequireAdmin() echo.MiddlewareFunc {
 }
 
 func parseAuthorizationHeader(authHeader string) (string, bool) {
+	return ParseAuthorizationHeader(authHeader)
+}
+
+func ParseAuthorizationHeader(authHeader string) (string, bool) {
 	parts := strings.Fields(authHeader)
 	switch len(parts) {
 	case 1:
