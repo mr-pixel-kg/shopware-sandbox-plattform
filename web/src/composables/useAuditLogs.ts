@@ -72,13 +72,27 @@ export function useAuditLogs() {
   }
 
   function exportCsv() {
-    const headers = ['Zeitpunkt', 'Benutzer', 'Aktion', 'Details', 'IP']
+    const headers = [
+      'Zeitpunkt',
+      'Benutzer',
+      'Aktion',
+      'Ressource',
+      'Ressource-ID',
+      'Details',
+      'IP',
+      'User-Agent',
+      'Client-Token',
+    ]
     const rows = filteredLogs.value.map((l) => [
       l.createdAt,
       l.user?.email ?? l.user?.id ?? '',
       l.action,
+      l.resourceType ?? '',
+      l.resourceId ?? '',
       JSON.stringify(l.details),
-      l.ipAddress,
+      l.ipAddress ?? '',
+      l.userAgent ?? '',
+      l.clientToken ?? '',
     ])
     const csv = [headers, ...rows].map((r) => r.join(';')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })

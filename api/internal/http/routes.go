@@ -65,6 +65,7 @@ func newEcho(cfg config.Config) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.Validator = NewValidator()
+	e.Use(authmw.EnsureClientToken())
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
 	e.Use(logging.EchoRequestLogger())

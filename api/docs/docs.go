@@ -1966,6 +1966,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "sandbox.created"
                 },
+                "clientToken": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"
+                },
                 "createdAt": {
                     "type": "string",
                     "example": "2026-03-20T10:15:00Z"
@@ -1982,8 +1987,21 @@ const docTemplate = `{
                     "type": "string",
                     "example": "203.0.113.25"
                 },
+                "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
+                },
+                "resourceType": {
+                    "type": "string",
+                    "example": "sandbox"
+                },
                 "user": {
                     "$ref": "#/definitions/dto.UserSummary"
+                },
+                "userAgent": {
+                    "type": "string",
+                    "example": "Mozilla/5.0"
                 }
             }
         },

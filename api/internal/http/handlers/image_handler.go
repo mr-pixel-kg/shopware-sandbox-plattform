@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
+	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
@@ -115,10 +116,11 @@ func (h *ImageHandler) Create(c echo.Context) error {
 		return responses.FromAppError(c, apperror.BadRequest("IMAGE_CREATE_FAILED", err.Error()).WithCause(err))
 	}
 
-	_ = h.audit.Log(&auth.UserID, "image.created", c.RealIP(), map[string]any{
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageCreated, &resourceType, &image.ID, map[string]any{
 		"name": input.Name,
 		"tag":  input.Tag,
-	})
+	}))
 
 	slog.Info("image created", logging.RequestFields(c,
 		"component", "image",
@@ -177,7 +179,8 @@ func (h *ImageHandler) Update(c echo.Context) error {
 		"is_public", image.IsPublic,
 		"has_thumbnail", image.ThumbnailURL != nil,
 	)...)
-	_ = h.audit.Log(&auth.UserID, "image.updated", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageUpdated, &resourceType, &image.ID, map[string]any{}))
 	h.enrichMetadata([]models.Image{*image})
 	return c.JSON(http.StatusOK, toImageResponse(image))
 }
@@ -236,7 +239,8 @@ func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
 		"image_id", image.ID.String(),
 		"thumbnail_url", image.ThumbnailURL,
 	)...)
-	_ = h.audit.Log(&auth.UserID, "image.thumbnail_uploaded", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageThumbnailUploaded, &resourceType, &image.ID, map[string]any{}))
 	h.enrichMetadata([]models.Image{*image})
 	return c.JSON(http.StatusOK, toImageResponse(image))
 }
@@ -271,7 +275,8 @@ func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
 		"user_id", auth.UserID.String(),
 		"image_id", image.ID.String(),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "image.thumbnail_deleted", c.RealIP(), map[string]any{"imageId": image.ID.String()})
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageThumbnailDeleted, &resourceType, &image.ID, map[string]any{}))
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -300,7 +305,8 @@ func (h *ImageHandler) Delete(c echo.Context) error {
 	}
 
 	slog.Info("image deleted", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
-	_ = h.audit.Log(&auth.UserID, "image.deleted", c.RealIP(), map[string]any{"imageId": id.String()})
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageDeleted, &resourceType, &id, map[string]any{}))
 	return c.NoContent(204)
 }
 

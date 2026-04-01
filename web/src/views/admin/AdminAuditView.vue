@@ -40,13 +40,78 @@ const {
 
 function actionBadgeConfig(action: string): { label: string; class: string } {
   const map: Record<string, { label: string; class: string }> = {
-    boot: { label: 'Gestartet', class: 'bg-green-500/15 text-green-700 border-green-500/25' },
-    create: { label: 'Erstellt', class: 'bg-green-500/15 text-green-700 border-green-500/25' },
-    extend: { label: 'Verlängert', class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25' },
-    stop: { label: 'Gestoppt', class: 'bg-red-500/15 text-red-700 border-red-500/25' },
-    delete: { label: 'Gelöscht', class: 'bg-red-500/15 text-red-700 border-red-500/25' },
-    login: { label: 'Angemeldet', class: 'bg-blue-500/15 text-blue-700 border-blue-500/25' },
-    invite: { label: 'Eingeladen', class: 'bg-purple-500/15 text-purple-700 border-purple-500/25' },
+    'auth.logged_in': {
+      label: 'Angemeldet',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'auth.logged_out': {
+      label: 'Abgemeldet',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'user.registered': {
+      label: 'Registriert',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'user.created': {
+      label: 'Benutzer erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'user.updated': {
+      label: 'Benutzer geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'user.deleted': {
+      label: 'Benutzer gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
+    'user.whitelisted': {
+      label: 'Whitelist hinzugefügt',
+      class: 'bg-purple-500/15 text-purple-700 border-purple-500/25',
+    },
+    'user.whitelist_removed': {
+      label: 'Whitelist entfernt',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'image.created': {
+      label: 'Image erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'image.updated': {
+      label: 'Image geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'image.deleted': {
+      label: 'Image gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
+    'image.thumbnail_uploaded': {
+      label: 'Thumbnail hochgeladen',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'image.thumbnail_deleted': {
+      label: 'Thumbnail gelöscht',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'image.snapshot_created': {
+      label: 'Snapshot erstellt',
+      class: 'bg-purple-500/15 text-purple-700 border-purple-500/25',
+    },
+    'sandbox.created': {
+      label: 'Sandbox erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'sandbox.updated': {
+      label: 'Sandbox geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'sandbox.ttl_updated': {
+      label: 'TTL geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'sandbox.deleted': {
+      label: 'Sandbox gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
   }
   return map[action] ?? { label: action, class: '' }
 }
@@ -112,8 +177,9 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
             <TableHead class="w-[20%]">Zeitpunkt</TableHead>
             <TableHead class="w-[20%]">Benutzer</TableHead>
             <TableHead class="w-[15%]">Aktion</TableHead>
-            <TableHead class="w-[30%]">Details</TableHead>
-            <TableHead class="w-[15%]">IP</TableHead>
+            <TableHead class="w-[15%]">Ressource</TableHead>
+            <TableHead class="w-[20%]">Details</TableHead>
+            <TableHead class="w-[15%]">Client</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -122,11 +188,12 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
               <TableCell><Skeleton class="h-4 w-28" /></TableCell>
               <TableCell><Skeleton class="h-4 w-20" /></TableCell>
               <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
               <TableCell><Skeleton class="h-4 w-36" /></TableCell>
               <TableCell><Skeleton class="h-4 w-20" /></TableCell>
             </TableRow>
           </template>
-          <TableEmpty v-else-if="logs.length === 0" :colspan="5">
+          <TableEmpty v-else-if="logs.length === 0" :colspan="6">
             Keine Einträge gefunden
           </TableEmpty>
           <TableRow v-for="log in logs" :key="log.id" class="h-13">
@@ -139,11 +206,16 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
                 {{ actionBadgeConfig(log.action).label }}
               </Badge>
             </TableCell>
+            <TableCell class="text-muted-foreground font-mono text-xs">
+              <div>{{ log.resourceType ?? '—' }}</div>
+              <div v-if="log.resourceId" class="truncate">{{ log.resourceId }}</div>
+            </TableCell>
             <TableCell class="text-muted-foreground max-w-[300px] truncate">
               {{ formatDetails(log.details) }}
             </TableCell>
             <TableCell class="text-muted-foreground font-mono text-xs">
-              {{ log.ipAddress }}
+              <div>{{ log.ipAddress ?? '—' }}</div>
+              <div v-if="log.clientToken" class="truncate">{{ log.clientToken }}</div>
             </TableCell>
           </TableRow>
         </TableBody>

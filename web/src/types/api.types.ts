@@ -109,7 +109,11 @@ export interface AuditLog {
     email: string
   } | null
   action: string
-  ipAddress: string
+  ipAddress?: string | null
+  userAgent?: string | null
+  clientToken?: string | null
+  resourceType?: string | null
+  resourceId?: string | null
   details: Record<string, unknown> | unknown[]
   createdAt: string
 }
