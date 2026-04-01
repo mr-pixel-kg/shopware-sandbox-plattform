@@ -72,6 +72,14 @@ export type SandboxStatus =
   | 'deleted'
   | 'failed'
 
+export interface SSHConnection {
+  host: string
+  port: number
+  username: string
+  password: string
+  command: string
+}
+
 export interface Sandbox extends BaseModel {
   id: string
   imageId: string
@@ -84,6 +92,7 @@ export interface Sandbox extends BaseModel {
   containerName: string
   url: string
   port?: number
+  ssh?: SSHConnection
   clientIp: string
   metadata?: MetadataItem[]
   expiresAt?: string

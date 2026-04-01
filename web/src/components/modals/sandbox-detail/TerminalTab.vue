@@ -24,23 +24,25 @@ defineExpose({ disconnect })
 
 <template>
   <div class="relative flex h-full flex-col">
-    <div
-      v-if="!isConnected && !error"
-      class="absolute inset-0 z-10 flex items-center justify-center"
-      :style="{ backgroundColor: TERMINAL_BG }"
-    >
-      <span class="text-sm text-neutral-400">Verbindung wird hergestellt…</span>
-    </div>
+    <div class="relative min-h-0 flex-1">
+      <div
+        v-if="!isConnected && !error"
+        class="absolute inset-0 z-10 flex items-center justify-center"
+        :style="{ backgroundColor: TERMINAL_BG }"
+      >
+        <span class="text-sm text-neutral-400">Verbindung wird hergestellt…</span>
+      </div>
 
-    <div
-      v-if="error && !isConnected"
-      class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
-      :style="{ backgroundColor: TERMINAL_BG }"
-    >
-      <span class="text-sm text-red-400">{{ error }}</span>
-      <Button variant="outline" size="sm" @click="connect">Erneut verbinden</Button>
-    </div>
+      <div
+        v-if="error && !isConnected"
+        class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
+        :style="{ backgroundColor: TERMINAL_BG }"
+      >
+        <span class="text-sm text-red-400">{{ error }}</span>
+        <Button variant="outline" size="sm" @click="connect">Erneut verbinden</Button>
+      </div>
 
-    <div ref="containerRef" class="min-h-0 flex-1" />
+      <div ref="containerRef" class="h-full" />
+    </div>
   </div>
 </template>
