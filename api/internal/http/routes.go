@@ -71,7 +71,7 @@ func newEcho(cfg config.Config) *echo.Echo {
 	e.Use(logging.EchoRequestLogger())
 	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
 		AllowOrigins:     cfg.Server.AllowedOrigins,
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Client-Token"},
 		AllowCredentials: true,
 	}))
 	return e
@@ -213,6 +213,7 @@ func registerAPIRoutes(
 	private.PATCH("/sandboxes/:id/ttl", sandboxHandler.ExtendTTL)
 	private.POST("/sandboxes/:id/snapshot", sandboxHandler.Snapshot)
 	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
 
 	admin := private.Group("/admin")
 	admin.Use(authmw.RequireAdmin())

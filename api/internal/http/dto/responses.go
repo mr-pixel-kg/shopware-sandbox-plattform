@@ -69,6 +69,11 @@ type AuditLogListResponse struct {
 	Meta AuditLogListMeta   `json:"meta"`
 }
 
+type AuditLogFacetsResponse struct {
+	Users   []UserSummary `json:"users"`
+	Actions []string      `json:"actions"`
+}
+
 type ImageResponse struct {
 	ID           uuid.UUID      `json:"id" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
 	Name         string         `json:"name" example:"dockware/dev"`

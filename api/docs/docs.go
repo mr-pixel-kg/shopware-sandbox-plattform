@@ -448,11 +448,11 @@ const docTemplate = `{
                 "summary": "List audit logs",
                 "parameters": [
                     {
-                        "maximum": 200,
+                        "maximum": 500,
                         "minimum": 1,
                         "type": "integer",
                         "example": 50,
-                        "description": "Max entries (1-200, default 50)",
+                        "description": "Max entries (1-500, default 50)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -519,6 +519,93 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/dto.AuditLogListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/audit-logs/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns available audit filter values for the current query window",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AuditLogs"
+                ],
+                "summary": "List audit log facets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"sandbox.created\"",
+                        "description": "Filter users by action",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"sandbox\"",
+                        "description": "Filter users by resource type",
+                        "name": "resourceType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter users by resource ID",
+                        "name": "resourceId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter users by client token",
+                        "name": "clientToken",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter from timestamp (inclusive)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter to timestamp (inclusive)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AuditLogFacetsResponse"
                         }
                     },
                     "400": {
@@ -2016,6 +2103,23 @@ const docTemplate = `{
                         "user"
                     ],
                     "example": "user"
+                }
+            }
+        },
+        "dto.AuditLogFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.UserSummary"
+                    }
                 }
             }
         },

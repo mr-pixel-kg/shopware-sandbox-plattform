@@ -14,10 +14,12 @@ import (
 )
 
 type auditLogStoreStub struct {
-	createFn   func(entry *models.AuditLog) error
-	listFn     func(options repositories.AuditLogListOptions) ([]models.AuditLog, int64, error)
-	lastCreate *models.AuditLog
-	lastList   repositories.AuditLogListOptions
+	createFn          func(entry *models.AuditLog) error
+	listFn            func(options repositories.AuditLogListOptions) ([]models.AuditLog, int64, error)
+	listDistinctUsers func(options repositories.AuditLogFacetOptions) ([]models.User, error)
+	lastCreate        *models.AuditLog
+	lastList          repositories.AuditLogListOptions
+	lastFacetList     repositories.AuditLogFacetOptions
 }
 
 func (s *auditLogStoreStub) Create(entry *models.AuditLog) error {
@@ -34,6 +36,14 @@ func (s *auditLogStoreStub) List(options repositories.AuditLogListOptions) ([]mo
 		return s.listFn(options)
 	}
 	return nil, 0, nil
+}
+
+func (s *auditLogStoreStub) ListDistinctUsers(options repositories.AuditLogFacetOptions) ([]models.User, error) {
+	s.lastFacetList = options
+	if s.listDistinctUsers != nil {
+		return s.listDistinctUsers(options)
+	}
+	return nil, nil
 }
 
 func TestAuditServiceLogCreatesAuditEntry(t *testing.T) {
@@ -200,4 +210,35 @@ func TestAuditServiceListReturnsRepositoryError(t *testing.T) {
 
 	require.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, result)
+}
+
+func TestAuditServiceListFacetsReturnsDistinctUsersAndKnownActions(t *testing.T) {
+	t.Parallel()
+
+	from := time.Now().UTC().Add(-24 * time.Hour)
+	action := "  sandbox.deleted  "
+	expectedUsers := []models.User{
+		{ID: uuid.New(), Email: "a@example.com"},
+		{ID: uuid.New(), Email: "b@example.com"},
+	}
+	store := &auditLogStoreStub{
+		listDistinctUsers: func(options repositories.AuditLogFacetOptions) ([]models.User, error) {
+			return expectedUsers, nil
+		},
+	}
+	service := NewAuditService(store)
+
+	result, err := service.ListFacets(AuditLogFacetInput{
+		Action: &action,
+		From:   &from,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, expectedUsers, result.Users)
+	require.NotNil(t, store.lastFacetList.Action)
+	assert.Equal(t, "sandbox.deleted", *store.lastFacetList.Action)
+	assert.Equal(t, &from, store.lastFacetList.From)
+	assert.Contains(t, result.Actions, string(auditcontracts.ActionSandboxDeleted))
+	assert.Contains(t, result.Actions, string(auditcontracts.ActionImageCreated))
 }

@@ -19,6 +19,7 @@ type AuditService struct {
 type auditLogStore interface {
 	Create(entry *models.AuditLog) error
 	List(options repositories.AuditLogListOptions) ([]models.AuditLog, int64, error)
+	ListDistinctUsers(options repositories.AuditLogFacetOptions) ([]models.User, error)
 }
 
 type AuditActor struct {
@@ -53,6 +54,20 @@ type AuditLogListResult struct {
 	Total  int64
 	Limit  int
 	Offset int
+}
+
+type AuditLogFacetInput struct {
+	Action       *string
+	ResourceType *string
+	ResourceID   *uuid.UUID
+	ClientToken  *uuid.UUID
+	From         *time.Time
+	To           *time.Time
+}
+
+type AuditLogFacetsResult struct {
+	Users   []models.User
+	Actions []string
 }
 
 func NewAuditService(repo auditLogStore) *AuditService {
@@ -137,5 +152,46 @@ func (s *AuditService) List(input AuditLogListInput) (*AuditLogListResult, error
 		Total:  total,
 		Limit:  input.Limit,
 		Offset: input.Offset,
+	}, nil
+}
+
+func (s *AuditService) ListFacets(input AuditLogFacetInput) (*AuditLogFacetsResult, error) {
+	if input.Action != nil {
+		value := strings.TrimSpace(*input.Action)
+		if value == "" {
+			input.Action = nil
+		} else {
+			input.Action = &value
+		}
+	}
+	if input.ResourceType != nil {
+		value := strings.TrimSpace(*input.ResourceType)
+		if value == "" {
+			input.ResourceType = nil
+		} else {
+			input.ResourceType = &value
+		}
+	}
+
+	users, err := s.repo.ListDistinctUsers(repositories.AuditLogFacetOptions{
+		Action:       input.Action,
+		ResourceType: input.ResourceType,
+		ResourceID:   input.ResourceID,
+		ClientToken:  input.ClientToken,
+		From:         input.From,
+		To:           input.To,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	actions := make([]string, 0, len(auditcontracts.AllActions()))
+	for _, action := range auditcontracts.AllActions() {
+		actions = append(actions, string(action))
+	}
+
+	return &AuditLogFacetsResult{
+		Users:   users,
+		Actions: actions,
 	}, nil
 }

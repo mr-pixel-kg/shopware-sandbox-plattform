@@ -146,6 +146,11 @@ export interface AuditLogListResponse {
   meta: AuditLogListMeta
 }
 
+export interface AuditLogFacetsResponse {
+  users: UserSummary[]
+  actions: string[]
+}
+
 export interface LoginRequest {
   email: string
   password: string

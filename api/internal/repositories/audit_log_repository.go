@@ -12,6 +12,15 @@ type AuditLogRepository struct {
 	db *gorm.DB
 }
 
+type AuditLogFacetOptions struct {
+	Action       *string
+	ResourceType *string
+	ResourceID   *uuid.UUID
+	ClientToken  *uuid.UUID
+	From         *time.Time
+	To           *time.Time
+}
+
 type AuditLogListOptions struct {
 	Limit        int
 	Offset       int
@@ -56,6 +65,25 @@ func (r *AuditLogRepository) List(options AuditLogListOptions) ([]models.AuditLo
 	return logs, total, err
 }
 
+func (r *AuditLogRepository) ListDistinctUsers(options AuditLogFacetOptions) ([]models.User, error) {
+	var users []models.User
+
+	query := r.db.
+		Table("users").
+		Select("DISTINCT users.id, users.email").
+		Joins("JOIN audit_logs ON audit_logs.user_id = users.id")
+
+	query = applyAuditLogFacetFilters(query, options).
+		Where("audit_logs.user_id IS NOT NULL").
+		Order("users.email asc")
+
+	if err := query.Scan(&users).Error; err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func applyAuditLogFilters(query *gorm.DB, options AuditLogListOptions) *gorm.DB {
 	if options.UserID != nil {
 		query = query.Where("user_id = ?", *options.UserID)
@@ -77,6 +105,29 @@ func applyAuditLogFilters(query *gorm.DB, options AuditLogListOptions) *gorm.DB 
 	}
 	if options.To != nil {
 		query = query.Where("timestamp <= ?", *options.To)
+	}
+
+	return query
+}
+
+func applyAuditLogFacetFilters(query *gorm.DB, options AuditLogFacetOptions) *gorm.DB {
+	if options.Action != nil {
+		query = query.Where("audit_logs.action = ?", *options.Action)
+	}
+	if options.ResourceType != nil {
+		query = query.Where("audit_logs.resource_type = ?", *options.ResourceType)
+	}
+	if options.ResourceID != nil {
+		query = query.Where("audit_logs.resource_id = ?", *options.ResourceID)
+	}
+	if options.ClientToken != nil {
+		query = query.Where("audit_logs.client_token = ?", *options.ClientToken)
+	}
+	if options.From != nil {
+		query = query.Where("audit_logs.timestamp >= ?", *options.From)
+	}
+	if options.To != nil {
+		query = query.Where("audit_logs.timestamp <= ?", *options.To)
 	}
 
 	return query

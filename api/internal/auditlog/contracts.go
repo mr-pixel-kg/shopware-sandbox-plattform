@@ -26,6 +26,27 @@ const (
 	ActionUserWhitelistRemoved Action = "user.whitelist_removed"
 )
 
+var allActions = []Action{
+	ActionAuthLoggedIn,
+	ActionAuthLoggedOut,
+	ActionUserRegistered,
+	ActionImageCreated,
+	ActionImageUpdated,
+	ActionImageDeleted,
+	ActionImageThumbnailUploaded,
+	ActionImageThumbnailDeleted,
+	ActionImageSnapshotCreated,
+	ActionSandboxCreated,
+	ActionSandboxUpdated,
+	ActionSandboxTTLUpdated,
+	ActionSandboxDeleted,
+	ActionUserCreated,
+	ActionUserUpdated,
+	ActionUserDeleted,
+	ActionUserWhitelisted,
+	ActionUserWhitelistRemoved,
+}
+
 type ResourceType string
 
 const (
@@ -33,3 +54,7 @@ const (
 	ResourceTypeSandbox ResourceType = "sandbox"
 	ResourceTypeUser    ResourceType = "user"
 )
+
+func AllActions() []Action {
+	return append([]Action(nil), allActions...)
+}

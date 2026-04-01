@@ -31,7 +31,7 @@ func NewAuditHandler(audit *services.AuditService) *AuditHandler {
 // @Tags         AuditLogs
 // @Security     BearerAuth
 // @Produce      json
-// @Param        limit query int false "Max entries (1-200, default 50)" minimum(1) maximum(200) example(50)
+// @Param        limit query int false "Max entries (1-500, default 50)" minimum(1) maximum(500) example(50)
 // @Param        offset query int false "Offset for pagination" minimum(0) example(0)
 // @Param        userId query string false "Filter by user ID" format(uuid)
 // @Param        action query string false "Filter by action" example("sandbox.created")
@@ -97,6 +97,48 @@ func (h *AuditHandler) List(c echo.Context) error {
 	})
 }
 
+// Facets godoc
+// @Summary      List audit log facets
+// @Description  Returns available audit filter values for the current query window
+// @Tags         AuditLogs
+// @Security     BearerAuth
+// @Produce      json
+// @Param        action query string false "Filter users by action" example("sandbox.created")
+// @Param        resourceType query string false "Filter users by resource type" example("sandbox")
+// @Param        resourceId query string false "Filter users by resource ID" format(uuid)
+// @Param        clientToken query string false "Filter users by client token" format(uuid)
+// @Param        from query string false "Filter from timestamp (inclusive)" format(date-time)
+// @Param        to query string false "Filter to timestamp (inclusive)" format(date-time)
+// @Success      200 {object} dto.AuditLogFacetsResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      401 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/audit-logs/facets [get]
+func (h *AuditHandler) Facets(c echo.Context) error {
+	input, err := parseAuditLogFacetInput(c)
+	if err != nil {
+		return responses.FromError(c, err)
+	}
+
+	result, err := h.audit.ListFacets(input)
+	if err != nil {
+		return responses.Error(c, http.StatusInternalServerError, "AUDIT_LOG_FACETS_FAILED", "Could not load audit log filters")
+	}
+
+	users := make([]dto.UserSummary, 0, len(result.Users))
+	for _, user := range result.Users {
+		users = append(users, dto.UserSummary{
+			ID:    user.ID,
+			Email: user.Email,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.AuditLogFacetsResponse{
+		Users:   users,
+		Actions: result.Actions,
+	})
+}
+
 func parseAuditLogListInput(c echo.Context) (services.AuditLogListInput, error) {
 	input := services.AuditLogListInput{
 		Limit:  50,
@@ -149,6 +191,43 @@ func parseAuditLogListInput(c echo.Context) (services.AuditLogListInput, error) 
 	input.From = from
 	input.To = to
 
+	if value := strings.TrimSpace(c.QueryParam("action")); value != "" {
+		input.Action = &value
+	}
+	if value := strings.TrimSpace(c.QueryParam("resourceType")); value != "" {
+		input.ResourceType = &value
+	}
+
+	return input, nil
+}
+
+func parseAuditLogFacetInput(c echo.Context) (services.AuditLogFacetInput, error) {
+	resourceID, err := parseOptionalUUIDQuery(c.QueryParam("resourceId"), "Invalid resourceId")
+	if err != nil {
+		return services.AuditLogFacetInput{}, err
+	}
+	clientToken, err := parseOptionalUUIDQuery(c.QueryParam("clientToken"), "Invalid clientToken")
+	if err != nil {
+		return services.AuditLogFacetInput{}, err
+	}
+	from, err := parseOptionalTimeQuery(c.QueryParam("from"), "Invalid from timestamp")
+	if err != nil {
+		return services.AuditLogFacetInput{}, err
+	}
+	to, err := parseOptionalTimeQuery(c.QueryParam("to"), "Invalid to timestamp")
+	if err != nil {
+		return services.AuditLogFacetInput{}, err
+	}
+	if from != nil && to != nil && from.After(*to) {
+		return services.AuditLogFacetInput{}, apperror.BadRequest("VALIDATION_ERROR", "from must be before or equal to to")
+	}
+
+	input := services.AuditLogFacetInput{
+		ResourceID:  resourceID,
+		ClientToken: clientToken,
+		From:        from,
+		To:          to,
+	}
 	if value := strings.TrimSpace(c.QueryParam("action")); value != "" {
 		input.Action = &value
 	}

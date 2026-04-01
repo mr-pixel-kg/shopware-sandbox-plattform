@@ -38,6 +38,7 @@ func TestAuditLogsAdminCanListWithPaginationAndFilters(t *testing.T) {
 	private := router.Group("/api")
 	private.Use(authmw.Auth(authService))
 	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
 
 	adminToken := createAdminToken(t, db, router)
 	user := createAuditHTTPUser(t, db, "audit-http-user")
@@ -123,6 +124,7 @@ func TestAuditLogsRequireAdmin(t *testing.T) {
 	private := router.Group("/api")
 	private.Use(authmw.Auth(authService))
 	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
 
 	userToken := createUserToken(t, db, router)
 	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs", nil, "Bearer "+userToken)
@@ -145,12 +147,54 @@ func TestAuditLogsRejectInvalidQueryParameters(t *testing.T) {
 	private := router.Group("/api")
 	private.Use(authmw.Auth(authService))
 	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
 
 	adminToken := createAdminToken(t, db, router)
 	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs?from=invalid", nil, "Bearer "+adminToken)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "Invalid from timestamp")
+}
+
+func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
+	db := testutil.OpenIntegrationDB(t)
+	testutil.ResetIntegrationDB(t, db)
+
+	router := newIntegrationRouter()
+	authService, auditService := newTestAuthServices(db)
+	authHandler := handlers.NewAuthHandler(authService, auditService)
+	auditHandler := handlers.NewAuditHandler(auditService)
+
+	router.POST("/api/auth/login", authHandler.Login)
+
+	private := router.Group("/api")
+	private.Use(authmw.Auth(authService))
+	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
+
+	adminToken := createAdminToken(t, db, router)
+	user := createAuditHTTPUser(t, db, "audit-facet-user")
+	repo := repositories.NewAuditLogRepository(db)
+	now := time.Now().UTC()
+
+	createAuditHTTPLog(t, repo, models.AuditLog{
+		ID:        uuid.New(),
+		UserID:    &user.ID,
+		Action:    "sandbox.created",
+		Details:   datatypes.JSON([]byte(`{}`)),
+		Timestamp: now,
+	})
+
+	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs/facets?from="+now.Add(-time.Hour).Format(time.RFC3339), nil, "Bearer "+adminToken)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var response dto.AuditLogFacetsResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Contains(t, response.Actions, "sandbox.created")
+	assert.Contains(t, response.Actions, "image.created")
+	require.Len(t, response.Users, 1)
+	assert.Equal(t, user.ID, response.Users[0].ID)
+	assert.Equal(t, user.Email, response.Users[0].Email)
 }
 
 func createAuditHTTPLog(t *testing.T, repo *repositories.AuditLogRepository, entry models.AuditLog) models.AuditLog {

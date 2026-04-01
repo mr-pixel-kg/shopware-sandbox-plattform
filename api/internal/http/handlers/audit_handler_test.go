@@ -93,3 +93,26 @@ func TestParseAuditLogListInputRejectsInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func TestParseAuditLogFacetInputDefaultsAndTrimsValues(t *testing.T) {
+	t.Parallel()
+
+	resourceID := uuid.New()
+	clientToken := uuid.New()
+	req := httptest.NewRequest("GET", "/api/audit-logs/facets?action=%20sandbox.created%20&resourceType=%20sandbox%20&resourceId="+resourceID.String()+
+		"&clientToken="+clientToken.String()+"&from=2026-04-01T10:00:00Z&to=2026-04-01T12:00:00Z", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+
+	input, err := parseAuditLogFacetInput(c)
+
+	require.NoError(t, err)
+	require.NotNil(t, input.Action)
+	assert.Equal(t, "sandbox.created", *input.Action)
+	require.NotNil(t, input.ResourceType)
+	assert.Equal(t, "sandbox", *input.ResourceType)
+	require.NotNil(t, input.ResourceID)
+	assert.Equal(t, resourceID, *input.ResourceID)
+	require.NotNil(t, input.ClientToken)
+	assert.Equal(t, clientToken, *input.ClientToken)
+}

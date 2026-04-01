@@ -15,6 +15,17 @@ definitions:
     - email
     - role
     type: object
+  dto.AuditLogFacetsResponse:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      users:
+        items:
+          $ref: '#/definitions/dto.UserSummary'
+        type: array
+    type: object
   dto.AuditLogListFilters:
     properties:
       action:
@@ -952,10 +963,10 @@ paths:
     get:
       description: Returns recent audit log entries, optionally limited
       parameters:
-      - description: Max entries (1-200, default 50)
+      - description: Max entries (1-500, default 50)
         example: 50
         in: query
-        maximum: 200
+        maximum: 500
         minimum: 1
         name: limit
         type: integer
@@ -1022,6 +1033,64 @@ paths:
       security:
       - BearerAuth: []
       summary: List audit logs
+      tags:
+      - AuditLogs
+  /api/audit-logs/facets:
+    get:
+      description: Returns available audit filter values for the current query window
+      parameters:
+      - description: Filter users by action
+        example: '"sandbox.created"'
+        in: query
+        name: action
+        type: string
+      - description: Filter users by resource type
+        example: '"sandbox"'
+        in: query
+        name: resourceType
+        type: string
+      - description: Filter users by resource ID
+        format: uuid
+        in: query
+        name: resourceId
+        type: string
+      - description: Filter users by client token
+        format: uuid
+        in: query
+        name: clientToken
+        type: string
+      - description: Filter from timestamp (inclusive)
+        format: date-time
+        in: query
+        name: from
+        type: string
+      - description: Filter to timestamp (inclusive)
+        format: date-time
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuditLogFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit log facets
       tags:
       - AuditLogs
   /api/auth/login:

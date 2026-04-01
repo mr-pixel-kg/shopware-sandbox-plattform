@@ -4,30 +4,11 @@ import { auditApi } from '@/api'
 
 import type { AuditLog, AuditLogListMeta } from '@/types'
 
-const auditActions = [
-  'auth.logged_in',
-  'auth.logged_out',
-  'user.registered',
-  'user.created',
-  'user.updated',
-  'user.deleted',
-  'user.whitelisted',
-  'user.whitelist_removed',
-  'image.created',
-  'image.updated',
-  'image.deleted',
-  'image.thumbnail_uploaded',
-  'image.thumbnail_deleted',
-  'image.snapshot_created',
-  'sandbox.created',
-  'sandbox.updated',
-  'sandbox.ttl_updated',
-  'sandbox.deleted',
-] as const
-
 export function useAuditLogs() {
   const logs = ref<AuditLog[]>([])
   const meta = ref<AuditLogListMeta | null>(null)
+  const availableUsers = ref<Array<{ id: string; email: string }>>([])
+  const availableActions = ref<string[]>([])
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref<string | null>(null)
@@ -43,17 +24,17 @@ export function useAuditLogs() {
     return Math.max(1, Math.ceil(total / pageSize))
   })
 
-  const uniqueUsers = computed(() => {
-    const users = new Map<string, string>()
-    for (const log of logs.value) {
-      if (log.user) users.set(log.user.id, log.user.email)
+  const queryParams = computed(() => {
+    return {
+      limit: pageSize,
+      offset: (page.value - 1) * pageSize,
+      userId: userFilter.value !== 'all' ? userFilter.value : undefined,
+      action: actionFilter.value !== 'all' ? actionFilter.value : undefined,
+      from: periodStart.value,
     }
-    return [...users.entries()].map(([id, email]) => ({ id, email }))
   })
 
-  const availableActions = computed(() => [...auditActions])
-
-  const queryParams = computed(() => {
+  const periodStart = computed(() => {
     const now = Date.now()
     const periodMs: Record<string, number> = {
       '24h': 24 * 60 * 60 * 1000,
@@ -61,14 +42,7 @@ export function useAuditLogs() {
       '30d': 30 * 24 * 60 * 60 * 1000,
     }
     const duration = periodMs[periodFilter.value] ?? periodMs['7d']
-
-    return {
-      limit: pageSize,
-      offset: (page.value - 1) * pageSize,
-      userId: userFilter.value !== 'all' ? userFilter.value : undefined,
-      action: actionFilter.value !== 'all' ? actionFilter.value : undefined,
-      from: new Date(now - duration).toISOString(),
-    }
+    return new Date(now - duration).toISOString()
   })
 
   async function fetch() {
@@ -86,7 +60,35 @@ export function useAuditLogs() {
     }
   }
 
-  function exportCsv() {
+  async function fetchFacets() {
+    try {
+      const response = await auditApi.facets({ from: periodStart.value })
+      availableUsers.value = response.users
+      availableActions.value = response.actions
+    } catch {
+      availableUsers.value = []
+      availableActions.value = []
+    }
+  }
+
+  async function exportCsv() {
+    const exportedLogs: AuditLog[] = []
+    let offset = 0
+
+    while (true) {
+      const response = await auditApi.list({
+        ...queryParams.value,
+        limit: 500,
+        offset,
+      })
+      exportedLogs.push(...response.data)
+
+      if (!response.meta.pagination.hasMore) {
+        break
+      }
+      offset += response.meta.pagination.count
+    }
+
     const headers = [
       'Zeitpunkt',
       'Benutzer',
@@ -98,7 +100,7 @@ export function useAuditLogs() {
       'User-Agent',
       'Client-Token',
     ]
-    const rows = logs.value.map((l) => [
+    const rows = exportedLogs.map((l) => [
       l.timestamp,
       l.user?.email ?? l.user?.id ?? '',
       l.action,
@@ -124,6 +126,14 @@ export function useAuditLogs() {
   })
 
   watch(
+    periodStart,
+    () => {
+      void fetchFacets()
+    },
+    { immediate: true },
+  )
+
+  watch(
     queryParams,
     () => {
       void fetch()
@@ -142,7 +152,7 @@ export function useAuditLogs() {
     userFilter,
     actionFilter,
     periodFilter,
-    uniqueUsers,
+    availableUsers,
     availableActions,
     refresh: fetch,
     exportCsv,

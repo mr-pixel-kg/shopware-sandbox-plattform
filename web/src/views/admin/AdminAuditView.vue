@@ -33,7 +33,7 @@ const {
   userFilter,
   actionFilter,
   periodFilter,
-  uniqueUsers,
+  availableUsers,
   availableActions,
   exportCsv,
 } = useAuditLogs()
@@ -142,7 +142,9 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Alle Benutzer</SelectItem>
-          <SelectItem v-for="u in uniqueUsers" :key="u.id" :value="u.id">{{ u.email }}</SelectItem>
+          <SelectItem v-for="u in availableUsers" :key="u.id" :value="u.id">
+            {{ u.email }}
+          </SelectItem>
         </SelectContent>
       </Select>
 
