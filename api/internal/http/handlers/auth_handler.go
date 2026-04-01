@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
+	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
@@ -53,7 +54,15 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		"user_id", user.ID.String(),
 		"email", logging.MaskEmail(user.Email),
 	)...)
-	_ = h.audit.Log(&user.ID, "auth.registered", c.RealIP(), map[string]any{"email": user.Email})
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(
+		c,
+		&user.ID,
+		auditcontracts.ActionUserRegistered,
+		&resourceType,
+		&user.ID,
+		map[string]any{"email": user.Email},
+	))
 	return c.JSON(201, user)
 }
 
@@ -85,7 +94,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		"user_id", user.ID.String(),
 		"email", logging.MaskEmail(user.Email),
 	)...)
-	_ = h.audit.Log(&user.ID, "auth.logged_in", c.RealIP(), map[string]any{})
+	_ = h.audit.Log(newAuditLogInput(c, &user.ID, auditcontracts.ActionAuthLoggedIn, nil, nil, map[string]any{}))
 	return c.JSON(200, dto.AuthLoginResponse{
 		Token: token,
 		User:  *user,
@@ -110,7 +119,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 
 	slog.Info("user logged out", logging.RequestFields(c, "component", "auth", "user_id", auth.UserID.String(), "token_id", auth.TokenID)...)
-	_ = h.audit.Log(&auth.UserID, "auth.logged_out", c.RealIP(), map[string]any{})
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionAuthLoggedOut, nil, nil, map[string]any{}))
 	return c.NoContent(204)
 }
 

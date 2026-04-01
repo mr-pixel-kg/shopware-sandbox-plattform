@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
+	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
@@ -75,7 +76,11 @@ func (h *WhitelistHandler) Add(c echo.Context) error {
 		"component", "admin",
 		"whitelisted_email", logging.MaskEmail(input.Email),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "admin.whitelist_added", c.RealIP(), map[string]any{"email": input.Email})
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserWhitelisted, &resourceType, &user.ID, map[string]any{
+		"email": user.Email,
+		"role":  user.Role,
+	}))
 	return c.JSON(201, user)
 }
 
@@ -114,6 +119,9 @@ func (h *WhitelistHandler) Remove(c echo.Context) error {
 		"component", "admin",
 		"removed_email", logging.MaskEmail(user.Email),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "admin.whitelist_removed", c.RealIP(), map[string]any{"email": user.Email})
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserWhitelistRemoved, &resourceType, &user.ID, map[string]any{
+		"email": user.Email,
+	}))
 	return c.NoContent(204)
 }

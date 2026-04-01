@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
+	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
@@ -100,12 +101,12 @@ func (h *UserHandler) Create(c echo.Context) error {
 		"email", logging.MaskEmail(user.Email),
 		"pending", user.IsPending(),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "admin.user_created", c.RealIP(), map[string]any{
-		"userId":  user.ID.String(),
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserCreated, &resourceType, &user.ID, map[string]any{
 		"email":   user.Email,
 		"role":    user.Role,
 		"pending": user.IsPending(),
-	})
+	}))
 
 	return c.JSON(http.StatusCreated, user)
 }
@@ -148,11 +149,11 @@ func (h *UserHandler) Update(c echo.Context) error {
 		"user_id", user.ID.String(),
 		"email", logging.MaskEmail(user.Email),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "admin.user_updated", c.RealIP(), map[string]any{
-		"userId": user.ID.String(),
-		"email":  user.Email,
-		"role":   user.Role,
-	})
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserUpdated, &resourceType, &user.ID, map[string]any{
+		"email": user.Email,
+		"role":  user.Role,
+	}))
 
 	return c.JSON(http.StatusOK, user)
 }
@@ -195,10 +196,10 @@ func (h *UserHandler) Delete(c echo.Context) error {
 		"user_id", user.ID.String(),
 		"email", logging.MaskEmail(user.Email),
 	)...)
-	_ = h.audit.Log(&auth.UserID, "admin.user_deleted", c.RealIP(), map[string]any{
-		"userId": user.ID.String(),
-		"email":  user.Email,
-	})
+	resourceType := auditcontracts.ResourceTypeUser
+	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserDeleted, &resourceType, &user.ID, map[string]any{
+		"email": user.Email,
+	}))
 
 	return c.NoContent(http.StatusNoContent)
 }

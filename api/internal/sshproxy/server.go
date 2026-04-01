@@ -255,11 +255,6 @@ func (s *Server) resolveTarget(ctx context.Context, containerName string) (addr,
 	}
 	labelUser = info.Config.Labels["sandbox_ssh_username"]
 
-	sshNatPort := nat.Port(portStr + "/tcp")
-	if bindings, ok := info.NetworkSettings.Ports[sshNatPort]; ok && len(bindings) > 0 && bindings[0].HostPort != "" {
-		return net.JoinHostPort("127.0.0.1", bindings[0].HostPort), labelUser, nil
-	}
-
 	targetPort, _ := strconv.Atoi(portStr)
 	if s.network != "" {
 		if ep, ok := info.NetworkSettings.Networks[s.network]; ok && ep.IPAddress != "" {
@@ -270,6 +265,11 @@ func (s *Server) resolveTarget(ctx context.Context, containerName string) (addr,
 		if ep.IPAddress != "" {
 			return net.JoinHostPort(ep.IPAddress, strconv.Itoa(targetPort)), labelUser, nil
 		}
+	}
+
+	sshNatPort := nat.Port(portStr + "/tcp")
+	if bindings, ok := info.NetworkSettings.Ports[sshNatPort]; ok && len(bindings) > 0 && bindings[0].HostPort != "" {
+		return net.JoinHostPort("127.0.0.1", bindings[0].HostPort), labelUser, nil
 	}
 
 	return "", "", fmt.Errorf("container %q: no reachable SSH endpoint", containerName)

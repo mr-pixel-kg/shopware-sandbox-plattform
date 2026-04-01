@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/docker"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
@@ -76,6 +77,7 @@ type CreateSandboxInput struct {
 	TTLMinutes     *int
 	DisplayName    *string
 	Metadata       map[string]string
+	AuditActor     AuditActor
 }
 
 type UpdateSandboxInput struct {
@@ -83,6 +85,7 @@ type UpdateSandboxInput struct {
 	UserID      *uuid.UUID
 	DisplayName *string
 	ClientIP    string
+	AuditActor  AuditActor
 }
 
 func (s *SandboxService) ListAll() ([]models.Sandbox, error) {
@@ -127,8 +130,15 @@ func (s *SandboxService) UpdateSandbox(input UpdateSandboxInput) (*models.Sandbo
 		return nil, err
 	}
 
-	_ = s.audit.Log(input.UserID, "sandbox.updated", input.ClientIP, map[string]any{
-		"sandboxId": sandbox.ID.String(),
+	resourceType := auditcontracts.ResourceTypeSandbox
+	_ = s.audit.Log(AuditLogInput{
+		Actor:        input.AuditActor,
+		Action:       auditcontracts.ActionSandboxUpdated,
+		ResourceType: &resourceType,
+		ResourceID:   &sandbox.ID,
+		Details: map[string]any{
+			"displayName": sandbox.DisplayName,
+		},
 	})
 
 	return sandbox, nil
@@ -285,16 +295,22 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, err
 	}
 
-	_ = s.audit.Log(input.UserID, "sandbox.created", input.ClientIP, map[string]any{
-		"sandboxId": sandbox.ID.String(),
-		"imageId":   image.ID.String(),
-		"actor":     sandboxActorType(sandbox),
+	resourceType := auditcontracts.ResourceTypeSandbox
+	_ = s.audit.Log(AuditLogInput{
+		Actor:        input.AuditActor,
+		Action:       auditcontracts.ActionSandboxCreated,
+		ResourceType: &resourceType,
+		ResourceID:   &sandbox.ID,
+		Details: map[string]any{
+			"imageId": image.ID.String(),
+			"actor":   sandboxActorType(sandbox),
+		},
 	})
 
 	return sandbox, nil
 }
 
-func (s *SandboxService) ExtendTTL(id uuid.UUID, ttlMinutes *int, clientIP string, userID *uuid.UUID) (*models.Sandbox, error) {
+func (s *SandboxService) ExtendTTL(id uuid.UUID, ttlMinutes *int, auditActor AuditActor) (*models.Sandbox, error) {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, ErrSandboxNotFound
@@ -329,34 +345,41 @@ func (s *SandboxService) ExtendTTL(id uuid.UUID, ttlMinutes *int, clientIP strin
 		eventMeta["newExpiresAt"] = sandbox.ExpiresAt.Format(time.RFC3339)
 	}
 	_ = s.addEvent(sandbox.ID, "extended", eventMeta)
-	_ = s.audit.Log(userID, "sandbox.extended", clientIP, map[string]any{
-		"sandboxId":  sandbox.ID.String(),
-		"ttlMinutes": ttlMinutes,
+	resourceType := auditcontracts.ResourceTypeSandbox
+	_ = s.audit.Log(AuditLogInput{
+		Actor:        auditActor,
+		Action:       auditcontracts.ActionSandboxTTLUpdated,
+		ResourceType: &resourceType,
+		ResourceID:   &sandbox.ID,
+		Details: map[string]any{
+			"ttlMinutes": ttlMinutes,
+		},
 	})
 
 	return sandbox, nil
 }
 
-func (s *SandboxService) Delete(ctx context.Context, id uuid.UUID, clientIP string, userID *uuid.UUID) error {
+func (s *SandboxService) Delete(ctx context.Context, id uuid.UUID, auditActor AuditActor) error {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {
 		return ErrSandboxNotFound
 	}
 
-	_ = s.audit.Log(userID, "sandbox.deleted", clientIP, map[string]any{
-		"sandboxId": sandbox.ID.String(),
-	})
-
 	if sandbox.Status.IsActive() {
 		_ = s.setStatus(sandbox, models.SandboxStatusStopping, strPtr("Container wird beendet"))
-		go s.deleteContainerAsync(sandbox.ID, sandbox.ContainerID, sandbox.ImageID)
+		go s.deleteContainerAsync(sandbox.ID, sandbox.ContainerID, sandbox.ImageID, auditActor)
 		return nil
 	}
 
-	return s.repo.DeleteByID(sandbox.ID)
+	if err := s.repo.DeleteByID(sandbox.ID); err != nil {
+		return err
+	}
+
+	s.logSandboxDeleted(sandbox.ID, auditActor)
+	return nil
 }
 
-func (s *SandboxService) deleteContainerAsync(sandboxID uuid.UUID, containerID string, imageID uuid.UUID) {
+func (s *SandboxService) deleteContainerAsync(sandboxID uuid.UUID, containerID string, imageID uuid.UUID, auditActor AuditActor) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -369,9 +392,10 @@ func (s *SandboxService) deleteContainerAsync(sandboxID uuid.UUID, containerID s
 
 	_ = s.setStatusByID(sandboxID, models.SandboxStatusDeleted, nil)
 	_ = s.addEvent(sandboxID, "deleted", map[string]any{})
+	s.logSandboxDeleted(sandboxID, auditActor)
 }
 
-func (s *SandboxService) DeleteForGuest(ctx context.Context, id uuid.UUID, guestSessionID uuid.UUID, clientIP string) error {
+func (s *SandboxService) DeleteForGuest(ctx context.Context, id uuid.UUID, guestSessionID uuid.UUID, auditActor AuditActor) error {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {
 		return ErrSandboxNotFound
@@ -381,7 +405,7 @@ func (s *SandboxService) DeleteForGuest(ctx context.Context, id uuid.UUID, guest
 		return ErrSandboxAccessDenied
 	}
 
-	return s.Delete(ctx, id, clientIP, nil)
+	return s.Delete(ctx, id, auditActor)
 }
 
 type CreateSnapshotInput struct {
@@ -394,6 +418,7 @@ type CreateSnapshotInput struct {
 	ClientIP    string
 	UserID      *uuid.UUID
 	Metadata    json.RawMessage
+	AuditActor  AuditActor
 }
 
 func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapshotInput) (*models.Image, error) {
@@ -431,10 +456,16 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 		"imageId":     image.ID.String(),
 	})
 
-	_ = s.audit.Log(input.UserID, "sandbox.snapshotted", input.ClientIP, map[string]any{
-		"sandboxId":   sandbox.ID.String(),
-		"targetImage": targetImage,
-		"imageId":     image.ID.String(),
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = s.audit.Log(AuditLogInput{
+		Actor:        input.AuditActor,
+		Action:       auditcontracts.ActionImageSnapshotCreated,
+		ResourceType: &resourceType,
+		ResourceID:   &image.ID,
+		Details: map[string]any{
+			"sandboxId":   sandbox.ID.String(),
+			"targetImage": targetImage,
+		},
 	})
 
 	go s.commitSnapshot(sandbox.ID, sandbox.ContainerID, image.ID, targetImage)
@@ -726,6 +757,17 @@ func (s *SandboxService) addEvent(sandboxID uuid.UUID, eventType string, metadat
 		EventType: eventType,
 		Metadata:  datatypes.JSON(payload),
 		CreatedAt: time.Now().UTC(),
+	})
+}
+
+func (s *SandboxService) logSandboxDeleted(sandboxID uuid.UUID, auditActor AuditActor) {
+	resourceType := auditcontracts.ResourceTypeSandbox
+	_ = s.audit.Log(AuditLogInput{
+		Actor:        auditActor,
+		Action:       auditcontracts.ActionSandboxDeleted,
+		ResourceType: &resourceType,
+		ResourceID:   &sandboxID,
+		Details:      map[string]any{},
 	})
 }
 

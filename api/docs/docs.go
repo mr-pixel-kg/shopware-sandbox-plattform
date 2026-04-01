@@ -448,12 +448,69 @@ const docTemplate = `{
                 "summary": "List audit logs",
                 "parameters": [
                     {
-                        "maximum": 200,
+                        "maximum": 500,
                         "minimum": 1,
                         "type": "integer",
                         "example": 50,
-                        "description": "Max entries (1-200, default 50)",
+                        "description": "Max entries (1-500, default 50)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "example": 0,
+                        "description": "Offset for pagination",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter by user ID",
+                        "name": "userId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"sandbox.created\"",
+                        "description": "Filter by action",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"sandbox\"",
+                        "description": "Filter by resource type",
+                        "name": "resourceType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter by resource ID",
+                        "name": "resourceId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter by client token",
+                        "name": "clientToken",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter from timestamp (inclusive)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter to timestamp (inclusive)",
+                        "name": "to",
                         "in": "query"
                     }
                 ],
@@ -461,10 +518,100 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.AuditLogResponse"
-                            }
+                            "$ref": "#/definitions/dto.AuditLogListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/audit-logs/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns available audit filter values for the current query window",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AuditLogs"
+                ],
+                "summary": "List audit log facets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"sandbox.created\"",
+                        "description": "Filter users by action",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"sandbox\"",
+                        "description": "Filter users by resource type",
+                        "name": "resourceType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter users by resource ID",
+                        "name": "resourceId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Filter users by client token",
+                        "name": "clientToken",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter from timestamp (inclusive)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Filter to timestamp (inclusive)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AuditLogFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
@@ -1959,6 +2106,81 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AuditLogFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.UserSummary"
+                    }
+                }
+            }
+        },
+        "dto.AuditLogListFilters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "sandbox.created"
+                },
+                "clientToken": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "from": {
+                    "type": "string",
+                    "example": "2026-04-01T00:00:00Z"
+                },
+                "resourceId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "resourceType": {
+                    "type": "string",
+                    "example": "sandbox"
+                },
+                "to": {
+                    "type": "string",
+                    "example": "2026-04-02T00:00:00Z"
+                },
+                "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
+        "dto.AuditLogListMeta": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "$ref": "#/definitions/dto.AuditLogListFilters"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dto.PaginationMeta"
+                }
+            }
+        },
+        "dto.AuditLogListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AuditLogResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dto.AuditLogListMeta"
+                }
+            }
+        },
         "dto.AuditLogResponse": {
             "type": "object",
             "properties": {
@@ -1966,9 +2188,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "sandbox.created"
                 },
-                "createdAt": {
+                "clientToken": {
                     "type": "string",
-                    "example": "2026-03-20T10:15:00Z"
+                    "format": "uuid",
+                    "example": "4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"
                 },
                 "details": {
                     "type": "object"
@@ -1982,8 +2205,25 @@ const docTemplate = `{
                     "type": "string",
                     "example": "203.0.113.25"
                 },
+                "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"
+                },
+                "resourceType": {
+                    "type": "string",
+                    "example": "sandbox"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2026-03-20T10:15:00Z"
+                },
                 "user": {
                     "$ref": "#/definitions/dto.UserSummary"
+                },
+                "userAgent": {
+                    "type": "string",
+                    "example": "Mozilla/5.0"
                 }
             }
         },
@@ -2256,6 +2496,31 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "example": "Sup3rS3cret!"
+                }
+            }
+        },
+        "dto.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "hasMore": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 137
                 }
             }
         },

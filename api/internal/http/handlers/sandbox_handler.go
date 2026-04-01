@@ -221,6 +221,7 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 		GuestSessionID: &guest.SessionID,
 		ClientIP:       c.RealIP(),
 		Metadata:       input.Metadata,
+		AuditActor:     newAuditActor(c, nil),
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -278,6 +279,7 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 		TTLMinutes:  input.TTLMinutes,
 		DisplayName: input.DisplayName,
 		Metadata:    input.Metadata,
+		AuditActor:  newAuditActor(c, &auth.UserID),
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -327,6 +329,7 @@ func (h *SandboxHandler) Update(c echo.Context) error {
 		UserID:      &auth.UserID,
 		DisplayName: input.DisplayName,
 		ClientIP:    c.RealIP(),
+		AuditActor:  newAuditActor(c, &auth.UserID),
 	})
 	if err != nil {
 		return mapSandboxError(c, err)
@@ -374,7 +377,7 @@ func (h *SandboxHandler) ExtendTTL(c echo.Context) error {
 		"sandbox_id", id.String(),
 		"ttl_minutes", input.TTLMinutes,
 	)...)
-	sandbox, err := h.sandboxes.ExtendTTL(id, input.TTLMinutes, c.RealIP(), &auth.UserID)
+	sandbox, err := h.sandboxes.ExtendTTL(id, input.TTLMinutes, newAuditActor(c, &auth.UserID))
 	if err != nil {
 		return mapSandboxError(c, err)
 	}
@@ -409,7 +412,7 @@ func (h *SandboxHandler) Delete(c echo.Context) error {
 
 	auth := mw.MustAuth(c)
 	slog.Debug("sandbox deletion requested", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "sandbox_id", id.String())...)
-	if err := h.sandboxes.Delete(c.Request().Context(), id, c.RealIP(), &auth.UserID); err != nil {
+	if err := h.sandboxes.Delete(c.Request().Context(), id, newAuditActor(c, &auth.UserID)); err != nil {
 		return mapSandboxError(c, err)
 	}
 
@@ -436,7 +439,7 @@ func (h *SandboxHandler) DeleteGuest(c echo.Context) error {
 
 	guest := mw.MustGuest(c)
 	slog.Debug("guest sandbox deletion requested", logging.RequestFields(c, "component", "sandbox", "guest_session_id", guest.SessionID.String(), "sandbox_id", id.String())...)
-	if err := h.sandboxes.DeleteForGuest(c.Request().Context(), id, guest.SessionID, c.RealIP()); err != nil {
+	if err := h.sandboxes.DeleteForGuest(c.Request().Context(), id, guest.SessionID, newAuditActor(c, nil)); err != nil {
 		return mapSandboxError(c, err)
 	}
 
@@ -490,6 +493,7 @@ func (h *SandboxHandler) Snapshot(c echo.Context) error {
 		ClientIP:    c.RealIP(),
 		UserID:      &auth.UserID,
 		Metadata:    metadataJSON,
+		AuditActor:  newAuditActor(c, &auth.UserID),
 	})
 	if err != nil {
 		return mapSandboxError(c, err)

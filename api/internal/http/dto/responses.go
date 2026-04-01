@@ -29,12 +29,49 @@ type UserSummary struct {
 }
 
 type AuditLogResponse struct {
-	ID        uuid.UUID      `json:"id" format:"uuid" example:"4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"`
-	User      *UserSummary   `json:"user"`
-	Action    string         `json:"action" example:"sandbox.created"`
-	IPAddress string         `json:"ipAddress" example:"203.0.113.25"`
-	Details   datatypes.JSON `json:"details" swaggertype:"object"`
-	CreatedAt time.Time      `json:"createdAt" example:"2026-03-20T10:15:00Z"`
+	ID           uuid.UUID      `json:"id" format:"uuid" example:"4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"`
+	User         *UserSummary   `json:"user"`
+	Action       string         `json:"action" example:"sandbox.created"`
+	IPAddress    *string        `json:"ipAddress,omitempty" example:"203.0.113.25"`
+	UserAgent    *string        `json:"userAgent,omitempty" example:"Mozilla/5.0"`
+	ClientToken  *uuid.UUID     `json:"clientToken,omitempty" format:"uuid" example:"4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf"`
+	ResourceType *string        `json:"resourceType,omitempty" example:"sandbox"`
+	ResourceID   *uuid.UUID     `json:"resourceId,omitempty" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
+	Details      datatypes.JSON `json:"details" swaggertype:"object"`
+	Timestamp    time.Time      `json:"timestamp" example:"2026-03-20T10:15:00Z"`
+}
+
+type PaginationMeta struct {
+	Limit   int   `json:"limit" example:"50"`
+	Offset  int   `json:"offset" example:"0"`
+	Count   int   `json:"count" example:"50"`
+	Total   int64 `json:"total" example:"137"`
+	HasMore bool  `json:"hasMore" example:"true"`
+}
+
+type AuditLogListFilters struct {
+	UserID       *uuid.UUID `json:"userId,omitempty" format:"uuid"`
+	Action       *string    `json:"action,omitempty" example:"sandbox.created"`
+	ResourceType *string    `json:"resourceType,omitempty" example:"sandbox"`
+	ResourceID   *uuid.UUID `json:"resourceId,omitempty" format:"uuid"`
+	ClientToken  *uuid.UUID `json:"clientToken,omitempty" format:"uuid"`
+	From         *time.Time `json:"from,omitempty" example:"2026-04-01T00:00:00Z"`
+	To           *time.Time `json:"to,omitempty" example:"2026-04-02T00:00:00Z"`
+}
+
+type AuditLogListMeta struct {
+	Pagination PaginationMeta      `json:"pagination"`
+	Filters    AuditLogListFilters `json:"filters"`
+}
+
+type AuditLogListResponse struct {
+	Data []AuditLogResponse `json:"data"`
+	Meta AuditLogListMeta   `json:"meta"`
+}
+
+type AuditLogFacetsResponse struct {
+	Users   []UserSummary `json:"users"`
+	Actions []string      `json:"actions"`
 }
 
 type ImageResponse struct {
