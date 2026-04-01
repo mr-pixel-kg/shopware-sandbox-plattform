@@ -15,13 +15,65 @@ definitions:
     - email
     - role
     type: object
+  dto.AuditLogFacetsResponse:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      users:
+        items:
+          $ref: '#/definitions/dto.UserSummary'
+        type: array
+    type: object
+  dto.AuditLogListFilters:
+    properties:
+      action:
+        example: sandbox.created
+        type: string
+      clientToken:
+        format: uuid
+        type: string
+      from:
+        example: "2026-04-01T00:00:00Z"
+        type: string
+      resourceId:
+        format: uuid
+        type: string
+      resourceType:
+        example: sandbox
+        type: string
+      to:
+        example: "2026-04-02T00:00:00Z"
+        type: string
+      userId:
+        format: uuid
+        type: string
+    type: object
+  dto.AuditLogListMeta:
+    properties:
+      filters:
+        $ref: '#/definitions/dto.AuditLogListFilters'
+      pagination:
+        $ref: '#/definitions/dto.PaginationMeta'
+    type: object
+  dto.AuditLogListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AuditLogResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/dto.AuditLogListMeta'
+    type: object
   dto.AuditLogResponse:
     properties:
       action:
         example: sandbox.created
         type: string
-      createdAt:
-        example: "2026-03-20T10:15:00Z"
+      clientToken:
+        example: 4d0dbf0d-1034-42ef-8b6d-7eb3ceef99cf
+        format: uuid
         type: string
       details:
         type: object
@@ -32,8 +84,21 @@ definitions:
       ipAddress:
         example: 203.0.113.25
         type: string
+      resourceId:
+        example: 5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2
+        format: uuid
+        type: string
+      resourceType:
+        example: sandbox
+        type: string
+      timestamp:
+        example: "2026-03-20T10:15:00Z"
+        type: string
       user:
         $ref: '#/definitions/dto.UserSummary'
+      userAgent:
+        example: Mozilla/5.0
+        type: string
     type: object
   dto.AuthLoginResponse:
     properties:
@@ -227,6 +292,24 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.PaginationMeta:
+    properties:
+      count:
+        example: 50
+        type: integer
+      hasMore:
+        example: true
+        type: boolean
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 137
+        type: integer
     type: object
   dto.PendingImageResponse:
     properties:
@@ -900,22 +983,65 @@ paths:
     get:
       description: Returns recent audit log entries, optionally limited
       parameters:
-      - description: Max entries (1-200, default 50)
+      - description: Max entries (1-500, default 50)
         example: 50
         in: query
-        maximum: 200
+        maximum: 500
         minimum: 1
         name: limit
         type: integer
+      - description: Offset for pagination
+        example: 0
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      - description: Filter by user ID
+        format: uuid
+        in: query
+        name: userId
+        type: string
+      - description: Filter by action
+        example: '"sandbox.created"'
+        in: query
+        name: action
+        type: string
+      - description: Filter by resource type
+        example: '"sandbox"'
+        in: query
+        name: resourceType
+        type: string
+      - description: Filter by resource ID
+        format: uuid
+        in: query
+        name: resourceId
+        type: string
+      - description: Filter by client token
+        format: uuid
+        in: query
+        name: clientToken
+        type: string
+      - description: Filter from timestamp (inclusive)
+        format: date-time
+        in: query
+        name: from
+        type: string
+      - description: Filter to timestamp (inclusive)
+        format: date-time
+        in: query
+        name: to
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.AuditLogResponse'
-            type: array
+            $ref: '#/definitions/dto.AuditLogListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -927,6 +1053,64 @@ paths:
       security:
       - BearerAuth: []
       summary: List audit logs
+      tags:
+      - AuditLogs
+  /api/audit-logs/facets:
+    get:
+      description: Returns available audit filter values for the current query window
+      parameters:
+      - description: Filter users by action
+        example: '"sandbox.created"'
+        in: query
+        name: action
+        type: string
+      - description: Filter users by resource type
+        example: '"sandbox"'
+        in: query
+        name: resourceType
+        type: string
+      - description: Filter users by resource ID
+        format: uuid
+        in: query
+        name: resourceId
+        type: string
+      - description: Filter users by client token
+        format: uuid
+        in: query
+        name: clientToken
+        type: string
+      - description: Filter from timestamp (inclusive)
+        format: date-time
+        in: query
+        name: from
+        type: string
+      - description: Filter to timestamp (inclusive)
+        format: date-time
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuditLogFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit log facets
       tags:
       - AuditLogs
   /api/auth/login:

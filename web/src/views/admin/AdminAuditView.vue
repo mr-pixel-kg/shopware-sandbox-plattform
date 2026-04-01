@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, Download } from 'lucide-vue-next'
+import { ref } from 'vue'
 
+import AuditLogDetailDrawer from '@/components/modals/AuditLogDetailDrawer.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,29 +26,99 @@ import {
 import { useAuditLogs } from '@/composables/useAuditLogs'
 import { formatDateTime } from '@/utils/formatters'
 
+import type { AuditLog } from '@/types'
+
 const {
   logs,
-  allLogs,
+  meta,
   loading,
   page,
   totalPages,
   userFilter,
   actionFilter,
   periodFilter,
-  uniqueUsers,
-  uniqueActions,
+  availableUsers,
+  availableActions,
   exportCsv,
 } = useAuditLogs()
 
+const showDetailDrawer = ref(false)
+const selectedLog = ref<AuditLog | null>(null)
+
 function actionBadgeConfig(action: string): { label: string; class: string } {
   const map: Record<string, { label: string; class: string }> = {
-    boot: { label: 'Gestartet', class: 'bg-green-500/15 text-green-700 border-green-500/25' },
-    create: { label: 'Erstellt', class: 'bg-green-500/15 text-green-700 border-green-500/25' },
-    extend: { label: 'Verlängert', class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25' },
-    stop: { label: 'Gestoppt', class: 'bg-red-500/15 text-red-700 border-red-500/25' },
-    delete: { label: 'Gelöscht', class: 'bg-red-500/15 text-red-700 border-red-500/25' },
-    login: { label: 'Angemeldet', class: 'bg-blue-500/15 text-blue-700 border-blue-500/25' },
-    invite: { label: 'Eingeladen', class: 'bg-purple-500/15 text-purple-700 border-purple-500/25' },
+    'auth.logged_in': {
+      label: 'Angemeldet',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'auth.logged_out': {
+      label: 'Abgemeldet',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'user.registered': {
+      label: 'Registriert',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'user.created': {
+      label: 'Benutzer erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'user.updated': {
+      label: 'Benutzer geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'user.deleted': {
+      label: 'Benutzer gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
+    'user.whitelisted': {
+      label: 'Whitelist hinzugefügt',
+      class: 'bg-purple-500/15 text-purple-700 border-purple-500/25',
+    },
+    'user.whitelist_removed': {
+      label: 'Whitelist entfernt',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'image.created': {
+      label: 'Image erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'image.updated': {
+      label: 'Image geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'image.deleted': {
+      label: 'Image gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
+    'image.thumbnail_uploaded': {
+      label: 'Thumbnail hochgeladen',
+      class: 'bg-blue-500/15 text-blue-700 border-blue-500/25',
+    },
+    'image.thumbnail_deleted': {
+      label: 'Thumbnail gelöscht',
+      class: 'bg-slate-500/15 text-slate-700 border-slate-500/25',
+    },
+    'image.snapshot_created': {
+      label: 'Snapshot erstellt',
+      class: 'bg-purple-500/15 text-purple-700 border-purple-500/25',
+    },
+    'sandbox.created': {
+      label: 'Sandbox erstellt',
+      class: 'bg-green-500/15 text-green-700 border-green-500/25',
+    },
+    'sandbox.updated': {
+      label: 'Sandbox geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'sandbox.ttl_updated': {
+      label: 'TTL geändert',
+      class: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/25',
+    },
+    'sandbox.deleted': {
+      label: 'Sandbox gelöscht',
+      class: 'bg-red-500/15 text-red-700 border-red-500/25',
+    },
   }
   return map[action] ?? { label: action, class: '' }
 }
@@ -56,6 +128,11 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
   return Object.entries(details)
     .map(([k, v]) => `${k}: ${v}`)
     .join(', ')
+}
+
+function openDetails(log: AuditLog) {
+  selectedLog.value = log
+  showDetailDrawer.value = true
 }
 </script>
 
@@ -77,7 +154,9 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Alle Benutzer</SelectItem>
-          <SelectItem v-for="u in uniqueUsers" :key="u.id" :value="u.id">{{ u.email }}</SelectItem>
+          <SelectItem v-for="u in availableUsers" :key="u.id" :value="u.id">
+            {{ u.email }}
+          </SelectItem>
         </SelectContent>
       </Select>
 
@@ -87,7 +166,7 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Alle Aktionen</SelectItem>
-          <SelectItem v-for="a in uniqueActions" :key="a" :value="a">{{ a }}</SelectItem>
+          <SelectItem v-for="a in availableActions" :key="a" :value="a">{{ a }}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -102,7 +181,9 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </SelectContent>
       </Select>
 
-      <span class="text-muted-foreground ml-auto text-sm"> {{ allLogs.length }} Einträge </span>
+      <span class="text-muted-foreground ml-auto text-sm">
+        {{ meta?.pagination.total ?? logs.length }} Einträge
+      </span>
     </div>
 
     <div class="rounded-md border">
@@ -112,8 +193,9 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
             <TableHead class="w-[20%]">Zeitpunkt</TableHead>
             <TableHead class="w-[20%]">Benutzer</TableHead>
             <TableHead class="w-[15%]">Aktion</TableHead>
-            <TableHead class="w-[30%]">Details</TableHead>
-            <TableHead class="w-[15%]">IP</TableHead>
+            <TableHead class="w-[15%]">Ressource</TableHead>
+            <TableHead class="w-[20%]">Details</TableHead>
+            <TableHead class="w-[15%]">Client</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -122,16 +204,25 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
               <TableCell><Skeleton class="h-4 w-28" /></TableCell>
               <TableCell><Skeleton class="h-4 w-20" /></TableCell>
               <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
               <TableCell><Skeleton class="h-4 w-36" /></TableCell>
               <TableCell><Skeleton class="h-4 w-20" /></TableCell>
             </TableRow>
           </template>
-          <TableEmpty v-else-if="logs.length === 0" :colspan="5">
+          <TableEmpty v-else-if="logs.length === 0" :colspan="6">
             Keine Einträge gefunden
           </TableEmpty>
-          <TableRow v-for="log in logs" :key="log.id" class="h-13">
+          <TableRow
+            v-for="log in logs"
+            :key="log.id"
+            class="hover:bg-muted/40 focus-within:bg-muted/40 h-13 cursor-pointer transition-colors"
+            tabindex="0"
+            @click="openDetails(log)"
+            @keydown.enter.prevent="openDetails(log)"
+            @keydown.space.prevent="openDetails(log)"
+          >
             <TableCell class="text-muted-foreground whitespace-nowrap">
-              {{ formatDateTime(log.createdAt) }}
+              {{ formatDateTime(log.timestamp) }}
             </TableCell>
             <TableCell>{{ log.user?.email ?? log.user?.id ?? '—' }}</TableCell>
             <TableCell>
@@ -139,11 +230,16 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
                 {{ actionBadgeConfig(log.action).label }}
               </Badge>
             </TableCell>
+            <TableCell class="text-muted-foreground font-mono text-xs">
+              <div>{{ log.resourceType ?? '—' }}</div>
+              <div v-if="log.resourceId" class="truncate">{{ log.resourceId }}</div>
+            </TableCell>
             <TableCell class="text-muted-foreground max-w-[300px] truncate">
               {{ formatDetails(log.details) }}
             </TableCell>
             <TableCell class="text-muted-foreground font-mono text-xs">
-              {{ log.ipAddress }}
+              <div>{{ log.ipAddress ?? '—' }}</div>
+              <div v-if="log.clientToken" class="truncate">{{ log.clientToken }}</div>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -161,5 +257,7 @@ function formatDetails(details: Record<string, unknown> | unknown[]): string {
         </Button>
       </div>
     </div>
+
+    <AuditLogDetailDrawer v-model:open="showDetailDrawer" :log="selectedLog" />
   </div>
 </template>
