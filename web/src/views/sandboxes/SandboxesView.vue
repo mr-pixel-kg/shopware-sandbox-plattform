@@ -94,7 +94,12 @@ const showEdit = ref(false)
 const showExtend = ref(false)
 const showSnapshot = ref(false)
 const showConfirmDelete = ref(false)
-const selectedSandbox = ref<Sandbox | null>(null)
+const selectedSandboxId = ref<string | null>(null)
+
+const selectedSandbox = computed(() => {
+  if (!selectedSandboxId.value) return null
+  return allSandboxes.value.find((s) => s.id === selectedSandboxId.value) ?? null
+})
 
 const hasActive = computed(() => activeSandboxes.value.length > 0)
 const hasRecent = computed(() => recentSandboxes.value.length > 0)
@@ -132,18 +137,18 @@ function isSandboxReadyForOpen(sandbox: Sandbox): boolean {
   return health.ready
 }
 
-function getSelectedImage() {
+const selectedImage = computed(() => {
   if (!selectedSandbox.value) return undefined
   return images.value.find((i) => i.id === selectedSandbox.value!.imageId)
-}
+})
 
-function getSelectedHealth() {
+const selectedHealth = computed(() => {
   if (!selectedSandbox.value) return undefined
-  return getLiveHealth(selectedSandbox.value)
-}
+  return healthBySandboxId.value[selectedSandbox.value.id]
+})
 
 function handleRowClick(sandbox: Sandbox) {
-  selectedSandbox.value = sandbox
+  selectedSandboxId.value = sandbox.id
   showDetail.value = true
 }
 
@@ -153,22 +158,22 @@ function handleOpen(sandbox: Sandbox) {
 }
 
 function handleEdit(sandbox: Sandbox) {
-  selectedSandbox.value = sandbox
+  selectedSandboxId.value = sandbox.id
   showEdit.value = true
 }
 
 function handleExtend(sandbox: Sandbox) {
-  selectedSandbox.value = sandbox
+  selectedSandboxId.value = sandbox.id
   showExtend.value = true
 }
 
 function handleSnapshot(sandbox: Sandbox) {
-  selectedSandbox.value = sandbox
+  selectedSandboxId.value = sandbox.id
   showSnapshot.value = true
 }
 
 function handleDelete(sandbox: Sandbox) {
-  selectedSandbox.value = sandbox
+  selectedSandboxId.value = sandbox.id
   showConfirmDelete.value = true
 }
 
@@ -549,8 +554,8 @@ async function handleConfirmDelete(done: (success: boolean) => void) {
     <SandboxDetailDialog
       v-model:open="showDetail"
       :sandbox="selectedSandbox"
-      :health="getSelectedHealth()"
-      :image="getSelectedImage()"
+      :health="selectedHealth"
+      :image="selectedImage"
     />
 
     <NewSandboxDialog
