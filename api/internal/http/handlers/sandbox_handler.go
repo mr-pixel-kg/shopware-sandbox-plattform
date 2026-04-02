@@ -66,8 +66,7 @@ func (h *SandboxHandler) List(c echo.Context) error {
 	}
 	auth := mw.MustAuth(c)
 	slog.Debug("listed all sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
-	resp := toSandboxResponses(sandboxes)
-	h.enrichSandboxes(sandboxes, resp)
+	resp := h.enrichSandboxResponses(sandboxes)
 	return c.JSON(200, resp)
 }
 
@@ -88,8 +87,7 @@ func (h *SandboxHandler) ListMine(c echo.Context) error {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load own sandboxes").WithCause(err))
 	}
 	slog.Debug("listed user sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
-	resp := toSandboxResponses(sandboxes)
-	h.enrichSandboxes(sandboxes, resp)
+	resp := h.enrichSandboxResponses(sandboxes)
 	return c.JSON(200, resp)
 }
 
@@ -108,8 +106,7 @@ func (h *SandboxHandler) ListGuest(c echo.Context) error {
 		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load guest sandboxes").WithCause(err))
 	}
 	slog.Debug("listed guest sandboxes", logging.RequestFields(c, "component", "sandbox", "guest_session_id", guest.SessionID.String(), "count", len(sandboxes))...)
-	resp := toSandboxResponses(sandboxes)
-	h.enrichSandboxes(sandboxes, resp)
+	resp := h.enrichSandboxResponses(sandboxes)
 	return c.JSON(200, resp)
 }
 
@@ -136,7 +133,7 @@ func (h *SandboxHandler) Get(c echo.Context) error {
 		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
 	}
 	slog.Debug("sandbox loaded", logging.RequestFields(c, "component", "sandbox", "sandbox_id", sandbox.ID.String(), "status", sandbox.Status)...)
-	resp := h.enrichSandbox(sandbox)
+	resp := h.enrichSandboxResponse(sandbox)
 	return c.JSON(200, resp)
 }
 
@@ -235,8 +232,8 @@ func (h *SandboxHandler) CreatePublicDemo(c echo.Context) error {
 		"image_id", sandbox.ImageID.String(),
 		"expires_at", sandbox.ExpiresAt,
 	)...)
-	h.enrichSandbox(sandbox)
-	return c.JSON(201, sandbox)
+	resp := h.enrichSandboxResponse(sandbox)
+	return c.JSON(201, resp)
 }
 
 // CreatePrivateSandbox godoc
@@ -293,8 +290,8 @@ func (h *SandboxHandler) CreatePrivateSandbox(c echo.Context) error {
 		"image_id", sandbox.ImageID.String(),
 		"expires_at", sandbox.ExpiresAt,
 	)...)
-	h.enrichSandbox(sandbox)
-	return c.JSON(201, sandbox)
+	resp := h.enrichSandboxResponse(sandbox)
+	return c.JSON(201, resp)
 }
 
 // Update godoc
@@ -340,8 +337,8 @@ func (h *SandboxHandler) Update(c echo.Context) error {
 		"user_id", auth.UserID.String(),
 		"sandbox_id", id.String(),
 	)...)
-	h.enrichSandbox(sandbox)
-	return c.JSON(200, sandbox)
+	resp := h.enrichSandboxResponse(sandbox)
+	return c.JSON(200, resp)
 }
 
 // ExtendTTL godoc

@@ -41,7 +41,7 @@ func mergeRegistryAndDB(reg []registry.MetadataItem, dbJSON datatypes.JSON) []re
 	return merged
 }
 
-func (h *SandboxHandler) enrichSandboxes(sandboxes []models.Sandbox, responses []dto.SandboxResponse) {
+func (h *SandboxHandler) enrichSandboxResponses(sandboxes []models.Sandbox) []dto.SandboxResponse {
 	type cachedEntry struct {
 		metadata []registry.MetadataItem
 		ssh      *registry.SSHEntry
@@ -86,18 +86,23 @@ func (h *SandboxHandler) enrichSandboxes(sandboxes []models.Sandbox, responses [
 			data, _ := json.Marshal(enriched)
 			sb.Metadata = datatypes.JSON(data)
 		}
+	}
 
-		// Enrich SSH
-		if h.sshCfg.Enabled {
-			responses[idx].SSH = buildSSHInfo(sb, h.sshCfg, entry.ssh)
+	responses := toSandboxResponses(sandboxes)
+
+	if h.sshCfg.Enabled {
+		for idx := range sandboxes {
+			entry := cache[sandboxes[idx].ImageID]
+			if entry != nil {
+				responses[idx].SSH = buildSSHInfo(&sandboxes[idx], h.sshCfg, entry.ssh)
+			}
 		}
 	}
+
+	return responses
 }
 
-func (h *SandboxHandler) enrichSandbox(sandbox *models.Sandbox) dto.SandboxResponse {
-	sl := []models.Sandbox{*sandbox}
-	resp := []dto.SandboxResponse{toSandboxResponse(sandbox)}
-	h.enrichSandboxes(sl, resp)
-	*sandbox = sl[0]
-	return resp[0]
+func (h *SandboxHandler) enrichSandboxResponse(sandbox *models.Sandbox) dto.SandboxResponse {
+	responses := h.enrichSandboxResponses([]models.Sandbox{*sandbox})
+	return responses[0]
 }
