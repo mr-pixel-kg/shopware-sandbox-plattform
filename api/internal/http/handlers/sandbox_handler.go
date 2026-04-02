@@ -466,14 +466,14 @@ func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.S
 // @Tags         Demos
 // @Accept       json
 // @Produce      json
-// @Param        body body dto.CreateSandboxRequest true "Sandbox configuration (only imageId used)"
+// @Param        body body dto.CreateDemoRequest true "Demo sandbox configuration"
 // @Success      201 {object} dto.SandboxResponse
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      409 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
 // @Router       /api/demos [post]
 func (h *SandboxHandler) CreateDemo(c echo.Context) error {
-	var input dto.CreateSandboxRequest
+	var input dto.CreateDemoRequest
 	if err := bindAndValidate(c, &input); err != nil {
 		return responses.FromError(c, err)
 	}

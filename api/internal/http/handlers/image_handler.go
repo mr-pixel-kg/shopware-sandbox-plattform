@@ -147,7 +147,7 @@ func (h *ImageHandler) Create(c echo.Context) error {
 // @Failure      401 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
 // @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id} [patch]
+// @Router       /api/images/{id} [put]
 func (h *ImageHandler) Update(c echo.Context) error {
 	auth := mw.MustAuth(c)
 	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
@@ -418,7 +418,7 @@ func (h *ImageHandler) Progress(c echo.Context) error {
 // @Success      200 {array} registry.MetadataItem
 // @Failure      400 {object} dto.ErrorResponse
 // @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/registry/lookup [get]
+// @Router       /api/registry [get]
 func (h *ImageHandler) RegistryLookup(c echo.Context) error {
 	name := c.QueryParam("name")
 
