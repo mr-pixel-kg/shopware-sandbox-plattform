@@ -35,6 +35,24 @@ func NewImageHandler(images *services.ImageService, audit *services.AuditService
 	return &ImageHandler{images: images, audit: audit, resolver: resolver}
 }
 
+// ListPublic godoc
+// @Summary      List public images
+// @Description  Returns all images marked as public (no auth required)
+// @Tags         Images
+// @Produce      json
+// @Success      200 {array} dto.ImageResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/images/public [get]
+func (h *ImageHandler) ListPublic(c echo.Context) error {
+	images, err := h.images.ListPublic()
+	if err != nil {
+		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load public images").WithCause(err))
+	}
+	h.enrichMetadata(images)
+	slog.Debug("listed public images", logging.RequestFields(c, "component", "image", "count", len(images))...)
+	return c.JSON(200, toImageResponses(images))
+}
+
 // ListAll godoc
 // @Summary      List all images
 // @Description  Returns all images including private ones

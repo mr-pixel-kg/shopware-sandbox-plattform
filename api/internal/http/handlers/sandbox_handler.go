@@ -459,3 +459,107 @@ func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.S
 
 	return nil
 }
+
+// CreateDemo godoc
+// @Summary      Create a guest demo sandbox
+// @Description  Create a sandbox for a guest visitor. Identified by X-Client-Id header. No auth required. Server applies default TTL.
+// @Tags         Demos
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.CreateSandboxRequest true "Sandbox configuration (only imageId used)"
+// @Success      201 {object} dto.SandboxResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      409 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/demos [post]
+func (h *SandboxHandler) CreateDemo(c echo.Context) error {
+	var input dto.CreateSandboxRequest
+	if err := bindAndValidate(c, &input); err != nil {
+		return responses.FromError(c, err)
+	}
+
+	imageID, err := uuid.Parse(input.ImageID)
+	if err != nil {
+		return responses.FromError(c, validationError("Invalid image id"))
+	}
+
+	clientID := mw.ClientID(c)
+	slog.Debug("demo creation requested", logging.RequestFields(c, "component", "sandbox", "image_id", imageID.String())...)
+	sandbox, err := h.sandboxes.Create(c.Request().Context(), services.CreateSandboxInput{
+		ImageID:    imageID,
+		ClientID:   clientID,
+		ClientIP:   c.RealIP(),
+		AuditActor: newAuditActor(c, nil),
+	})
+	if err != nil {
+		return mapSandboxError(c, err)
+	}
+	h.health.StartMonitoring(sandbox.ID)
+
+	slog.Info("demo created", logging.RequestFields(c,
+		"component", "sandbox",
+		"sandbox_id", sandbox.ID.String(),
+		"image_id", sandbox.ImageID.String(),
+	)...)
+	resp := h.enrichSandboxResponse(sandbox)
+	return c.JSON(201, resp)
+}
+
+// ListDemos godoc
+// @Summary      List guest demo sandboxes
+// @Description  Returns sandboxes belonging to the given client ID. No auth required.
+// @Tags         Demos
+// @Produce      json
+// @Param        clientId query string true "Client ID" format(uuid)
+// @Success      200 {array} dto.SandboxResponse
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/demos [get]
+func (h *SandboxHandler) ListDemos(c echo.Context) error {
+	clientIDStr := c.QueryParam("clientId")
+	if clientIDStr == "" {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "clientId query parameter is required"))
+	}
+	parsed, err := uuid.Parse(clientIDStr)
+	if err != nil {
+		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid clientId"))
+	}
+
+	sandboxes, err := h.sandboxes.ListByClientID(parsed)
+	if err != nil {
+		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load demo sandboxes").WithCause(err))
+	}
+	slog.Debug("listed demo sandboxes", logging.RequestFields(c, "component", "sandbox", "client_id", parsed.String(), "count", len(sandboxes))...)
+	resp := h.enrichSandboxResponses(sandboxes)
+	return c.JSON(200, resp)
+}
+
+// DeleteDemo godoc
+// @Summary      Delete a guest demo sandbox
+// @Description  Delete a sandbox owned by the X-Client-Id. No auth required.
+// @Tags         Demos
+// @Param        id path string true "Sandbox ID" format(uuid)
+// @Success      204
+// @Failure      400 {object} dto.ErrorResponse
+// @Failure      403 {object} dto.ErrorResponse
+// @Failure      404 {object} dto.ErrorResponse
+// @Failure      500 {object} dto.ErrorResponse
+// @Router       /api/demos/{id} [delete]
+func (h *SandboxHandler) DeleteDemo(c echo.Context) error {
+	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+	if err != nil {
+		return responses.FromError(c, err)
+	}
+
+	clientID := mw.ClientID(c)
+	if clientID == nil {
+		return responses.FromAppError(c, apperror.BadRequest("MISSING_CLIENT_ID", "X-Client-Id header is required"))
+	}
+
+	if err := h.sandboxes.DeleteForGuest(c.Request().Context(), id, *clientID, newAuditActor(c, nil)); err != nil {
+		return mapSandboxError(c, err)
+	}
+
+	slog.Info("demo deleted", logging.RequestFields(c, "component", "sandbox", "client_id", clientID.String(), "sandbox_id", id.String())...)
+	return c.NoContent(204)
+}
