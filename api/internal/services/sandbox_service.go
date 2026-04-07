@@ -149,11 +149,12 @@ func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResu
 		err       error
 	)
 
-	if input.ClientID != nil {
+	switch {
+	case input.ClientID != nil:
 		sandboxes, total, err = s.repo.ListAllByClientIDPaginated(*input.ClientID, input.Limit, input.Offset)
-	} else if input.UserID != nil {
+	case input.UserID != nil:
 		sandboxes, total, err = s.repo.ListAllByUserPaginated(*input.UserID, input.Limit, input.Offset)
-	} else {
+	default:
 		sandboxes, total, err = s.repo.ListAllPaginated(input.Limit, input.Offset)
 	}
 	if err != nil {
