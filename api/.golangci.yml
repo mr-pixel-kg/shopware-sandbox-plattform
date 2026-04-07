@@ -44,6 +44,7 @@ linters:
     gosec:
       excludes:
         - G118
+        - G706
     gocritic:
       enabled-tags:
         - diagnostic

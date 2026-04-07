@@ -1,43 +1,61 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
+	"gorm.io/gorm"
 )
 
 type UserHandler struct {
-	users *services.UserService
-	audit *services.AuditService
+	Users *services.UserService
+	Audit *services.AuditService
 }
 
-func NewUserHandler(users *services.UserService, audit *services.AuditService) *UserHandler {
-	return &UserHandler{users: users, audit: audit}
+func (h UserHandler) MountRoutes(s *fuego.Server) {
+	users := fuego.Group(s, "/users")
+	fuego.Get(users, "", h.list,
+		option.Summary("List users"),
+		option.Description("Return all users, including pending invited users"),
+		option.Tags("Users"),
+	)
+	fuego.Get(users, "/{id}", h.get,
+		option.Summary("Get user"),
+		option.Description("Return a single user by ID"),
+		option.Tags("Users"),
+	)
+	fuego.Post(users, "", h.create,
+		option.Summary("Create user"),
+		option.Description("Create an active user or invite a pending user when no password is provided"),
+		option.Tags("Users"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+	fuego.Patch(users, "/{id}", h.update,
+		option.Summary("Update user"),
+		option.Description("Update a user's email, role, and optionally password"),
+		option.Tags("Users"),
+	)
+	fuego.Delete(users, "/{id}", h.delete,
+		option.Summary("Delete user"),
+		option.Description("Delete a user by ID"),
+		option.Tags("Users"),
+		option.DefaultStatusCode(http.StatusNoContent),
+	)
 }
 
-// List godoc
-// @Summary      List users
-// @Description  Return all users, including pending invited users
-// @Tags         Admin
-// @Security     BearerAuth
-// @Produce      json
-// @Success      200 {array} dto.UserResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/users [get]
-func (h *UserHandler) List(c echo.Context) error {
-	users, err := h.users.List()
+func (h UserHandler) list(c fuego.ContextNoBody) ([]dto.UserResponse, error) {
+	users, err := h.Users.List()
 	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("USER_LIST_FAILED", "Could not list users").WithCause(err))
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not list users"}
 	}
 
 	out := make([]dto.UserResponse, len(users))
@@ -47,179 +65,126 @@ func (h *UserHandler) List(c echo.Context) error {
 			IsPending: u.IsPending(), CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 		}
 	}
-	return c.JSON(http.StatusOK, out)
+	return out, nil
 }
 
-// Get godoc
-// @Summary      Get user
-// @Description  Return a single user by ID
-// @Tags         Admin
-// @Security     BearerAuth
-// @Produce      json
-// @Param        id path string true "User ID" format(uuid)
-// @Success      200 {object} dto.UserResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/users/{id} [get]
-func (h *UserHandler) Get(c echo.Context) error {
-	id, err := parseUserID(c)
+func (h UserHandler) get(c fuego.ContextNoBody) (dto.UserResponse, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return err
+		return dto.UserResponse{}, err
 	}
 
-	user, getErr := h.users.Get(id)
-	if getErr != nil {
-		return responses.FromError(c, getErr)
+	user, err := h.Users.Get(id)
+	if err != nil {
+		return dto.UserResponse{}, mapUserError(err)
 	}
 
-	return c.JSON(http.StatusOK, dto.UserResponse{
+	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, Role: user.Role,
 		IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
-	})
+	}, nil
 }
 
-// Create godoc
-// @Summary      Create user
-// @Description  Create an active user or invite a pending user when no password is provided
-// @Tags         Admin
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.CreateUserRequest true "User payload"
-// @Success      201 {object} dto.UserResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/users [post]
-func (h *UserHandler) Create(c echo.Context) error {
-	var input dto.CreateUserRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
-	}
-
-	user, err := h.users.Create(input.Email, input.Role, input.Password)
+func (h UserHandler) create(c fuego.ContextWithBody[dto.CreateUserRequest]) (dto.UserResponse, error) {
+	body, err := c.Body()
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	auth := mw.MustAuth(c)
-	slog.Info("user created", logging.RequestFields(c,
-		"component", "admin",
-		"user_id", user.ID.String(),
-		"email", logging.MaskEmail(user.Email),
-		"pending", user.IsPending(),
-	)...)
+	user, err := h.Users.Create(body.Email, body.Role, body.Password)
+	if err != nil {
+		return dto.UserResponse{}, mapUserError(err)
+	}
+
+	auth := mw.MustAuth(c.Request())
+	slog.Info("user created", "component", "admin", "user_id", user.ID, "email", user.Email, "pending", user.IsPending())
 	resourceType := auditcontracts.ResourceTypeUser
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserCreated, &resourceType, &user.ID, map[string]any{
-		"email":   user.Email,
-		"role":    user.Role,
-		"pending": user.IsPending(),
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionUserCreated, &resourceType, &user.ID, map[string]any{
+		"email": user.Email, "role": user.Role, "pending": user.IsPending(),
 	}))
 
-	return c.JSON(http.StatusCreated, dto.UserResponse{
+	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, Role: user.Role,
 		IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
-	})
+	}, nil
 }
 
-// Update godoc
-// @Summary      Update user
-// @Description  Update a user's email, role, and optionally password
-// @Tags         Admin
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id path string true "User ID" format(uuid)
-// @Param        body body dto.UpdateUserRequest true "User payload"
-// @Success      200 {object} dto.UserResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/users/{id} [patch]
-func (h *UserHandler) Update(c echo.Context) error {
-	id, err := parseUserID(c)
+func (h UserHandler) update(c fuego.ContextWithBody[dto.UpdateUserRequest]) (dto.UserResponse, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return err
+		return dto.UserResponse{}, err
 	}
 
-	var input dto.UpdateUserRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+	body, err := c.Body()
+	if err != nil {
+		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	user, updateErr := h.users.Update(id, input.Email, input.Role, input.Password)
-	if updateErr != nil {
-		return responses.FromError(c, updateErr)
+	user, err := h.Users.Update(id, body.Email, body.Role, body.Password)
+	if err != nil {
+		return dto.UserResponse{}, mapUserError(err)
 	}
 
-	auth := mw.MustAuth(c)
-	slog.Info("user updated", logging.RequestFields(c,
-		"component", "admin",
-		"user_id", user.ID.String(),
-		"email", logging.MaskEmail(user.Email),
-	)...)
+	auth := mw.MustAuth(c.Request())
+	slog.Info("user updated", "component", "admin", "user_id", user.ID, "email", user.Email)
 	resourceType := auditcontracts.ResourceTypeUser
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserUpdated, &resourceType, &user.ID, map[string]any{
-		"email": user.Email,
-		"role":  user.Role,
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionUserUpdated, &resourceType, &user.ID, map[string]any{
+		"email": user.Email, "role": user.Role,
 	}))
 
-	return c.JSON(http.StatusOK, dto.UserResponse{
+	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, Role: user.Role,
 		IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
-	})
+	}, nil
 }
 
-// Delete godoc
-// @Summary      Delete user
-// @Description  Delete a user by ID
-// @Tags         Admin
-// @Security     BearerAuth
-// @Produce      json
-// @Param        id path string true "User ID" format(uuid)
-// @Success      204
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/users/{id} [delete]
-func (h *UserHandler) Delete(c echo.Context) error {
-	id, err := parseUserID(c)
+func (h UserHandler) delete(c fuego.ContextNoBody) (any, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	auth := mw.MustAuth(c)
+	auth := mw.MustAuth(c.Request())
 	if auth.UserID == id {
-		return responses.FromAppError(c, apperror.BadRequest("CANNOT_DELETE_SELF", "You cannot delete your own user"))
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "You cannot delete your own user"}
 	}
 
-	user, getErr := h.users.Get(id)
-	if getErr != nil {
-		return responses.FromError(c, getErr)
+	user, err := h.Users.Get(id)
+	if err != nil {
+		return nil, mapUserError(err)
 	}
 
-	if deleteErr := h.users.Delete(id); deleteErr != nil {
-		return responses.FromError(c, deleteErr)
+	if err := h.Users.Delete(id); err != nil {
+		return nil, mapUserError(err)
 	}
 
-	slog.Info("user deleted", logging.RequestFields(c,
-		"component", "admin",
-		"user_id", user.ID.String(),
-		"email", logging.MaskEmail(user.Email),
-	)...)
+	slog.Info("user deleted", "component", "admin", "user_id", user.ID, "email", user.Email)
 	resourceType := auditcontracts.ResourceTypeUser
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionUserDeleted, &resourceType, &user.ID, map[string]any{
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionUserDeleted, &resourceType, &user.ID, map[string]any{
 		"email": user.Email,
 	}))
 
-	return c.NoContent(http.StatusNoContent)
+	return nil, nil
 }
 
-func parseUserID(c echo.Context) (uuid.UUID, error) {
-	return parseUUIDParam(c, "id", "INVALID_ID", "Invalid UUID")
+func mapUserError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var appErr *apperror.AppError
+	if errors.As(err, &appErr) {
+		return fuego.HTTPError{Status: appErr.StatusCode, Detail: appErr.Message}
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "User not found"}
+	}
+	return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "User operation failed"}
+}
+
+func parsePathUUID(c interface{ PathParam(string) string }, name string) (uuid.UUID, error) {
+	id, err := uuid.Parse(c.PathParam(name))
+	if err != nil {
+		return uuid.Nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid " + name}
+	}
+	return id, nil
 }

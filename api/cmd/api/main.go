@@ -1,17 +1,3 @@
-// @title           Shopshredder Sandbox API
-// @version         1.0.0
-// @description     API for managing public demo sandboxes and internal employee sandboxes.
-//
-// @host            localhost:8080
-// @BasePath        /
-//
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-// @description Paste the JWT token. "Bearer " is optional.
-
-//go:generate go tool swag init -g main.go -d .,../../internal/http/handlers,../../internal/http/dto,../../internal/models,../../internal/http,../../internal/registry -o ../../docs --parseInternal --packagePrefix github.com/manuel/shopware-testenv-platform/api
-
 package main
 
 import (
@@ -23,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/manuel/shopware-testenv-platform/api/docs"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/database"
 	httpserver "github.com/manuel/shopware-testenv-platform/api/internal/http"

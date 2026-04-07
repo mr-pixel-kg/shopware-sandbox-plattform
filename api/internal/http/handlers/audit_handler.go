@@ -1,62 +1,56 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
 type AuditHandler struct {
-	audit *services.AuditService
+	Audit *services.AuditService
 }
 
-func NewAuditHandler(audit *services.AuditService) *AuditHandler {
-	return &AuditHandler{audit: audit}
+func (h AuditHandler) MountRoutes(s *fuego.Server) {
+	logs := fuego.Group(s, "/audit-logs")
+	fuego.Get(logs, "", h.list,
+		option.Summary("List audit logs"),
+		option.Description("Returns recent audit log entries with pagination and filtering"),
+		option.Tags("AuditLogs"),
+		option.QueryInt("limit", "Max entries (1-500, default 50)"),
+		option.QueryInt("offset", "Offset for pagination"),
+		option.Query("userId", "Filter by user ID"),
+		option.Query("action", "Filter by action"),
+		option.Query("resourceType", "Filter by resource type"),
+		option.Query("resourceId", "Filter by resource ID"),
+		option.Query("clientId", "Filter by client ID"),
+		option.Query("from", "Filter from timestamp (inclusive, RFC3339)"),
+		option.Query("to", "Filter to timestamp (inclusive, RFC3339)"),
+	)
+	fuego.Get(logs, "/facets", h.facets,
+		option.Summary("List audit log facets"),
+		option.Description("Returns available audit filter values for the current query window"),
+		option.Tags("AuditLogs"),
+	)
 }
 
-// List godoc
-// @Summary      List audit logs
-// @Description  Returns recent audit log entries, optionally limited
-// @Tags         AuditLogs
-// @Security     BearerAuth
-// @Produce      json
-// @Param        limit query int false "Max entries (1-500, default 50)" minimum(1) maximum(500) example(50)
-// @Param        offset query int false "Offset for pagination" minimum(0) example(0)
-// @Param        userId query string false "Filter by user ID" format(uuid)
-// @Param        action query string false "Filter by action" example("sandbox.created")
-// @Param        resourceType query string false "Filter by resource type" example("sandbox")
-// @Param        resourceId query string false "Filter by resource ID" format(uuid)
-// @Param        clientId query string false "Filter by client ID" format(uuid)
-// @Param        from query string false "Filter from timestamp (inclusive)" format(date-time)
-// @Param        to query string false "Filter to timestamp (inclusive)" format(date-time)
-// @Success      200 {object} dto.AuditLogListResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/audit-logs [get]
-func (h *AuditHandler) List(c echo.Context) error {
-	filters, err := parseAuditLogListInput(c)
+func (h AuditHandler) list(c fuego.ContextNoBody) (dto.AuditLogListResponse, error) {
+	r := c.Request()
+	filters, err := parseAuditLogListInput(r)
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.AuditLogListResponse{}, err
 	}
 
-	auth := middleware.MustAuth(c)
-	result, err := h.audit.List(filters)
+	result, err := h.Audit.List(filters)
 	if err != nil {
-		return responses.Error(c, http.StatusInternalServerError, "AUDIT_LOG_LIST_FAILED", "Could not load audit logs")
+		return dto.AuditLogListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load audit logs"}
 	}
-	slog.Debug("audit logs listed", logging.RequestFields(c, "component", "audit", "user_id", auth.UserID.String(), "limit", filters.Limit, "offset", filters.Offset, "count", len(result.Logs), "total", result.Total)...)
 
 	response := make([]dto.AuditLogResponse, 0, len(result.Logs))
 	for _, logEntry := range result.Logs {
@@ -78,7 +72,7 @@ func (h *AuditHandler) List(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, dto.AuditLogListResponse{
+	return dto.AuditLogListResponse{
 		Data: response,
 		Meta: dto.AuditLogListMeta{
 			Pagination: dto.PaginationMeta{
@@ -98,132 +92,104 @@ func (h *AuditHandler) List(c echo.Context) error {
 				To:           filters.To,
 			},
 		},
-	})
+	}, nil
 }
 
-// Facets godoc
-// @Summary      List audit log facets
-// @Description  Returns available audit filter values for the current query window
-// @Tags         AuditLogs
-// @Security     BearerAuth
-// @Produce      json
-// @Param        action query string false "Filter users by action" example("sandbox.created")
-// @Param        resourceType query string false "Filter users by resource type" example("sandbox")
-// @Param        resourceId query string false "Filter users by resource ID" format(uuid)
-// @Param        clientId query string false "Filter by client ID" format(uuid)
-// @Param        from query string false "Filter from timestamp (inclusive)" format(date-time)
-// @Param        to query string false "Filter to timestamp (inclusive)" format(date-time)
-// @Success      200 {object} dto.AuditLogFacetsResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/audit-logs/facets [get]
-func (h *AuditHandler) Facets(c echo.Context) error {
-	input, err := parseAuditLogFacetInput(c)
+func (h AuditHandler) facets(c fuego.ContextNoBody) (dto.AuditLogFacetsResponse, error) {
+	r := c.Request()
+	input, err := parseAuditLogFacetInput(r)
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.AuditLogFacetsResponse{}, err
 	}
 
-	result, err := h.audit.ListFacets(input)
+	result, err := h.Audit.ListFacets(input)
 	if err != nil {
-		return responses.Error(c, http.StatusInternalServerError, "AUDIT_LOG_FACETS_FAILED", "Could not load audit log filters")
+		return dto.AuditLogFacetsResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load audit log facets"}
 	}
 
 	users := make([]dto.UserSummary, 0, len(result.Users))
 	for _, user := range result.Users {
-		users = append(users, dto.UserSummary{
-			ID:    user.ID,
-			Email: user.Email,
-		})
+		users = append(users, dto.UserSummary{ID: user.ID, Email: user.Email})
 	}
 
-	return c.JSON(http.StatusOK, dto.AuditLogFacetsResponse{
-		Users:   users,
-		Actions: result.Actions,
-	})
+	return dto.AuditLogFacetsResponse{Users: users, Actions: result.Actions}, nil
 }
 
-func parseAuditLogListInput(c echo.Context) (services.AuditLogListInput, error) {
-	input := services.AuditLogListInput{
-		Limit:  50,
-		Offset: 0,
-	}
+func parseAuditLogListInput(r *http.Request) (services.AuditLogListInput, error) {
+	q := r.URL.Query()
+	input := services.AuditLogListInput{Limit: 50, Offset: 0}
 
-	if value := strings.TrimSpace(c.QueryParam("limit")); value != "" {
-		parsed, err := strconv.Atoi(value)
+	if v := strings.TrimSpace(q.Get("limit")); v != "" {
+		parsed, err := strconv.Atoi(v)
 		if err != nil || parsed <= 0 || parsed > 500 {
-			return input, apperror.BadRequest("VALIDATION_ERROR", "limit must be between 1 and 500")
+			return input, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "limit must be between 1 and 500"}
 		}
 		input.Limit = parsed
 	}
-
-	if value := strings.TrimSpace(c.QueryParam("offset")); value != "" {
-		parsed, err := strconv.Atoi(value)
+	if v := strings.TrimSpace(q.Get("offset")); v != "" {
+		parsed, err := strconv.Atoi(v)
 		if err != nil || parsed < 0 {
-			return input, apperror.BadRequest("VALIDATION_ERROR", "offset must be 0 or greater")
+			return input, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "offset must be 0 or greater"}
 		}
 		input.Offset = parsed
 	}
 
-	userID, err := parseOptionalUUIDQuery(c.QueryParam("userId"), "Invalid userId")
+	var err error
+	input.UserID, err = parseOptionalUUIDQuery(q.Get("userId"), "Invalid userId")
 	if err != nil {
 		return input, err
 	}
-	resourceID, err := parseOptionalUUIDQuery(c.QueryParam("resourceId"), "Invalid resourceId")
+	input.ResourceID, err = parseOptionalUUIDQuery(q.Get("resourceId"), "Invalid resourceId")
 	if err != nil {
 		return input, err
 	}
-	clientID, err := parseOptionalUUIDQuery(c.QueryParam("clientId"), "Invalid clientId")
+	input.ClientID, err = parseOptionalUUIDQuery(q.Get("clientId"), "Invalid clientId")
 	if err != nil {
 		return input, err
 	}
-	from, err := parseOptionalTimeQuery(c.QueryParam("from"), "Invalid from timestamp")
+	input.From, err = parseOptionalTimeQuery(q.Get("from"), "Invalid from timestamp")
 	if err != nil {
 		return input, err
 	}
-	to, err := parseOptionalTimeQuery(c.QueryParam("to"), "Invalid to timestamp")
+	input.To, err = parseOptionalTimeQuery(q.Get("to"), "Invalid to timestamp")
 	if err != nil {
 		return input, err
 	}
-	if from != nil && to != nil && from.After(*to) {
-		return input, apperror.BadRequest("VALIDATION_ERROR", "from must be before or equal to to")
+	if input.From != nil && input.To != nil && input.From.After(*input.To) {
+		return input, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "from must be before or equal to to"}
 	}
 
-	input.UserID = userID
-	input.ResourceID = resourceID
-	input.ClientID = clientID
-	input.From = from
-	input.To = to
-
-	if value := strings.TrimSpace(c.QueryParam("action")); value != "" {
-		input.Action = &value
+	if v := strings.TrimSpace(q.Get("action")); v != "" {
+		input.Action = &v
 	}
-	if value := strings.TrimSpace(c.QueryParam("resourceType")); value != "" {
-		input.ResourceType = &value
+	if v := strings.TrimSpace(q.Get("resourceType")); v != "" {
+		input.ResourceType = &v
 	}
 
 	return input, nil
 }
 
-func parseAuditLogFacetInput(c echo.Context) (services.AuditLogFacetInput, error) {
-	resourceID, err := parseOptionalUUIDQuery(c.QueryParam("resourceId"), "Invalid resourceId")
+func parseAuditLogFacetInput(r *http.Request) (services.AuditLogFacetInput, error) {
+	q := r.URL.Query()
+
+	resourceID, err := parseOptionalUUIDQuery(q.Get("resourceId"), "Invalid resourceId")
 	if err != nil {
 		return services.AuditLogFacetInput{}, err
 	}
-	clientID, err := parseOptionalUUIDQuery(c.QueryParam("clientId"), "Invalid clientId")
+	clientID, err := parseOptionalUUIDQuery(q.Get("clientId"), "Invalid clientId")
 	if err != nil {
 		return services.AuditLogFacetInput{}, err
 	}
-	from, err := parseOptionalTimeQuery(c.QueryParam("from"), "Invalid from timestamp")
+	from, err := parseOptionalTimeQuery(q.Get("from"), "Invalid from timestamp")
 	if err != nil {
 		return services.AuditLogFacetInput{}, err
 	}
-	to, err := parseOptionalTimeQuery(c.QueryParam("to"), "Invalid to timestamp")
+	to, err := parseOptionalTimeQuery(q.Get("to"), "Invalid to timestamp")
 	if err != nil {
 		return services.AuditLogFacetInput{}, err
 	}
 	if from != nil && to != nil && from.After(*to) {
-		return services.AuditLogFacetInput{}, apperror.BadRequest("VALIDATION_ERROR", "from must be before or equal to to")
+		return services.AuditLogFacetInput{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "from must be before or equal to to"}
 	}
 
 	input := services.AuditLogFacetInput{
@@ -232,11 +198,11 @@ func parseAuditLogFacetInput(c echo.Context) (services.AuditLogFacetInput, error
 		From:       from,
 		To:         to,
 	}
-	if value := strings.TrimSpace(c.QueryParam("action")); value != "" {
-		input.Action = &value
+	if v := strings.TrimSpace(q.Get("action")); v != "" {
+		input.Action = &v
 	}
-	if value := strings.TrimSpace(c.QueryParam("resourceType")); value != "" {
-		input.ResourceType = &value
+	if v := strings.TrimSpace(q.Get("resourceType")); v != "" {
+		input.ResourceType = &v
 	}
 
 	return input, nil
@@ -247,10 +213,9 @@ func parseOptionalUUIDQuery(raw string, message string) (*uuid.UUID, error) {
 	if raw == "" {
 		return nil, nil
 	}
-
 	value, err := uuid.Parse(raw)
 	if err != nil {
-		return nil, apperror.BadRequest("VALIDATION_ERROR", message)
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: message}
 	}
 	return &value, nil
 }
@@ -260,10 +225,9 @@ func parseOptionalTimeQuery(raw string, message string) (*time.Time, error) {
 	if raw == "" {
 		return nil, nil
 	}
-
 	value, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
-		return nil, apperror.BadRequest("VALIDATION_ERROR", message)
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: message}
 	}
 	return &value, nil
 }

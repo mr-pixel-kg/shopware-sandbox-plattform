@@ -3,389 +3,250 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
+	"github.com/manuel/shopware-testenv-platform/api/internal/http/errs"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 	"gorm.io/gorm"
 )
 
-type ImageHandler struct {
-	images   *services.ImageService
-	audit    *services.AuditService
-	resolver RegistryResolver
-}
-
 type RegistryResolver interface {
 	ResolveEntry(imageName string) *registry.ImageEntry
 }
 
-func NewImageHandler(images *services.ImageService, audit *services.AuditService, resolver RegistryResolver) *ImageHandler {
-	return &ImageHandler{images: images, audit: audit, resolver: resolver}
+type ImageHandler struct {
+	Images   *services.ImageService
+	Audit    *services.AuditService
+	Resolver RegistryResolver
 }
 
-// ListPublic godoc
-// @Summary      List public images
-// @Description  Returns all images marked as public (no auth required)
-// @Tags         Images
-// @Produce      json
-// @Success      200 {array} dto.ImageResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/public [get]
-func (h *ImageHandler) ListPublic(c echo.Context) error {
-	images, err := h.images.ListPublic()
+func (h ImageHandler) MountPublicRoutes(s *fuego.Server) {
+	images := fuego.Group(s, "/images")
+	fuego.Get(images, "/public", h.listPublic,
+		option.Summary("List public images"),
+		option.Description("Returns all images marked as public (no auth required)"),
+		option.Tags("Images"),
+	)
+	fuego.Get(images, "/pending", h.listPending,
+		option.Summary("List pending image operations"),
+		option.Description("Returns all images with ongoing operations with optional progress percentage"),
+		option.Tags("Images"),
+	)
+	fuego.GetStd(images, "/{id}/progress", h.progress,
+		option.Summary("Stream image progress"),
+		option.Description("SSE endpoint streaming progress events for image operations"),
+		option.Tags("Images"),
+	)
+	fuego.Get(s, "/registry", h.registryLookup,
+		option.Summary("Lookup registry metadata"),
+		option.Description("Return registry-defined metadata for an image by name or ID"),
+		option.Tags("Images"),
+		option.Query("name", "Image name (e.g. dockware/dev:6.6.9.0)"),
+		option.Query("id", "Image ID"),
+	)
+}
+
+func (h ImageHandler) MountAuthedRoutes(s *fuego.Server) {
+	images := fuego.Group(s, "/images")
+	fuego.Get(images, "", h.listAll,
+		option.Summary("List all images"),
+		option.Description("Returns all images including private ones"),
+		option.Tags("Images"),
+	)
+	fuego.Post(images, "", h.create,
+		option.Summary("Create an image"),
+		option.Description("Register a new Docker image. If not available locally, a background pull is started."),
+		option.Tags("Images"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+	fuego.Patch(images, "/{id}", h.update,
+		option.Summary("Update an image"),
+		option.Description("Update image metadata and visibility"),
+		option.Tags("Images"),
+	)
+	fuego.Delete(images, "/{id}", h.delete,
+		option.Summary("Delete an image"),
+		option.Description("Remove a Docker image registration"),
+		option.Tags("Images"),
+		option.DefaultStatusCode(http.StatusNoContent),
+	)
+	fuego.PostStd(images, "/{id}/thumbnail", h.uploadThumbnail,
+		option.Summary("Upload an image thumbnail"),
+		option.Description("Upload or replace the thumbnail for an image"),
+		option.Tags("Images"),
+	)
+	fuego.DeleteStd(images, "/{id}/thumbnail", h.deleteThumbnail,
+		option.Summary("Delete an image thumbnail"),
+		option.Description("Remove the thumbnail associated with an image"),
+		option.Tags("Images"),
+	)
+}
+
+func (h ImageHandler) listPublic(c fuego.ContextNoBody) ([]dto.ImageResponse, error) {
+	images, err := h.Images.ListPublic()
 	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load public images").WithCause(err))
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load public images"}
 	}
-	slog.Debug("listed public images", logging.RequestFields(c, "component", "image", "count", len(images))...)
+
 	out := make([]dto.ImageResponse, len(images))
 	for i := range images {
-		img := &images[i]
-		var owner *dto.UserSummary
-		if img.Owner != nil {
-			owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email}
-		}
-		out[i] = dto.ImageResponse{
-			ID: img.ID, Name: img.Name, Tag: img.Tag,
-			Title: img.Title, Description: img.Description,
-			ThumbnailURL: img.ThumbnailURL, IsPublic: img.IsPublic,
-			Status: img.Status, Error: img.Error,
-			Metadata: img.Metadata, RegistryRef: img.RegistryRef,
-			Owner:     owner,
-			CreatedAt: img.CreatedAt, UpdatedAt: img.UpdatedAt,
-		}
+		out[i] = imageToResponse(&images[i])
 	}
-	return c.JSON(200, out)
+	return out, nil
 }
 
-// ListAll godoc
-// @Summary      List all images
-// @Description  Returns all images including private ones
-// @Tags         Images
-// @Security     BearerAuth
-// @Produce      json
-// @Success      200 {array} dto.ImageResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images [get]
-func (h *ImageHandler) ListAll(c echo.Context) error {
-	images, err := h.images.ListAll()
+func (h ImageHandler) listAll(c fuego.ContextNoBody) ([]dto.ImageResponse, error) {
+	images, err := h.Images.ListAll()
 	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("IMAGE_LIST_FAILED", "Could not load images").WithCause(err))
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load images"}
 	}
-	slog.Debug("listed all images", logging.RequestFields(c, "component", "image", "count", len(images))...)
+
 	out := make([]dto.ImageResponse, len(images))
 	for i := range images {
-		img := &images[i]
-		var owner *dto.UserSummary
-		if img.Owner != nil {
-			owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email}
-		}
-		out[i] = dto.ImageResponse{
-			ID: img.ID, Name: img.Name, Tag: img.Tag,
-			Title: img.Title, Description: img.Description,
-			ThumbnailURL: img.ThumbnailURL, IsPublic: img.IsPublic,
-			Status: img.Status, Error: img.Error,
-			Metadata: img.Metadata, RegistryRef: img.RegistryRef,
-			Owner:     owner,
-			CreatedAt: img.CreatedAt, UpdatedAt: img.UpdatedAt,
-		}
+		out[i] = imageToResponse(&images[i])
 	}
-	return c.JSON(200, out)
+	return out, nil
 }
 
-// Create godoc
-// @Summary      Create an image
-// @Description  Register a new Docker image. If not available locally, a background pull is started.
-// @Tags         Images
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.CreateImageRequest true "Image details"
-// @Success      201 {object} dto.ImageResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Router       /api/images [post]
-func (h *ImageHandler) Create(c echo.Context) error {
-	var input dto.CreateImageRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+func (h ImageHandler) create(c fuego.ContextWithBody[dto.CreateImageRequest]) (dto.ImageResponse, error) {
+	body, err := c.Body()
+	if err != nil {
+		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	auth := mw.MustAuth(c)
-	slog.Debug("image creation requested", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"name", input.Name,
-		"tag", input.Tag,
-		"is_public", input.IsPublic,
-	)...)
+	auth := mw.MustAuth(c.Request())
+	slog.Debug("image creation requested", "component", "image", "user_id", auth.UserID, "name", body.Name, "tag", body.Tag)
 
-	metadataJSON, _ := json.Marshal(input.Metadata)
-	image, err := h.images.CreateForUser(
+	metadataJSON, _ := json.Marshal(body.Metadata)
+	image, err := h.Images.CreateForUser(
 		c.Request().Context(),
 		&auth.UserID,
-		input.Name,
-		input.Tag,
-		input.Title,
-		input.Description,
-		input.IsPublic,
-		metadataJSON,
-		nil,
+		body.Name, body.Tag,
+		body.Title, body.Description,
+		body.IsPublic,
+		metadataJSON, nil,
 	)
 	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("IMAGE_CREATE_FAILED", err.Error()).WithCause(err))
+		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: err.Error()}
 	}
 
 	resourceType := auditcontracts.ResourceTypeImage
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageCreated, &resourceType, &image.ID, map[string]any{
-		"name": input.Name,
-		"tag":  input.Tag,
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionImageCreated, &resourceType, &image.ID, map[string]any{
+		"name": body.Name, "tag": body.Tag,
 	}))
 
-	slog.Info("image created", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", image.ID.String(),
-		"image", image.FullName(),
-		"status", image.Status,
-	)...)
-	var owner *dto.UserSummary
-	if image.Owner != nil {
-		owner = &dto.UserSummary{ID: image.Owner.ID, Email: image.Owner.Email}
-	}
-	return c.JSON(201, dto.ImageResponse{
-		ID: image.ID, Name: image.Name, Tag: image.Tag,
-		Title: image.Title, Description: image.Description,
-		ThumbnailURL: image.ThumbnailURL, IsPublic: image.IsPublic,
-		Status: image.Status, Error: image.Error,
-		Metadata: image.Metadata, RegistryRef: image.RegistryRef,
-		Owner:     owner,
-		CreatedAt: image.CreatedAt, UpdatedAt: image.UpdatedAt,
-	})
+	slog.Info("image created", "component", "image", "user_id", auth.UserID, "image_id", image.ID, "image", image.FullName(), "status", image.Status)
+	return imageToResponse(image), nil
 }
 
-// Update godoc
-// @Summary      Update an image
-// @Description  Update image metadata and visibility
-// @Tags         Images
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id path string true "Image ID" format(uuid)
-// @Param        body body dto.UpdateImageRequest true "Updated image fields"
-// @Success      200 {object} dto.ImageResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id} [put]
-func (h *ImageHandler) Update(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
+func (h ImageHandler) update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (dto.ImageResponse, error) {
+	auth := mw.MustAuth(c.Request())
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.ImageResponse{}, err
 	}
 
-	var input dto.UpdateImageRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
-	}
-
-	slog.Debug("image update requested", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", id.String(),
-		"is_public", input.IsPublic,
-	)...)
-	metadataJSON, _ := json.Marshal(input.Metadata)
-	image, err := h.images.Update(id, input.Title, input.Description, input.IsPublic, metadataJSON)
+	body, err := c.Body()
 	if err != nil {
-		return mapImageError(c, "IMAGE_UPDATE_FAILED", "Could not update image", err)
+		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	slog.Info("image updated", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", image.ID.String(),
-		"is_public", image.IsPublic,
-		"has_thumbnail", image.ThumbnailURL != nil,
-	)...)
+	metadataJSON, _ := json.Marshal(body.Metadata)
+	image, err := h.Images.Update(id, body.Title, body.Description, body.IsPublic, metadataJSON)
+	if err != nil {
+		return dto.ImageResponse{}, mapImageError(err)
+	}
+
+	slog.Info("image updated", "component", "image", "user_id", auth.UserID, "image_id", image.ID)
 	resourceType := auditcontracts.ResourceTypeImage
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageUpdated, &resourceType, &image.ID, map[string]any{}))
-	var owner *dto.UserSummary
-	if image.Owner != nil {
-		owner = &dto.UserSummary{ID: image.Owner.ID, Email: image.Owner.Email}
-	}
-	return c.JSON(http.StatusOK, dto.ImageResponse{
-		ID: image.ID, Name: image.Name, Tag: image.Tag,
-		Title: image.Title, Description: image.Description,
-		ThumbnailURL: image.ThumbnailURL, IsPublic: image.IsPublic,
-		Status: image.Status, Error: image.Error,
-		Metadata: image.Metadata, RegistryRef: image.RegistryRef,
-		Owner:     owner,
-		CreatedAt: image.CreatedAt, UpdatedAt: image.UpdatedAt,
-	})
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionImageUpdated, &resourceType, &image.ID, map[string]any{}))
+	return imageToResponse(image), nil
 }
 
-// UploadThumbnail godoc
-// @Summary      Upload an image thumbnail
-// @Description  Upload or replace the thumbnail for an image
-// @Tags         Images
-// @Security     BearerAuth
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        id path string true "Image ID" format(uuid)
-// @Param        thumbnail formData file true "Thumbnail file"
-// @Success      200 {object} dto.ImageResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id}/thumbnail [post]
-func (h *ImageHandler) UploadThumbnail(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
+func (h ImageHandler) delete(c fuego.ContextNoBody) (any, error) {
+	auth := mw.MustAuth(c.Request())
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return nil, err
 	}
 
-	fileHeader, err := c.FormFile("thumbnail")
-	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Missing thumbnail upload"))
+	slog.Debug("image deletion requested", "component", "image", "user_id", auth.UserID, "image_id", id)
+	if err := h.Images.Delete(c.Request().Context(), id); err != nil {
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not delete image"}
 	}
 
-	file, err := fileHeader.Open()
+	slog.Info("image deleted", "component", "image", "user_id", auth.UserID, "image_id", id)
+	resourceType := auditcontracts.ResourceTypeImage
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionImageDeleted, &resourceType, &id, map[string]any{}))
+	return nil, nil
+}
+
+func (h ImageHandler) uploadThumbnail(w http.ResponseWriter, r *http.Request) {
+	auth := mw.MustAuth(r)
+	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("THUMBNAIL_UPLOAD_FAILED", "Could not open thumbnail upload").WithCause(err))
+		errs.Write(w, http.StatusBadRequest, "Invalid image id")
+		return
+	}
+
+	file, fh, err := r.FormFile("thumbnail")
+	if err != nil {
+		errs.Write(w, http.StatusBadRequest, "Missing thumbnail upload")
+		return
 	}
 	defer file.Close()
 
-	slog.Debug("thumbnail upload requested", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", id.String(),
-		"filename", fileHeader.Filename,
-		"size", fileHeader.Size,
-	)...)
-	image, err := h.images.SaveThumbnail(id, file, fileHeader.Filename, fileHeader.Header.Get(echo.HeaderContentType))
+	slog.Debug("thumbnail upload requested", "component", "image", "user_id", auth.UserID, "image_id", id, "filename", fh.Filename, "size", fh.Size)
+	image, err := h.Images.SaveThumbnail(id, file, fh.Filename, fh.Header.Get("Content-Type"))
 	if err != nil {
 		if errors.Is(err, services.ErrUnsupportedThumbnailFormat) {
-			return responses.FromAppError(c, apperror.BadRequest("THUMBNAIL_FORMAT_UNSUPPORTED", "Unsupported thumbnail format").WithCause(err))
+			errs.Write(w, http.StatusBadRequest, "Unsupported thumbnail format")
+			return
 		}
-		return mapImageError(c, "THUMBNAIL_UPLOAD_FAILED", "Could not store thumbnail", err)
+		errs.Write(w, http.StatusInternalServerError, "Could not store thumbnail")
+		return
 	}
 
-	slog.Info("thumbnail uploaded", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", image.ID.String(),
-		"thumbnail_url", image.ThumbnailURL,
-	)...)
+	slog.Info("thumbnail uploaded", "component", "image", "user_id", auth.UserID, "image_id", image.ID)
 	resourceType := auditcontracts.ResourceTypeImage
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageThumbnailUploaded, &resourceType, &image.ID, map[string]any{}))
-	var owner *dto.UserSummary
-	if image.Owner != nil {
-		owner = &dto.UserSummary{ID: image.Owner.ID, Email: image.Owner.Email}
-	}
-	return c.JSON(http.StatusOK, dto.ImageResponse{
-		ID: image.ID, Name: image.Name, Tag: image.Tag,
-		Title: image.Title, Description: image.Description,
-		ThumbnailURL: image.ThumbnailURL, IsPublic: image.IsPublic,
-		Status: image.Status, Error: image.Error,
-		Metadata: image.Metadata, RegistryRef: image.RegistryRef,
-		Owner:     owner,
-		CreatedAt: image.CreatedAt, UpdatedAt: image.UpdatedAt,
-	})
+	_ = h.Audit.Log(newAuditLogInput(r, &auth.UserID, auditcontracts.ActionImageThumbnailUploaded, &resourceType, &image.ID, map[string]any{}))
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(imageToResponse(image))
 }
 
-// DeleteThumbnail godoc
-// @Summary      Delete an image thumbnail
-// @Description  Remove the thumbnail associated with an image
-// @Tags         Images
-// @Security     BearerAuth
-// @Param        id path string true "Image ID" format(uuid)
-// @Success      204
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id}/thumbnail [delete]
-func (h *ImageHandler) DeleteThumbnail(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
+func (h ImageHandler) deleteThumbnail(w http.ResponseWriter, r *http.Request) {
+	auth := mw.MustAuth(r)
+	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		return responses.FromError(c, err)
+		errs.Write(w, http.StatusBadRequest, "Invalid image id")
+		return
 	}
 
-	slog.Debug("thumbnail deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
-	image, err := h.images.DeleteThumbnail(id)
+	image, err := h.Images.DeleteThumbnail(id)
 	if err != nil {
-		return mapImageError(c, "THUMBNAIL_DELETE_FAILED", "Could not delete thumbnail", err)
+		errs.Write(w, http.StatusInternalServerError, "Could not delete thumbnail")
+		return
 	}
 
-	slog.Info("thumbnail deleted", logging.RequestFields(c,
-		"component", "image",
-		"user_id", auth.UserID.String(),
-		"image_id", image.ID.String(),
-	)...)
+	slog.Info("thumbnail deleted", "component", "image", "user_id", auth.UserID, "image_id", image.ID)
 	resourceType := auditcontracts.ResourceTypeImage
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageThumbnailDeleted, &resourceType, &image.ID, map[string]any{}))
-	return c.NoContent(http.StatusNoContent)
+	_ = h.Audit.Log(newAuditLogInput(r, &auth.UserID, auditcontracts.ActionImageThumbnailDeleted, &resourceType, &image.ID, map[string]any{}))
+	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete godoc
-// @Summary      Delete an image
-// @Description  Remove a Docker image registration
-// @Tags         Images
-// @Security     BearerAuth
-// @Param        id path string true "Image ID" format(uuid)
-// @Success      204
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/images/{id} [delete]
-func (h *ImageHandler) Delete(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
-	if err != nil {
-		return responses.FromError(c, err)
-	}
-
-	slog.Debug("image deletion requested", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
-	if err := h.images.Delete(c.Request().Context(), id); err != nil {
-		return responses.FromAppError(c, apperror.Internal("IMAGE_DELETE_FAILED", "Could not delete image").WithCause(err))
-	}
-
-	slog.Info("image deleted", logging.RequestFields(c, "component", "image", "user_id", auth.UserID.String(), "image_id", id.String())...)
-	resourceType := auditcontracts.ResourceTypeImage
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionImageDeleted, &resourceType, &id, map[string]any{}))
-	return c.NoContent(204)
-}
-
-// ListPending godoc
-// @Summary      List pending image operations
-// @Description  Returns all images with ongoing operations with optional progress percentage
-// @Tags         Images
-// @Security     BearerAuth
-// @Produce      json
-// @Success      200 {array} dto.PendingImageResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Router       /api/images/pending [get]
-func (h *ImageHandler) ListPending(c echo.Context) error {
-	images, percents := h.images.ListPendingImages()
-
+func (h ImageHandler) listPending(c fuego.ContextNoBody) ([]dto.PendingImageResponse, error) {
+	images, percents := h.Images.ListPendingImages()
 	out := make([]dto.PendingImageResponse, len(images))
 	for i, img := range images {
 		out[i] = dto.PendingImageResponse{
@@ -397,126 +258,133 @@ func (h *ImageHandler) ListPending(c echo.Context) error {
 			Status:  img.Status,
 		}
 	}
-	return c.JSON(200, out)
+	return out, nil
 }
 
-// Progress godoc
-// @Summary      Stream image progress
-// @Description  SSE endpoint streaming progress events for image operations
-// @Tags         Images
-// @Produce      text/event-stream
-// @Param        id path string true "Image ID" format(uuid)
-// @Success      200 {object} dto.ImageProgressEvent "Last emitted SSE event payload"
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/images/{id}/progress [get]
-func (h *ImageHandler) Progress(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid image id")
+func (h ImageHandler) progress(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		return responses.FromError(c, err)
+		errs.Write(w, http.StatusBadRequest, "Invalid image id")
+		return
 	}
 
-	idStr := id.String()
-
-	image, dbErr := h.images.FindByID(id)
-	if dbErr != nil {
-		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+	image, err := h.Images.FindByID(id)
+	if err != nil {
+		errs.Write(w, http.StatusNotFound, "Image not found")
+		return
 	}
 
 	switch image.Status {
 	case models.ImageStatusReady:
-		writeSSEHeaders(c)
-		sendSSEEvent(c, map[string]any{"percent": 100, "status": "ready"})
-		return nil
+		writeSSEHeaders(w)
+		sendSSEEvent(w, map[string]any{"percent": 100, "status": "ready"})
 
 	case models.ImageStatusFailed:
-		writeSSEHeaders(c)
+		writeSSEHeaders(w)
 		errMsg := ""
 		if image.Error != nil {
 			errMsg = *image.Error
 		}
-		sendSSEEvent(c, map[string]any{"percent": 0, "status": "failed", "error": errMsg})
-		return nil
+		sendSSEEvent(w, map[string]any{"percent": 0, "status": "failed", "error": errMsg})
 
 	case models.ImageStatusPulling:
-		if !h.images.IsPulling(idStr) {
-			writeSSEHeaders(c)
-			sendSSEEvent(c, map[string]any{"percent": 0, "status": "failed", "error": "pull process not running"})
-			return nil
+		if !h.Images.IsPulling(id.String()) {
+			writeSSEHeaders(w)
+			sendSSEEvent(w, map[string]any{"percent": 0, "status": "failed", "error": "pull process not running"})
+			return
 		}
 
-		writeSSEHeaders(c)
-		ch, cancel := h.images.WatchPullProgress(idStr)
+		writeSSEHeaders(w)
+		ch, cancel := h.Images.WatchPullProgress(id.String())
 		defer cancel()
 
-		ctx := c.Request().Context()
+		ctx := r.Context()
 		for {
 			select {
 			case <-ctx.Done():
-				return nil
+				return
 			case progress, ok := <-ch:
 				if !ok {
-					return nil
+					return
 				}
-				sendSSEEvent(c, progress)
+				sendSSEEvent(w, progress)
 			}
 		}
 
 	case models.ImageStatusCommitting:
-		writeSSEHeaders(c)
-		sendSSEEvent(c, map[string]any{"percent": 0, "status": "committing"})
-		return nil
+		writeSSEHeaders(w)
+		sendSSEEvent(w, map[string]any{"percent": 0, "status": "committing"})
 
 	default:
-		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+		errs.Write(w, http.StatusNotFound, "Image not found")
 	}
 }
 
-// RegistryLookup godoc
-// @Summary      Lookup registry metadata
-// @Description  Return registry-defined metadata for an image by name or ID
-// @Tags         Images
-// @Produce      json
-// @Param        name query string false "Image name (e.g. dockware/dev:6.6.9.0)"
-// @Param        id query string false "Image ID" format(uuid)
-// @Success      200 {array} registry.MetadataItem
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/registry [get]
-func (h *ImageHandler) RegistryLookup(c echo.Context) error {
-	name := c.QueryParam("name")
+func (h ImageHandler) registryLookup(c fuego.ContextNoBody) ([]registry.MetadataItem, error) {
+	r := c.Request()
+	name := r.URL.Query().Get("name")
 
 	if name == "" {
-		if idStr := c.QueryParam("id"); idStr != "" {
+		if idStr := r.URL.Query().Get("id"); idStr != "" {
 			id, err := uuid.Parse(idStr)
 			if err != nil {
-				return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid image id"))
+				return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid image id"}
 			}
-			image, err := h.images.FindByID(id)
+			image, err := h.Images.FindByID(id)
 			if err != nil {
-				return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found"))
+				return nil, fuego.HTTPError{Status: http.StatusNotFound, Detail: "Image not found"}
 			}
 			name = image.RegistryName()
 		}
 	}
 
 	if name == "" {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "name or id query parameter is required"))
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "name or id query parameter is required"}
 	}
 
-	entry := h.resolver.ResolveEntry(name)
+	entry := h.Resolver.ResolveEntry(name)
 	if entry == nil {
-		return c.JSON(http.StatusOK, []registry.MetadataItem{})
+		return []registry.MetadataItem{}, nil
 	}
 	meta := make([]registry.MetadataItem, len(entry.Metadata))
 	copy(meta, entry.Metadata)
-	return c.JSON(http.StatusOK, meta)
+	return meta, nil
 }
 
-func mapImageError(c echo.Context, code, message string, err error) error {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return responses.FromAppError(c, apperror.NotFound("IMAGE_NOT_FOUND", "Image not found").WithCause(err))
+func imageToResponse(img *models.Image) dto.ImageResponse {
+	var owner *dto.UserSummary
+	if img.Owner != nil {
+		owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email}
 	}
+	return dto.ImageResponse{
+		ID: img.ID, Name: img.Name, Tag: img.Tag,
+		Title: img.Title, Description: img.Description,
+		ThumbnailURL: img.ThumbnailURL, IsPublic: img.IsPublic,
+		Status: img.Status, Error: img.Error,
+		Metadata: img.Metadata, RegistryRef: img.RegistryRef,
+		Owner:     owner,
+		CreatedAt: img.CreatedAt, UpdatedAt: img.UpdatedAt,
+	}
+}
 
-	return responses.FromAppError(c, apperror.Internal(code, message).WithCause(err))
+func mapImageError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "Image not found"}
+	}
+	return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: err.Error()}
+}
+
+func writeSSEHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+}
+
+func sendSSEEvent(w http.ResponseWriter, v any) {
+	data, _ := json.Marshal(v)
+	fmt.Fprintf(w, "data: %s\n\n", data)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }

@@ -1,17 +1,17 @@
 package handlers
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
 func newAuditLogInput(
-	c echo.Context,
+	r *http.Request,
 	userID *uuid.UUID,
 	action auditcontracts.Action,
 	resourceType *auditcontracts.ResourceType,
@@ -21,9 +21,9 @@ func newAuditLogInput(
 	return services.AuditLogInput{
 		Actor: services.AuditActor{
 			UserID:    userID,
-			IPAddress: optionalString(strings.TrimSpace(c.RealIP())),
-			UserAgent: optionalString(strings.TrimSpace(c.Request().UserAgent())),
-			ClientID:  mw.ClientID(c),
+			IPAddress: optionalString(strings.TrimSpace(r.RemoteAddr)),
+			UserAgent: optionalString(strings.TrimSpace(r.UserAgent())),
+			ClientID:  mw.ClientIDFromContext(r),
 		},
 		Action:       action,
 		ResourceType: resourceType,
@@ -32,8 +32,8 @@ func newAuditLogInput(
 	}
 }
 
-func newAuditActor(c echo.Context, userID *uuid.UUID) services.AuditActor {
-	return newAuditLogInput(c, userID, "", nil, nil, nil).Actor
+func newAuditActor(r *http.Request, userID *uuid.UUID) services.AuditActor {
+	return newAuditLogInput(r, userID, "", nil, nil, nil).Actor
 }
 
 func optionalString(value string) *string {

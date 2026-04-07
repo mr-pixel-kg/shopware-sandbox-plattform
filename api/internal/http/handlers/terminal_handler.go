@@ -10,14 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
-	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	"github.com/manuel/shopware-testenv-platform/api/internal/docker"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
+	"github.com/manuel/shopware-testenv-platform/api/internal/http/errs"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
@@ -29,101 +29,89 @@ const (
 )
 
 type TerminalHandler struct {
-	terminals      *services.TerminalService
-	auth           *services.AuthService
-	upgrader       websocket.Upgrader
-	allowedOrigins []string
+	Terminals      *services.TerminalService
+	Auth           *services.AuthService
+	AllowedOrigins []string
 }
 
-func NewTerminalHandler(
-	terminals *services.TerminalService,
-	auth *services.AuthService,
-	allowedOrigins []string,
-) *TerminalHandler {
-	h := &TerminalHandler{
-		terminals:      terminals,
-		auth:           auth,
-		allowedOrigins: allowedOrigins,
-	}
-	h.upgrader = websocket.Upgrader{
+func (h TerminalHandler) upgrader() *websocket.Upgrader {
+	return &websocket.Upgrader{
 		ReadBufferSize:  4096,
 		WriteBufferSize: 4096,
-		CheckOrigin:     h.checkOrigin,
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			for _, allowed := range h.AllowedOrigins {
+				if allowed == "*" || allowed == origin {
+					return true
+				}
+			}
+			return false
+		},
 	}
-	return h
 }
 
-func (h *TerminalHandler) checkOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	for _, allowed := range h.allowedOrigins {
-		if allowed == "*" || allowed == origin {
-			return true
-		}
-	}
-	return false
+func (h TerminalHandler) MountPublicRoutes(s *fuego.Server) {
+	fuego.GetStd(s, "/sandboxes/{id}/terminal", h.connect,
+		option.Summary("Open interactive terminal session"),
+		option.Description("Interactive shell (docker exec) into the sandbox container via WebSocket"),
+		option.Tags("Sandboxes"),
+		option.Query("access_token", "Bearer token"),
+		option.QueryInt("cols", "Initial terminal columns (default 80)"),
+		option.QueryInt("rows", "Initial terminal rows (default 24)"),
+	)
 }
 
-// Connect godoc
-// @Summary      Open interactive terminal session
-// @Description  Interactive shell (docker exec) into the sandbox container
-// @Tags         Sandboxes
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Param        access_token query string true "Bearer token"
-// @Param        cols query int false "Initial terminal columns" default(80)
-// @Param        rows query int false "Initial terminal rows" default(24)
-// @Success      101 "Switching Protocols – WebSocket connection established"
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse "Sandbox not running or session limit reached"
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id}/terminal [get]
-func (h *TerminalHandler) Connect(c echo.Context) error {
-	sandboxID, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h TerminalHandler) connect(w http.ResponseWriter, r *http.Request) {
+	sandboxID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		return responses.FromError(c, err)
+		errs.Write(w, http.StatusBadRequest, "Invalid sandbox id")
+		return
 	}
 
-	token := c.QueryParam("access_token")
+	token := r.URL.Query().Get("access_token")
 	if token == "" {
-		if t, ok := mw.ParseAuthorizationHeader(c.Request().Header.Get(echo.HeaderAuthorization)); ok {
+		if t, ok := mw.ParseAuthorizationHeader(r.Header.Get("Authorization")); ok {
 			token = t
 		}
 	}
 	if token == "" {
-		return responses.FromAppError(c, apperror.Unauthorized("Missing access token"))
+		errs.Write(w, http.StatusUnauthorized, "Missing access token")
+		return
 	}
 
-	user, err := h.auth.Authenticate(token)
+	user, err := h.Auth.Authenticate(token)
 	if err != nil {
-		return responses.FromAppError(c, apperror.Unauthorized("Invalid or expired token"))
+		errs.Write(w, http.StatusUnauthorized, "Invalid or expired token")
+		return
 	}
 
-	sandbox, err := h.terminals.ValidateAccess(services.ValidateTerminalAccessInput{
+	sandbox, err := h.Terminals.ValidateAccess(services.ValidateTerminalAccessInput{
 		SandboxID: sandboxID,
 		UserID:    user.ID,
 		IsAdmin:   user.IsAdmin(),
 	})
 	if err != nil {
-		return mapTerminalError(c, err)
+		mapTerminalErrorStd(w, err)
+		return
 	}
 
-	cols, rows := parseTerminalSize(c)
+	cols, rows := parseTerminalSize(r)
 
-	execSession, err := h.terminals.OpenSession(c.Request().Context(), sandbox, cols, rows)
+	execSession, err := h.Terminals.OpenSession(r.Context(), sandbox, cols, rows)
 	if err != nil {
-		return mapTerminalError(c, err)
+		mapTerminalErrorStd(w, err)
+		return
 	}
 
-	ws, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
+	ws, err := h.upgrader().Upgrade(w, r, nil)
 	if err != nil {
 		_ = execSession.Close()
-		h.terminals.CloseSession(sandboxID)
+		h.Terminals.CloseSession(sandboxID)
 		slog.Error("websocket upgrade failed", "error", err, "sandbox_id", sandboxID)
-		return nil
+		return
 	}
 
 	slog.Info("terminal session started", "sandbox_id", sandboxID, "user_id", user.ID)
@@ -131,26 +119,25 @@ func (h *TerminalHandler) Connect(c echo.Context) error {
 	h.bridgeConnection(ws, execSession, sandboxID)
 
 	slog.Info("terminal session ended", "sandbox_id", sandboxID, "user_id", user.ID)
-	return nil
 }
 
-func mapTerminalError(c echo.Context, err error) error {
+func mapTerminalErrorStd(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, services.ErrSandboxNotFound):
-		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found"))
+		errs.Write(w, http.StatusNotFound, "Sandbox not found")
 	case errors.Is(err, services.ErrTerminalNotRunning):
-		return responses.FromAppError(c, apperror.Conflict("SANDBOX_NOT_RUNNING", "Sandbox is not running"))
+		errs.Write(w, http.StatusConflict, "Sandbox is not running")
 	case errors.Is(err, services.ErrTerminalAccessDenied):
-		return responses.FromAppError(c, apperror.New(http.StatusForbidden, "TERMINAL_ACCESS_DENIED", "Terminal access denied"))
+		errs.Write(w, http.StatusForbidden, "Terminal access denied")
 	case errors.Is(err, services.ErrTerminalSessionLimit):
-		return responses.FromAppError(c, apperror.Conflict("TERMINAL_SESSION_LIMIT", "Too many active terminal sessions"))
+		errs.Write(w, http.StatusConflict, "Too many active terminal sessions")
 	default:
-		return responses.FromAppError(c, apperror.Internal("TERMINAL_ERROR", "Terminal error").WithCause(err))
+		errs.Write(w, http.StatusInternalServerError, "Terminal error")
 	}
 }
 
-func (h *TerminalHandler) bridgeConnection(ws *websocket.Conn, exec *docker.ExecSession, sandboxID uuid.UUID) {
-	cfg := h.terminals.Config()
+func (h TerminalHandler) bridgeConnection(ws *websocket.Conn, exec *docker.ExecSession, sandboxID uuid.UUID) {
+	cfg := h.Terminals.Config()
 	idleTimeout := time.Duration(cfg.IdleTimeoutMinutes) * time.Minute
 	maxDuration := time.Duration(cfg.MaxDurationMinutes) * time.Minute
 	deadline := time.Now().Add(maxDuration)
@@ -158,7 +145,7 @@ func (h *TerminalHandler) bridgeConnection(ws *websocket.Conn, exec *docker.Exec
 	defer func() {
 		_ = ws.Close()
 		_ = exec.Close()
-		h.terminals.CloseSession(sandboxID)
+		h.Terminals.CloseSession(sandboxID)
 	}()
 
 	done := make(chan struct{})
@@ -267,13 +254,13 @@ func sendControlMessage(ws *websocket.Conn, msgType, message string, code int) {
 	_ = ws.WriteMessage(websocket.TextMessage, data)
 }
 
-func parseTerminalSize(c echo.Context) (cols, rows uint) {
+func parseTerminalSize(r *http.Request) (cols, rows uint) {
 	cols = 80
 	rows = 24
-	if v, err := strconv.ParseUint(c.QueryParam("cols"), 10, 32); err == nil && v > 0 {
+	if v, err := strconv.ParseUint(r.URL.Query().Get("cols"), 10, 32); err == nil && v > 0 {
 		cols = uint(v)
 	}
-	if v, err := strconv.ParseUint(c.QueryParam("rows"), 10, 32); err == nil && v > 0 {
+	if v, err := strconv.ParseUint(r.URL.Query().Get("rows"), 10, 32); err == nil && v > 0 {
 		rows = uint(v)
 	}
 	return

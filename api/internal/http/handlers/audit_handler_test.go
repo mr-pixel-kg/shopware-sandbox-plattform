@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,10 +18,8 @@ func TestParseAuditLogListInputDefaultsAndTrimsValues(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/audit-logs?limit=25&offset=10&userId="+userID.String()+
 		"&action=%20sandbox.created%20&resourceType=%20sandbox%20&resourceId="+resourceID.String()+
 		"&clientId="+clientID.String()+"&from=2026-04-01T10:00:00Z&to=2026-04-01T12:00:00Z", nil)
-	rec := httptest.NewRecorder()
-	c := echo.New().NewContext(req, rec)
 
-	input, err := parseAuditLogListInput(c)
+	input, err := parseAuditLogListInput(req)
 
 	require.NoError(t, err)
 	assert.Equal(t, 25, input.Limit)
@@ -47,10 +44,8 @@ func TestParseAuditLogListInputUsesDefaultPagination(t *testing.T) {
 	t.Parallel()
 
 	req := httptest.NewRequest("GET", "/api/audit-logs", nil)
-	rec := httptest.NewRecorder()
-	c := echo.New().NewContext(req, rec)
 
-	input, err := parseAuditLogListInput(c)
+	input, err := parseAuditLogListInput(req)
 
 	require.NoError(t, err)
 	assert.Equal(t, 50, input.Limit)
@@ -83,10 +78,8 @@ func TestParseAuditLogListInputRejectsInvalidValues(t *testing.T) {
 			t.Parallel()
 
 			req := httptest.NewRequest("GET", "/api/audit-logs?"+tt.query, nil)
-			rec := httptest.NewRecorder()
-			c := echo.New().NewContext(req, rec)
 
-			_, err := parseAuditLogListInput(c)
+			_, err := parseAuditLogListInput(req)
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.detail)
@@ -101,10 +94,8 @@ func TestParseAuditLogFacetInputDefaultsAndTrimsValues(t *testing.T) {
 	clientID := uuid.New()
 	req := httptest.NewRequest("GET", "/api/audit-logs/facets?action=%20sandbox.created%20&resourceType=%20sandbox%20&resourceId="+resourceID.String()+
 		"&clientId="+clientID.String()+"&from=2026-04-01T10:00:00Z&to=2026-04-01T12:00:00Z", nil)
-	rec := httptest.NewRecorder()
-	c := echo.New().NewContext(req, rec)
 
-	input, err := parseAuditLogFacetInput(c)
+	input, err := parseAuditLogFacetInput(req)
 
 	require.NoError(t, err)
 	require.NotNil(t, input.Action)

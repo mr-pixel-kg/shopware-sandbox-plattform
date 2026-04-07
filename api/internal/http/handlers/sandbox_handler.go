@@ -5,688 +5,505 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
+	"github.com/manuel/shopware-testenv-platform/api/internal/http/errs"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
 	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/registry"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
 type SandboxHandler struct {
-	sandboxes *services.SandboxService
-	health    *services.SandboxHealthService
-	auth      *services.AuthService
+	Sandboxes *services.SandboxService
+	Health    *services.SandboxHealthService
+	Auth      *services.AuthService
 }
 
-func NewSandboxHandler(
-	sandboxes *services.SandboxService,
-	health *services.SandboxHealthService,
-	auth *services.AuthService,
-) *SandboxHandler {
-	return &SandboxHandler{
-		sandboxes: sandboxes,
-		health:    health,
-		auth:      auth,
-	}
+func (h SandboxHandler) MountPublicRoutes(s *fuego.Server) {
+	demos := fuego.Group(s, "/demos")
+	fuego.Post(demos, "", h.createDemo,
+		option.Summary("Create a guest demo sandbox"),
+		option.Description("Create a sandbox for a guest visitor. Identified by X-Client-Id header. No auth required."),
+		option.Tags("Demos"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+	fuego.Get(demos, "", h.listDemos,
+		option.Summary("List guest demo sandboxes"),
+		option.Description("Returns sandboxes belonging to the given client ID. No auth required."),
+		option.Tags("Demos"),
+		option.Query("clientId", "Client ID (required)"),
+	)
+	fuego.Delete(demos, "/{id}", h.deleteDemo,
+		option.Summary("Delete a guest demo sandbox"),
+		option.Description("Delete a sandbox owned by the X-Client-Id. No auth required."),
+		option.Tags("Demos"),
+		option.DefaultStatusCode(http.StatusNoContent),
+	)
+
+	sandboxes := fuego.Group(s, "/sandboxes")
+	fuego.GetStd(sandboxes, "/{id}/health", h.health,
+		option.Summary("Stream sandbox health"),
+		option.Description("SSE endpoint streaming sandbox readiness for active subscribers"),
+		option.Tags("Sandboxes"),
+		option.Query("access_token", "Bearer token fallback for EventSource"),
+	)
+	fuego.GetStd(sandboxes, "/{id}/stream", h.stream,
+		option.Summary("Stream sandbox state"),
+		option.Description("SSE endpoint streaming real-time state updates for a single sandbox"),
+		option.Tags("Sandboxes"),
+	)
 }
 
-// List godoc
-// @Summary      List sandboxes
-// @Description  Admins see all sandboxes. Regular users see their own. Use ?owner=self for own, ?clientId=<uuid> for guest sandboxes.
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Produce      json
-// @Param        owner query string false "Filter: 'self' for own sandboxes"
-// @Param        clientId query string false "Filter by client ID" format(uuid)
-// @Success      200 {array} dto.SandboxResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/sandboxes [get]
-func (h *SandboxHandler) List(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	user := c.Get("user").(*models.User)
+func (h SandboxHandler) MountAuthedRoutes(s *fuego.Server) {
+	sandboxes := fuego.Group(s, "/sandboxes")
+	fuego.Get(sandboxes, "", h.list,
+		option.Summary("List sandboxes"),
+		option.Description("Admins see all sandboxes. Regular users see their own. Use ?owner=self for own, ?clientId=<uuid> for guest sandboxes."),
+		option.Tags("Sandboxes"),
+		option.Query("owner", "Filter: 'self' for own sandboxes"),
+		option.Query("clientId", "Filter by client ID"),
+	)
+	fuego.Get(sandboxes, "/{id}", h.get,
+		option.Summary("Get sandbox by ID"),
+		option.Description("Returns a single sandbox by its UUID"),
+		option.Tags("Sandboxes"),
+	)
+	fuego.Post(sandboxes, "", h.create,
+		option.Summary("Create a sandbox"),
+		option.Description("Spin up a new sandbox. Always requires auth. Stores X-Client-Id header on sandbox automatically."),
+		option.Tags("Sandboxes"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+	fuego.Patch(sandboxes, "/{id}", h.update,
+		option.Summary("Update sandbox"),
+		option.Description("Update display name and/or extend TTL of a sandbox owned by the authenticated user"),
+		option.Tags("Sandboxes"),
+	)
+	fuego.Delete(sandboxes, "/{id}", h.delete,
+		option.Summary("Delete a sandbox"),
+		option.Description("Stop and remove a sandbox. Checks ownership by user ID or X-Client-Id header."),
+		option.Tags("Sandboxes"),
+		option.DefaultStatusCode(http.StatusNoContent),
+	)
+	fuego.Post(sandboxes, "/{id}/snapshots", h.snapshot,
+		option.Summary("Create a snapshot image from a sandbox"),
+		option.Description("Commit the current state of a running sandbox as a new Docker image"),
+		option.Tags("Sandboxes"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+}
+
+func (h SandboxHandler) list(c fuego.ContextNoBody) ([]dto.SandboxResponse, error) {
+	r := c.Request()
+	auth := mw.MustAuth(r)
+	user := mw.UserFromContext(r)
 
 	var (
 		sandboxes []models.Sandbox
 		err       error
 	)
 
-	if clientIDStr := c.QueryParam("clientId"); clientIDStr != "" {
+	if clientIDStr := r.URL.Query().Get("clientId"); clientIDStr != "" {
 		parsed, parseErr := uuid.Parse(clientIDStr)
 		if parseErr != nil {
-			return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid clientId"))
+			return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid clientId"}
 		}
-		sandboxes, err = h.sandboxes.ListByClientID(parsed)
-	} else if user.IsAdmin() && c.QueryParam("owner") != "self" {
-		sandboxes, err = h.sandboxes.ListAll()
+		sandboxes, err = h.Sandboxes.ListByClientID(parsed)
+	} else if user.IsAdmin() && r.URL.Query().Get("owner") != "self" {
+		sandboxes, err = h.Sandboxes.ListAll()
 	} else {
-		sandboxes, err = h.sandboxes.ListByUser(auth.UserID)
+		sandboxes, err = h.Sandboxes.ListByUser(auth.UserID)
 	}
 
 	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load sandboxes").WithCause(err))
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load sandboxes"}
 	}
-	slog.Debug("listed sandboxes", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "count", len(sandboxes))...)
-	sshCfg := h.sandboxes.SSHConfig()
+
+	sshCfg := h.Sandboxes.SSHConfig()
 	out := make([]dto.SandboxResponse, len(sandboxes))
 	for i, sb := range sandboxes {
-		var owner *dto.UserSummary
-		if sb.Owner != nil {
-			owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email}
-		}
-		var ssh *dto.SSHConnectionInfo
-		if sshCfg.Enabled {
-			sshEntry := h.sandboxes.ResolveSSHEntry(sb.ImageID)
-			ssh = buildSSHInfo(&sandboxes[i], sshCfg, sshEntry)
-		}
-		out[i] = dto.SandboxResponse{
-			ID: sb.ID, ImageID: sb.ImageID, Owner: owner,
-			ClientID: sb.ClientID, DisplayName: sb.DisplayName,
-			Status: sb.Status, StateReason: sb.StateReason,
-			ContainerID: sb.ContainerID, ContainerName: sb.ContainerName,
-			URL: sb.URL, Port: sb.Port, SSH: ssh, ClientIP: sb.ClientIP,
-			Metadata:  sb.Metadata,
-			ExpiresAt: sb.ExpiresAt, LastSeenAt: sb.LastSeenAt,
-			CreatedAt: sb.CreatedAt, UpdatedAt: sb.UpdatedAt,
-		}
+		out[i] = sandboxToResponse(&sandboxes[i], sshCfg, h.Sandboxes.ResolveSSHEntry(sb.ImageID))
 	}
-	return c.JSON(200, out)
+	return out, nil
 }
 
-// Get godoc
-// @Summary      Get sandbox by ID
-// @Description  Returns a single sandbox by its UUID
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Produce      json
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Success      200 {object} dto.SandboxResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id} [get]
-func (h *SandboxHandler) Get(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) get(c fuego.ContextNoBody) (dto.SandboxResponse, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.SandboxResponse{}, err
 	}
 
-	sandbox, err := h.sandboxes.FindByID(id)
+	sandbox, err := h.Sandboxes.FindByID(id)
 	if err != nil {
-		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusNotFound, Detail: "Sandbox not found"}
 	}
-	slog.Debug("sandbox loaded", logging.RequestFields(c, "component", "sandbox", "sandbox_id", sandbox.ID.String(), "status", sandbox.Status)...)
-	var owner *dto.UserSummary
-	if sandbox.Owner != nil {
-		owner = &dto.UserSummary{ID: sandbox.Owner.ID, Email: sandbox.Owner.Email}
-	}
-	sshCfg := h.sandboxes.SSHConfig()
-	var ssh *dto.SSHConnectionInfo
-	if sshCfg.Enabled {
-		sshEntry := h.sandboxes.ResolveSSHEntry(sandbox.ImageID)
-		ssh = buildSSHInfo(sandbox, sshCfg, sshEntry)
-	}
-	return c.JSON(200, dto.SandboxResponse{
-		ID: sandbox.ID, ImageID: sandbox.ImageID, Owner: owner,
-		ClientID: sandbox.ClientID, DisplayName: sandbox.DisplayName,
-		Status: sandbox.Status, StateReason: sandbox.StateReason,
-		ContainerID: sandbox.ContainerID, ContainerName: sandbox.ContainerName,
-		URL: sandbox.URL, Port: sandbox.Port, SSH: ssh, ClientIP: sandbox.ClientIP,
-		Metadata:  sandbox.Metadata,
-		ExpiresAt: sandbox.ExpiresAt, LastSeenAt: sandbox.LastSeenAt,
-		CreatedAt: sandbox.CreatedAt, UpdatedAt: sandbox.UpdatedAt,
-	})
+
+	sshCfg := h.Sandboxes.SSHConfig()
+	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
 }
 
-// Health godoc
-// @Summary      Stream sandbox health
-// @Description  SSE endpoint streaming sandbox readiness for active subscribers.
-// @Tags         Sandboxes
-// @Produce      text/event-stream
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Param        access_token query string false "Bearer token fallback for EventSource"
-// @Success      200 {object} dto.SandboxHealthEvent "Last emitted SSE event payload"
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id}/health [get]
-func (h *SandboxHandler) Health(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) create(c fuego.ContextWithBody[dto.CreateSandboxRequest]) (dto.SandboxResponse, error) {
+	body, err := c.Body()
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	sandbox, err := h.sandboxes.FindByID(id)
+	imageID, err := uuid.Parse(body.ImageID)
 	if err != nil {
-		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid image id"}
 	}
 
-	if err := h.authorizeHealthAccess(c, sandbox); err != nil {
-		return err
-	}
+	r := c.Request()
+	auth := mw.MustAuth(r)
+	clientID := mw.ClientIDFromContext(r)
 
-	writeSSEHeaders(c)
-	ch, cancel := h.health.Watch(sandbox)
-	defer cancel()
-
-	ctx := c.Request().Context()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case event, ok := <-ch:
-			if !ok {
-				return nil
-			}
-			sendSSEEvent(c, event)
-		}
-	}
-}
-
-// Create godoc
-// @Summary      Create a sandbox
-// @Description  Spin up a new sandbox. Always requires auth. Stores X-Client-Id header on sandbox automatically.
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.CreateSandboxRequest true "Sandbox configuration"
-// @Success      201 {object} dto.SandboxResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/sandboxes [post]
-func (h *SandboxHandler) Create(c echo.Context) error {
-	var input dto.CreateSandboxRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
-	}
-
-	imageID, err := uuid.Parse(input.ImageID)
-	if err != nil {
-		return responses.FromError(c, validationError("Invalid image id"))
-	}
-
-	auth := mw.MustAuth(c)
-	clientID := mw.ClientID(c)
-	slog.Debug("sandbox creation requested", logging.RequestFields(c,
-		"component", "sandbox",
-		"user_id", auth.UserID.String(),
-		"image_id", imageID.String(),
-		"ttl_minutes", input.TTLMinutes,
-	)...)
-	sandbox, err := h.sandboxes.Create(c.Request().Context(), services.CreateSandboxInput{
+	slog.Debug("sandbox creation requested", "component", "sandbox", "user_id", auth.UserID, "image_id", imageID, "ttl_minutes", body.TTLMinutes)
+	sandbox, err := h.Sandboxes.Create(r.Context(), services.CreateSandboxInput{
 		ImageID:     imageID,
 		UserID:      &auth.UserID,
 		ClientID:    clientID,
-		ClientIP:    c.RealIP(),
-		TTLMinutes:  input.TTLMinutes,
-		DisplayName: input.DisplayName,
-		Metadata:    input.Metadata,
-		AuditActor:  newAuditActor(c, &auth.UserID),
+		ClientIP:    r.RemoteAddr,
+		TTLMinutes:  body.TTLMinutes,
+		DisplayName: body.DisplayName,
+		Metadata:    body.Metadata,
+		AuditActor:  newAuditActor(r, &auth.UserID),
 	})
 	if err != nil {
-		return mapSandboxError(c, err)
+		return dto.SandboxResponse{}, mapSandboxError(err)
 	}
-	h.health.StartMonitoring(sandbox.ID)
+	h.Health.StartMonitoring(sandbox.ID)
 
-	slog.Info("sandbox created", logging.RequestFields(c,
-		"component", "sandbox",
-		"user_id", auth.UserID.String(),
-		"sandbox_id", sandbox.ID.String(),
-		"image_id", sandbox.ImageID.String(),
-		"expires_at", sandbox.ExpiresAt,
-	)...)
-	var owner *dto.UserSummary
-	if sandbox.Owner != nil {
-		owner = &dto.UserSummary{ID: sandbox.Owner.ID, Email: sandbox.Owner.Email}
-	}
-	sshCfg := h.sandboxes.SSHConfig()
-	var ssh *dto.SSHConnectionInfo
-	if sshCfg.Enabled {
-		sshEntry := h.sandboxes.ResolveSSHEntry(sandbox.ImageID)
-		ssh = buildSSHInfo(sandbox, sshCfg, sshEntry)
-	}
-	return c.JSON(201, dto.SandboxResponse{
-		ID: sandbox.ID, ImageID: sandbox.ImageID, Owner: owner,
-		ClientID: sandbox.ClientID, DisplayName: sandbox.DisplayName,
-		Status: sandbox.Status, StateReason: sandbox.StateReason,
-		ContainerID: sandbox.ContainerID, ContainerName: sandbox.ContainerName,
-		URL: sandbox.URL, Port: sandbox.Port, SSH: ssh, ClientIP: sandbox.ClientIP,
-		Metadata:  sandbox.Metadata,
-		ExpiresAt: sandbox.ExpiresAt, LastSeenAt: sandbox.LastSeenAt,
-		CreatedAt: sandbox.CreatedAt, UpdatedAt: sandbox.UpdatedAt,
-	})
+	slog.Info("sandbox created", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", sandbox.ID, "image_id", sandbox.ImageID, "expires_at", sandbox.ExpiresAt)
+	sshCfg := h.Sandboxes.SSHConfig()
+	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
 }
 
-// Update godoc
-// @Summary      Update sandbox
-// @Description  Update display name and/or extend TTL of a sandbox owned by the authenticated user
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Param        body body dto.UpdateSandboxRequest true "Update payload"
-// @Success      200 {object} dto.SandboxResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id} [patch]
-func (h *SandboxHandler) Update(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) update(c fuego.ContextWithBody[dto.UpdateSandboxRequest]) (dto.SandboxResponse, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.SandboxResponse{}, err
 	}
 
-	var input dto.UpdateSandboxRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+	body, err := c.Body()
+	if err != nil {
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	auth := mw.MustAuth(c)
-	sandbox, err := h.sandboxes.UpdateSandbox(services.UpdateSandboxInput{
+	r := c.Request()
+	auth := mw.MustAuth(r)
+	sandbox, err := h.Sandboxes.UpdateSandbox(services.UpdateSandboxInput{
 		SandboxID:   id,
 		UserID:      &auth.UserID,
-		DisplayName: input.DisplayName,
-		TTLMinutes:  input.TTLMinutes,
-		ClientIP:    c.RealIP(),
-		AuditActor:  newAuditActor(c, &auth.UserID),
+		DisplayName: body.DisplayName,
+		TTLMinutes:  body.TTLMinutes,
+		ClientIP:    r.RemoteAddr,
+		AuditActor:  newAuditActor(r, &auth.UserID),
 	})
 	if err != nil {
-		return mapSandboxError(c, err)
+		return dto.SandboxResponse{}, mapSandboxError(err)
 	}
 
-	slog.Info("sandbox updated", logging.RequestFields(c,
-		"component", "sandbox",
-		"user_id", auth.UserID.String(),
-		"sandbox_id", id.String(),
-	)...)
-	var owner *dto.UserSummary
-	if sandbox.Owner != nil {
-		owner = &dto.UserSummary{ID: sandbox.Owner.ID, Email: sandbox.Owner.Email}
-	}
-	sshCfg := h.sandboxes.SSHConfig()
-	var ssh *dto.SSHConnectionInfo
-	if sshCfg.Enabled {
-		sshEntry := h.sandboxes.ResolveSSHEntry(sandbox.ImageID)
-		ssh = buildSSHInfo(sandbox, sshCfg, sshEntry)
-	}
-	return c.JSON(200, dto.SandboxResponse{
-		ID: sandbox.ID, ImageID: sandbox.ImageID, Owner: owner,
-		ClientID: sandbox.ClientID, DisplayName: sandbox.DisplayName,
-		Status: sandbox.Status, StateReason: sandbox.StateReason,
-		ContainerID: sandbox.ContainerID, ContainerName: sandbox.ContainerName,
-		URL: sandbox.URL, Port: sandbox.Port, SSH: ssh, ClientIP: sandbox.ClientIP,
-		Metadata:  sandbox.Metadata,
-		ExpiresAt: sandbox.ExpiresAt, LastSeenAt: sandbox.LastSeenAt,
-		CreatedAt: sandbox.CreatedAt, UpdatedAt: sandbox.UpdatedAt,
-	})
+	slog.Info("sandbox updated", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id)
+	sshCfg := h.Sandboxes.SSHConfig()
+	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
 }
 
-// Delete godoc
-// @Summary      Delete a sandbox
-// @Description  Stop and remove a sandbox. Checks ownership by user ID or X-Client-Id header.
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Success      204
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id} [delete]
-func (h *SandboxHandler) Delete(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) delete(c fuego.ContextNoBody) (any, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return nil, err
 	}
 
-	auth := mw.MustAuth(c)
-	user := c.Get("user").(*models.User)
+	r := c.Request()
+	auth := mw.MustAuth(r)
+	user := mw.UserFromContext(r)
 
-	sandbox, err := h.sandboxes.FindByID(id)
+	sandbox, err := h.Sandboxes.FindByID(id)
 	if err != nil {
-		return mapSandboxError(c, err)
+		return nil, mapSandboxError(err)
 	}
 
 	if !user.IsAdmin() {
 		ownsViaUser := sandbox.OwnerID != nil && *sandbox.OwnerID == auth.UserID
-		clientID := mw.ClientID(c)
+		clientID := mw.ClientIDFromContext(r)
 		ownsViaClient := sandbox.ClientID != nil && clientID != nil && *sandbox.ClientID == *clientID
 		if !ownsViaUser && !ownsViaClient {
-			return mapSandboxError(c, services.ErrSandboxAccessDenied)
+			return nil, mapSandboxError(services.ErrSandboxAccessDenied)
 		}
 	}
 
-	slog.Debug("sandbox deletion requested", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "sandbox_id", id.String())...)
-	if err := h.sandboxes.Delete(c.Request().Context(), id, newAuditActor(c, &auth.UserID)); err != nil {
-		return mapSandboxError(c, err)
+	slog.Debug("sandbox deletion requested", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id)
+	if err := h.Sandboxes.Delete(r.Context(), id, newAuditActor(r, &auth.UserID)); err != nil {
+		return nil, mapSandboxError(err)
 	}
 
-	slog.Info("sandbox deleted", logging.RequestFields(c, "component", "sandbox", "user_id", auth.UserID.String(), "sandbox_id", id.String())...)
-	return c.NoContent(204)
+	slog.Info("sandbox deleted", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id)
+	return nil, nil
 }
 
-// Snapshot godoc
-// @Summary      Create a snapshot image from a sandbox
-// @Description  Commit the current state of a running sandbox as a new Docker image
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Param        body body dto.CreateSnapshotRequest true "Snapshot metadata"
-// @Success      201 {object} dto.ImageResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id}/snapshots [post]
-func (h *SandboxHandler) Snapshot(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) snapshot(c fuego.ContextWithBody[dto.CreateSnapshotRequest]) (dto.ImageResponse, error) {
+	id, err := parsePathUUID(c, "id")
 	if err != nil {
-		return responses.FromError(c, err)
+		return dto.ImageResponse{}, err
 	}
 
-	var input dto.CreateSnapshotRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+	body, err := c.Body()
+	if err != nil {
+		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	auth := mw.MustAuth(c)
-	slog.Debug("sandbox snapshot requested", logging.RequestFields(c,
-		"component", "sandbox",
-		"user_id", auth.UserID.String(),
-		"sandbox_id", id.String(),
-		"name", input.Name,
-		"tag", input.Tag,
-		"is_public", input.IsPublic,
-	)...)
-	metadataJSON, _ := json.Marshal(input.Metadata)
-	image, err := h.sandboxes.CreateSnapshot(c.Request().Context(), services.CreateSnapshotInput{
+	r := c.Request()
+	auth := mw.MustAuth(r)
+	slog.Debug("sandbox snapshot requested", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id, "name", body.Name, "tag", body.Tag)
+
+	metadataJSON, _ := json.Marshal(body.Metadata)
+	image, err := h.Sandboxes.CreateSnapshot(r.Context(), services.CreateSnapshotInput{
 		SandboxID:   id,
-		Name:        input.Name,
-		Tag:         input.Tag,
-		Title:       input.Title,
-		Description: input.Description,
-		IsPublic:    input.IsPublic,
-		ClientIP:    c.RealIP(),
+		Name:        body.Name,
+		Tag:         body.Tag,
+		Title:       body.Title,
+		Description: body.Description,
+		IsPublic:    body.IsPublic,
+		ClientIP:    r.RemoteAddr,
 		UserID:      &auth.UserID,
 		Metadata:    metadataJSON,
-		AuditActor:  newAuditActor(c, &auth.UserID),
+		AuditActor:  newAuditActor(r, &auth.UserID),
 	})
 	if err != nil {
-		return mapSandboxError(c, err)
+		return dto.ImageResponse{}, mapSandboxError(err)
 	}
 
-	slog.Info("sandbox snapshot created", logging.RequestFields(c,
-		"component", "sandbox",
-		"user_id", auth.UserID.String(),
-		"sandbox_id", id.String(),
-		"image_id", image.ID.String(),
-		"image", image.FullName(),
-	)...)
-	var owner *dto.UserSummary
-	if image.Owner != nil {
-		owner = &dto.UserSummary{ID: image.Owner.ID, Email: image.Owner.Email}
-	}
-	return c.JSON(201, dto.ImageResponse{
-		ID: image.ID, Name: image.Name, Tag: image.Tag,
-		Title: image.Title, Description: image.Description,
-		ThumbnailURL: image.ThumbnailURL, IsPublic: image.IsPublic,
-		Status: image.Status, Error: image.Error,
-		Metadata: image.Metadata, RegistryRef: image.RegistryRef,
-		Owner:     owner,
-		CreatedAt: image.CreatedAt, UpdatedAt: image.UpdatedAt,
-	})
+	slog.Info("sandbox snapshot created", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id, "image_id", image.ID, "image", image.FullName())
+	return imageToResponse(image), nil
 }
 
-// Stream godoc
-// @Summary      Stream sandbox state
-// @Description  SSE endpoint streaming real-time state updates for a single sandbox
-// @Tags         Sandboxes
-// @Security     BearerAuth
-// @Produce      text/event-stream
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Success      200 {object} dto.SandboxStreamEvent
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Router       /api/sandboxes/{id}/stream [get]
-func (h *SandboxHandler) Stream(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
+func (h SandboxHandler) health(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		return responses.FromError(c, err)
+		errs.Write(w, http.StatusBadRequest, "Invalid sandbox id")
+		return
 	}
 
-	sandbox, err := h.sandboxes.FindByID(id)
+	sandbox, err := h.Sandboxes.FindByID(id)
 	if err != nil {
-		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found").WithCause(err))
+		errs.Write(w, http.StatusNotFound, "Sandbox not found")
+		return
 	}
 
-	if err := h.authorizeHealthAccess(c, sandbox); err != nil {
-		return err
+	if err := h.authorizeHealthAccess(w, r, sandbox); err != nil {
+		return
 	}
 
-	writeSSEHeaders(c)
+	writeSSEHeaders(w)
+	ch, cancel := h.Health.Watch(sandbox)
+	defer cancel()
 
-	ctx := c.Request().Context()
-	ch := h.health.WatchStream(ctx, sandbox)
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			sendSSEEvent(w, dto.SandboxHealthEvent{
+				SandboxID:     event.SandboxID.String(),
+				Status:        event.Status,
+				Ready:         event.Ready,
+				URL:           event.URL,
+				HTTPStatus:    event.HTTPStatus,
+				LatencyMs:     event.LatencyMs,
+				FailureReason: event.FailureReason,
+				Message:       event.Message,
+				CheckedAt:     event.CheckedAt.Format(time.RFC3339),
+			})
+		}
+	}
+}
+
+func (h SandboxHandler) stream(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		errs.Write(w, http.StatusBadRequest, "Invalid sandbox id")
+		return
+	}
+
+	sandbox, err := h.Sandboxes.FindByID(id)
+	if err != nil {
+		errs.Write(w, http.StatusNotFound, "Sandbox not found")
+		return
+	}
+
+	if err := h.authorizeHealthAccess(w, r, sandbox); err != nil {
+		return
+	}
+
+	writeSSEHeaders(w)
+	ctx := r.Context()
+	ch := h.Health.WatchStream(ctx, sandbox)
 	for event := range ch {
-		sendSSEEvent(c, dto.SandboxStreamEvent{
+		sendSSEEvent(w, dto.SandboxStreamEvent{
 			ID:          event.SandboxID.String(),
 			Status:      event.Status,
 			StateReason: event.StateReason,
 		})
 	}
-	return nil
 }
 
-func mapSandboxError(c echo.Context, err error) error {
-	switch err {
-	case services.ErrSandboxLimitReached:
-		return responses.FromAppError(c, apperror.Conflict("SANDBOX_LIMIT_REACHED", "Maximum number of sandboxes reached"))
-	case services.ErrSandboxNotFound:
-		return responses.FromAppError(c, apperror.NotFound("SANDBOX_NOT_FOUND", "Sandbox not found"))
-	case services.ErrSandboxAccessDenied:
-		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox does not belong to the current user"))
-	default:
-		return responses.FromAppError(c, apperror.Internal("SANDBOX_ERROR", "Sandbox operation failed").WithCause(err))
+func (h SandboxHandler) createDemo(c fuego.ContextWithBody[dto.CreateDemoRequest]) (dto.SandboxResponse, error) {
+	body, err := c.Body()
+	if err != nil {
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
+
+	imageID, err := uuid.Parse(body.ImageID)
+	if err != nil {
+		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid image id"}
+	}
+
+	r := c.Request()
+	clientID := mw.ClientIDFromContext(r)
+	slog.Debug("demo creation requested", "component", "sandbox", "image_id", imageID)
+	sandbox, err := h.Sandboxes.Create(r.Context(), services.CreateSandboxInput{
+		ImageID:    imageID,
+		ClientID:   clientID,
+		ClientIP:   r.RemoteAddr,
+		AuditActor: newAuditActor(r, nil),
+	})
+	if err != nil {
+		return dto.SandboxResponse{}, mapSandboxError(err)
+	}
+	h.Health.StartMonitoring(sandbox.ID)
+
+	slog.Info("demo created", "component", "sandbox", "sandbox_id", sandbox.ID, "image_id", sandbox.ImageID)
+	sshCfg := h.Sandboxes.SSHConfig()
+	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
 }
 
-func (h *SandboxHandler) authorizeHealthAccess(c echo.Context, sandbox *models.Sandbox) error {
-	userToken := c.QueryParam("access_token")
+func (h SandboxHandler) listDemos(c fuego.ContextNoBody) ([]dto.SandboxResponse, error) {
+	clientIDStr := c.Request().URL.Query().Get("clientId")
+	if clientIDStr == "" {
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "clientId query parameter is required"}
+	}
+	parsed, err := uuid.Parse(clientIDStr)
+	if err != nil {
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid clientId"}
+	}
+
+	sandboxes, err := h.Sandboxes.ListByClientID(parsed)
+	if err != nil {
+		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load demo sandboxes"}
+	}
+
+	sshCfg := h.Sandboxes.SSHConfig()
+	out := make([]dto.SandboxResponse, len(sandboxes))
+	for i, sb := range sandboxes {
+		out[i] = sandboxToResponse(&sandboxes[i], sshCfg, h.Sandboxes.ResolveSSHEntry(sb.ImageID))
+	}
+	return out, nil
+}
+
+func (h SandboxHandler) deleteDemo(c fuego.ContextNoBody) (any, error) {
+	id, err := parsePathUUID(c, "id")
+	if err != nil {
+		return nil, err
+	}
+
+	r := c.Request()
+	clientID := mw.ClientIDFromContext(r)
+	if clientID == nil {
+		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "X-Client-Id header is required"}
+	}
+
+	if err := h.Sandboxes.DeleteForGuest(r.Context(), id, *clientID, newAuditActor(r, nil)); err != nil {
+		return nil, mapSandboxError(err)
+	}
+
+	slog.Info("demo deleted", "component", "sandbox", "client_id", clientID, "sandbox_id", id)
+	return nil, nil
+}
+
+func (h SandboxHandler) authorizeHealthAccess(w http.ResponseWriter, r *http.Request, sandbox *models.Sandbox) error {
+	userToken := r.URL.Query().Get("access_token")
 	if userToken == "" {
-		authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
-		if token, ok := mw.ParseAuthorizationHeader(authHeader); ok {
+		if token, ok := mw.ParseAuthorizationHeader(r.Header.Get("Authorization")); ok {
 			userToken = token
 		}
 	}
 
 	if userToken != "" {
-		user, err := h.auth.Authenticate(userToken)
+		user, err := h.Auth.Authenticate(userToken)
 		if err != nil {
-			return responses.FromAppError(c, apperror.Unauthorized("Invalid or expired token"))
+			errs.Write(w, http.StatusUnauthorized, "Invalid or expired token")
+			return err
 		}
-
+		if user.IsAdmin() {
+			return nil
+		}
 		if sandbox.OwnerID != nil && *sandbox.OwnerID == user.ID {
 			return nil
 		}
-
-		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox access denied"))
+		errs.Write(w, http.StatusForbidden, "Sandbox access denied")
+		return fmt.Errorf("forbidden")
 	}
 
 	if sandbox.ClientID == nil {
-		return responses.FromAppError(c, apperror.Unauthorized("Missing bearer token"))
+		errs.Write(w, http.StatusUnauthorized, "Missing bearer token")
+		return fmt.Errorf("unauthorized")
 	}
 
-	clientID := mw.ClientID(c)
+	clientID := mw.ClientIDFromContext(r)
 	if clientID == nil || *sandbox.ClientID != *clientID {
-		return responses.FromAppError(c, apperror.New(403, "SANDBOX_ACCESS_DENIED", "Sandbox access denied"))
+		errs.Write(w, http.StatusForbidden, "Sandbox access denied")
+		return fmt.Errorf("forbidden")
 	}
 
 	return nil
 }
 
-// CreateDemo godoc
-// @Summary      Create a guest demo sandbox
-// @Description  Create a sandbox for a guest visitor. Identified by X-Client-Id header. No auth required. Server applies default TTL.
-// @Tags         Demos
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.CreateDemoRequest true "Demo sandbox configuration"
-// @Success      201 {object} dto.SandboxResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/demos [post]
-func (h *SandboxHandler) CreateDemo(c echo.Context) error {
-	var input dto.CreateDemoRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+func mapSandboxError(err error) error {
+	switch err {
+	case services.ErrSandboxLimitReached:
+		return fuego.HTTPError{Status: http.StatusConflict, Detail: "Maximum number of sandboxes reached"}
+	case services.ErrSandboxNotFound:
+		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "Sandbox not found"}
+	case services.ErrSandboxAccessDenied:
+		return fuego.HTTPError{Status: http.StatusForbidden, Detail: "Sandbox does not belong to the current user"}
+	default:
+		return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Sandbox operation failed"}
 	}
+}
 
-	imageID, err := uuid.Parse(input.ImageID)
-	if err != nil {
-		return responses.FromError(c, validationError("Invalid image id"))
-	}
-
-	clientID := mw.ClientID(c)
-	slog.Debug("demo creation requested", logging.RequestFields(c, "component", "sandbox", "image_id", imageID.String())...)
-	sandbox, err := h.sandboxes.Create(c.Request().Context(), services.CreateSandboxInput{
-		ImageID:    imageID,
-		ClientID:   clientID,
-		ClientIP:   c.RealIP(),
-		AuditActor: newAuditActor(c, nil),
-	})
-	if err != nil {
-		return mapSandboxError(c, err)
-	}
-	h.health.StartMonitoring(sandbox.ID)
-
-	slog.Info("demo created", logging.RequestFields(c,
-		"component", "sandbox",
-		"sandbox_id", sandbox.ID.String(),
-		"image_id", sandbox.ImageID.String(),
-	)...)
+func sandboxToResponse(sb *models.Sandbox, sshCfg config.SSHConfig, sshEntry *registry.SSHEntry) dto.SandboxResponse {
 	var owner *dto.UserSummary
-	if sandbox.Owner != nil {
-		owner = &dto.UserSummary{ID: sandbox.Owner.ID, Email: sandbox.Owner.Email}
+	if sb.Owner != nil {
+		owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email}
 	}
-	sshCfg := h.sandboxes.SSHConfig()
 	var ssh *dto.SSHConnectionInfo
 	if sshCfg.Enabled {
-		sshEntry := h.sandboxes.ResolveSSHEntry(sandbox.ImageID)
-		ssh = buildSSHInfo(sandbox, sshCfg, sshEntry)
+		ssh = buildSSHInfo(sb, sshCfg, sshEntry)
 	}
-	return c.JSON(201, dto.SandboxResponse{
-		ID: sandbox.ID, ImageID: sandbox.ImageID, Owner: owner,
-		ClientID: sandbox.ClientID, DisplayName: sandbox.DisplayName,
-		Status: sandbox.Status, StateReason: sandbox.StateReason,
-		ContainerID: sandbox.ContainerID, ContainerName: sandbox.ContainerName,
-		URL: sandbox.URL, Port: sandbox.Port, SSH: ssh, ClientIP: sandbox.ClientIP,
-		Metadata:  sandbox.Metadata,
-		ExpiresAt: sandbox.ExpiresAt, LastSeenAt: sandbox.LastSeenAt,
-		CreatedAt: sandbox.CreatedAt, UpdatedAt: sandbox.UpdatedAt,
-	})
-}
-
-// ListDemos godoc
-// @Summary      List guest demo sandboxes
-// @Description  Returns sandboxes belonging to the given client ID. No auth required.
-// @Tags         Demos
-// @Produce      json
-// @Param        clientId query string true "Client ID" format(uuid)
-// @Success      200 {array} dto.SandboxResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/demos [get]
-func (h *SandboxHandler) ListDemos(c echo.Context) error {
-	clientIDStr := c.QueryParam("clientId")
-	if clientIDStr == "" {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "clientId query parameter is required"))
+	return dto.SandboxResponse{
+		ID: sb.ID, ImageID: sb.ImageID, Owner: owner,
+		ClientID: sb.ClientID, DisplayName: sb.DisplayName,
+		Status: sb.Status, StateReason: sb.StateReason,
+		ContainerID: sb.ContainerID, ContainerName: sb.ContainerName,
+		URL: sb.URL, Port: sb.Port, SSH: ssh, ClientIP: sb.ClientIP,
+		Metadata:  sb.Metadata,
+		ExpiresAt: sb.ExpiresAt, LastSeenAt: sb.LastSeenAt,
+		CreatedAt: sb.CreatedAt, UpdatedAt: sb.UpdatedAt,
 	}
-	parsed, err := uuid.Parse(clientIDStr)
-	if err != nil {
-		return responses.FromAppError(c, apperror.BadRequest("VALIDATION_ERROR", "Invalid clientId"))
-	}
-
-	sandboxes, err := h.sandboxes.ListByClientID(parsed)
-	if err != nil {
-		return responses.FromAppError(c, apperror.Internal("SANDBOX_LIST_FAILED", "Could not load demo sandboxes").WithCause(err))
-	}
-	slog.Debug("listed demo sandboxes", logging.RequestFields(c, "component", "sandbox", "client_id", parsed.String(), "count", len(sandboxes))...)
-	sshCfg := h.sandboxes.SSHConfig()
-	out := make([]dto.SandboxResponse, len(sandboxes))
-	for i, sb := range sandboxes {
-		var owner *dto.UserSummary
-		if sb.Owner != nil {
-			owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email}
-		}
-		var ssh *dto.SSHConnectionInfo
-		if sshCfg.Enabled {
-			sshEntry := h.sandboxes.ResolveSSHEntry(sb.ImageID)
-			ssh = buildSSHInfo(&sandboxes[i], sshCfg, sshEntry)
-		}
-		out[i] = dto.SandboxResponse{
-			ID: sb.ID, ImageID: sb.ImageID, Owner: owner,
-			ClientID: sb.ClientID, DisplayName: sb.DisplayName,
-			Status: sb.Status, StateReason: sb.StateReason,
-			ContainerID: sb.ContainerID, ContainerName: sb.ContainerName,
-			URL: sb.URL, Port: sb.Port, SSH: ssh, ClientIP: sb.ClientIP,
-			Metadata:  sb.Metadata,
-			ExpiresAt: sb.ExpiresAt, LastSeenAt: sb.LastSeenAt,
-			CreatedAt: sb.CreatedAt, UpdatedAt: sb.UpdatedAt,
-		}
-	}
-	return c.JSON(200, out)
-}
-
-// DeleteDemo godoc
-// @Summary      Delete a guest demo sandbox
-// @Description  Delete a sandbox owned by the X-Client-Id. No auth required.
-// @Tags         Demos
-// @Param        id path string true "Sandbox ID" format(uuid)
-// @Success      204
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
-// @Failure      404 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/demos/{id} [delete]
-func (h *SandboxHandler) DeleteDemo(c echo.Context) error {
-	id, err := parseUUIDParam(c, "id", "VALIDATION_ERROR", "Invalid sandbox id")
-	if err != nil {
-		return responses.FromError(c, err)
-	}
-
-	clientID := mw.ClientID(c)
-	if clientID == nil {
-		return responses.FromAppError(c, apperror.BadRequest("MISSING_CLIENT_ID", "X-Client-Id header is required"))
-	}
-
-	if err := h.sandboxes.DeleteForGuest(c.Request().Context(), id, *clientID, newAuditActor(c, nil)); err != nil {
-		return mapSandboxError(c, err)
-	}
-
-	slog.Info("demo deleted", logging.RequestFields(c, "component", "sandbox", "client_id", clientID.String(), "sandbox_id", id.String())...)
-	return c.NoContent(204)
 }
 
 func buildSSHInfo(sandbox *models.Sandbox, sshCfg config.SSHConfig, sshEntry *registry.SSHEntry) *dto.SSHConnectionInfo {

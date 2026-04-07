@@ -3,143 +3,111 @@ package handlers
 import (
 	"errors"
 	"log/slog"
+	"net/http"
 
-	"github.com/labstack/echo/v4"
-	"github.com/manuel/shopware-testenv-platform/api/internal/apperror"
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	auditcontracts "github.com/manuel/shopware-testenv-platform/api/internal/auditlog"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	mw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
-	"github.com/manuel/shopware-testenv-platform/api/internal/http/responses"
-	"github.com/manuel/shopware-testenv-platform/api/internal/logging"
-	"github.com/manuel/shopware-testenv-platform/api/internal/models"
 	"github.com/manuel/shopware-testenv-platform/api/internal/services"
 )
 
 type AuthHandler struct {
-	auth  *services.AuthService
-	audit *services.AuditService
+	Auth  *services.AuthService
+	Audit *services.AuditService
 }
 
-func NewAuthHandler(auth *services.AuthService, audit *services.AuditService) *AuthHandler {
-	return &AuthHandler{auth: auth, audit: audit}
+func (h AuthHandler) MountPublicRoutes(s *fuego.Server) {
+	auth := fuego.Group(s, "/auth")
+	fuego.Post(auth, "/register", h.register,
+		option.Summary("Register a new user"),
+		option.Description("Create a new user account with email and password"),
+		option.Tags("Auth"),
+		option.DefaultStatusCode(http.StatusCreated),
+	)
+	fuego.Post(auth, "/login", h.login,
+		option.Summary("Log in"),
+		option.Description("Authenticate with email and password, receive a JWT token"),
+		option.Tags("Auth"),
+	)
 }
 
-// Register godoc
-// @Summary      Register a new user
-// @Description  Create a new user account with email and password
-// @Tags         Auth
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.RegisterRequest true "Registration credentials"
-// @Success      201 {object} dto.UserResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      409 {object} dto.ErrorResponse
-// @Router       /api/auth/register [post]
-func (h *AuthHandler) Register(c echo.Context) error {
-	var input dto.RegisterRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
+func (h AuthHandler) MountAuthedRoutes(s *fuego.Server) {
+	auth := fuego.Group(s, "/auth")
+	fuego.Post(auth, "/logout", h.logout,
+		option.Summary("Log out"),
+		option.Description("Invalidate the current session token"),
+		option.Tags("Auth"),
+		option.DefaultStatusCode(http.StatusNoContent),
+	)
+	fuego.Get(auth, "/me", h.me,
+		option.Summary("Get current user"),
+		option.Description("Return the authenticated user's profile"),
+		option.Tags("Auth"),
+	)
+}
+
+func (h AuthHandler) register(c fuego.ContextWithBody[dto.RegisterRequest]) (dto.UserResponse, error) {
+	body, err := c.Body()
+	if err != nil {
+		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	slog.Debug("register request received", logging.RequestFields(c, "component", "auth", "email", logging.MaskEmail(input.Email))...)
-	user, err := h.auth.Register(input.Email, input.Password)
+	slog.Debug("register request received", "component", "auth", "email", body.Email)
+	user, err := h.Auth.Register(body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailNotWhitelisted) {
-			return responses.FromAppError(c, apperror.Forbidden("Email not whitelisted for registration"))
+			return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusForbidden, Detail: "Email not whitelisted for registration"}
 		}
-		return responses.FromAppError(c, apperror.BadRequest("REGISTER_FAILED", "Could not register user").WithCause(err))
+		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Could not register user"}
 	}
 
-	slog.Info("user registered", logging.RequestFields(c,
-		"component", "auth",
-		"user_id", user.ID.String(),
-		"email", logging.MaskEmail(user.Email),
-	)...)
+	slog.Info("user registered", "component", "auth", "user_id", user.ID, "email", user.Email)
 	resourceType := auditcontracts.ResourceTypeUser
-	_ = h.audit.Log(newAuditLogInput(
-		c,
-		&user.ID,
-		auditcontracts.ActionUserRegistered,
-		&resourceType,
-		&user.ID,
-		map[string]any{"email": user.Email},
-	))
-	return c.JSON(201, dto.UserResponse{
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &user.ID, auditcontracts.ActionUserRegistered, &resourceType, &user.ID, map[string]any{"email": user.Email}))
+
+	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, Role: user.Role,
 		IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
-	})
+	}, nil
 }
 
-// Login godoc
-// @Summary      Log in
-// @Description  Authenticate with email and password, receive a JWT token
-// @Tags         Auth
-// @Accept       json
-// @Produce      json
-// @Param        body body dto.LoginRequest true "Login credentials"
-// @Success      200 {object} dto.AuthLoginResponse
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Router       /api/auth/login [post]
-func (h *AuthHandler) Login(c echo.Context) error {
-	var input dto.LoginRequest
-	if err := bindAndValidate(c, &input); err != nil {
-		return responses.FromError(c, err)
-	}
-
-	slog.Debug("login request received", logging.RequestFields(c, "component", "auth", "email", logging.MaskEmail(input.Email))...)
-	token, user, err := h.auth.Login(input.Email, input.Password)
+func (h AuthHandler) login(c fuego.ContextWithBody[dto.LoginRequest]) (dto.LoginResponse, error) {
+	body, err := c.Body()
 	if err != nil {
-		return responses.FromAppError(c, apperror.Unauthorized("Email or password is invalid").WithCause(err))
+		return dto.LoginResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	slog.Info("user logged in", logging.RequestFields(c,
-		"component", "auth",
-		"user_id", user.ID.String(),
-		"email", logging.MaskEmail(user.Email),
-	)...)
-	_ = h.audit.Log(newAuditLogInput(c, &user.ID, auditcontracts.ActionAuthLoggedIn, nil, nil, map[string]any{}))
-	return c.JSON(200, dto.AuthLoginResponse{
+	slog.Debug("login request received", "component", "auth", "email", body.Email)
+	token, user, err := h.Auth.Login(body.Email, body.Password)
+	if err != nil {
+		return dto.LoginResponse{}, fuego.HTTPError{Status: http.StatusUnauthorized, Detail: "Email or password is invalid"}
+	}
+
+	slog.Info("user logged in", "component", "auth", "user_id", user.ID, "email", user.Email)
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &user.ID, auditcontracts.ActionAuthLoggedIn, nil, nil, map[string]any{}))
+
+	return dto.LoginResponse{
 		Token: token,
 		User: dto.UserResponse{
 			ID: user.ID, Email: user.Email, Role: user.Role,
 			IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
 		},
-	})
+	}, nil
 }
 
-// Logout godoc
-// @Summary      Log out
-// @Description  Invalidate the current session token
-// @Tags         Auth
-// @Security     BearerAuth
-// @Produce      json
-// @Success      204
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      500 {object} dto.ErrorResponse
-// @Router       /api/auth/logout [post]
-func (h *AuthHandler) Logout(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	slog.Info("user logged out", logging.RequestFields(c, "component", "auth", "user_id", auth.UserID.String())...)
-	_ = h.audit.Log(newAuditLogInput(c, &auth.UserID, auditcontracts.ActionAuthLoggedOut, nil, nil, map[string]any{}))
-	return c.NoContent(204)
+func (h AuthHandler) logout(c fuego.ContextNoBody) (any, error) {
+	auth := mw.MustAuth(c.Request())
+	slog.Info("user logged out", "component", "auth", "user_id", auth.UserID)
+	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionAuthLoggedOut, nil, nil, map[string]any{}))
+	return nil, nil
 }
 
-// Me godoc
-// @Summary      Get current user
-// @Description  Return the authenticated user's profile
-// @Tags         Auth
-// @Security     BearerAuth
-// @Produce      json
-// @Success      200 {object} dto.UserResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Router       /api/auth/me [get]
-func (h *AuthHandler) Me(c echo.Context) error {
-	auth := mw.MustAuth(c)
-	user := c.Get("user").(*models.User)
-	slog.Debug("profile requested", logging.RequestFields(c, "component", "auth", "user_id", auth.UserID.String())...)
-	return c.JSON(200, dto.UserResponse{
+func (h AuthHandler) me(c fuego.ContextNoBody) (dto.UserResponse, error) {
+	user := mw.UserFromContext(c.Request())
+	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, Role: user.Role,
 		IsPending: user.IsPending(), CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
-	})
+	}, nil
 }
