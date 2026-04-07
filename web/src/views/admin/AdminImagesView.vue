@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import AddImageDialog from '@/components/modals/AddImageDialog.vue'
 import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
 import EditImageDrawer from '@/components/modals/EditImageDrawer.vue'
+import DataTablePagination from '@/components/shared/DataTablePagination.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,9 @@ import type { Image, MetadataItem } from '@/types'
 
 const {
   images,
+  paginatedImages,
+  page,
+  pageSize,
   pendingImages,
   loading,
   createImage,
@@ -180,7 +184,7 @@ function getOwnerLabel(image: Image): string {
           <TableEmpty v-else-if="images.length === 0" :colspan="6">
             Keine Vorlagen vorhanden
           </TableEmpty>
-          <TableRow v-for="image in images" :key="image.id" class="h-13">
+          <TableRow v-for="image in paginatedImages" :key="image.id" class="h-13">
             <TableCell>
               <div>
                 <div class="font-medium">{{ image.title || image.name }}</div>
@@ -275,6 +279,13 @@ function getOwnerLabel(image: Image): string {
         </TableBody>
       </Table>
     </div>
+
+    <DataTablePagination
+      :page="page"
+      :total-items="images.length"
+      :page-size="pageSize"
+      @update:page="page = $event"
+    />
 
     <AddImageDialog v-model:open="showAddImage" @submit="handleCreateImage" />
 

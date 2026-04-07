@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { usersApi, whitelistApi } from '@/api'
+import { usePagination } from '@/composables/usePagination'
 
 import type { CreateUserRequest, UpdateUserRequest, User } from '@/types'
 
@@ -15,11 +16,24 @@ export function useUsers() {
 
   const invitedUsers = computed<User[]>(() => users.value.filter((user) => user.isPending))
 
+  const {
+    page: activePage,
+    pageSize: activePageSize,
+    paginatedItems: paginatedActiveUsers,
+  } = usePagination({ pageSize: 20, source: activeUsers })
+
+  const {
+    page: invitedPage,
+    pageSize: invitedPageSize,
+    paginatedItems: paginatedInvitedUsers,
+  } = usePagination({ pageSize: 20, source: invitedUsers })
+
   async function fetch() {
     if (!initialized.value) loading.value = true
     error.value = null
     try {
-      users.value = await usersApi.list()
+      const response = await usersApi.list({ limit: 500 })
+      users.value = response.data
       initialized.value = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
@@ -64,6 +78,12 @@ export function useUsers() {
     users,
     activeUsers,
     invitedUsers,
+    paginatedActiveUsers,
+    paginatedInvitedUsers,
+    activePage,
+    activePageSize,
+    invitedPage,
+    invitedPageSize,
     loading,
     error,
     busyIds,

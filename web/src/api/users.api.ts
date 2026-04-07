@@ -1,13 +1,17 @@
 import { apiClient } from './client'
 
-import type { CreateUserRequest, PaginatedResponse, UpdateUserRequest, User } from '@/types'
+import type {
+  CreateUserRequest,
+  PaginatedResponse,
+  PaginationParams,
+  UpdateUserRequest,
+  User,
+} from '@/types'
 
 export const usersApi = {
-  async list(): Promise<User[]> {
-    const { data } = await apiClient.get<PaginatedResponse<User>>('/api/users', {
-      params: { limit: 500 },
-    })
-    return data.data
+  async list(params?: PaginationParams): Promise<PaginatedResponse<User>> {
+    const { data } = await apiClient.get<PaginatedResponse<User>>('/api/users', { params })
+    return data
   },
 
   async create(req: CreateUserRequest): Promise<User> {

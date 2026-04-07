@@ -153,7 +153,8 @@ export function useSandboxes() {
     error.value = null
     try {
       if (authStore.isAuthenticated) {
-        sandboxes.value = await sandboxesApi.list()
+        const response = await sandboxesApi.list({ limit: 500 })
+        sandboxes.value = response.data
       } else {
         sandboxes.value = await sandboxesApi.listDemos(getClientId())
       }

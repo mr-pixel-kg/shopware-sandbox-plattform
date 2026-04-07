@@ -7,6 +7,7 @@ import ConfirmDialog from '@/components/modals/ConfirmDialog.vue'
 import CreateUserDialog from '@/components/modals/CreateUserDialog.vue'
 import EditUserDrawer from '@/components/modals/EditUserDrawer.vue'
 import InviteUserDialog from '@/components/modals/InviteUserDialog.vue'
+import DataTablePagination from '@/components/shared/DataTablePagination.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,12 @@ const authStore = useAuthStore()
 const {
   activeUsers,
   invitedUsers,
+  paginatedActiveUsers,
+  paginatedInvitedUsers,
+  activePage,
+  activePageSize,
+  invitedPage,
+  invitedPageSize,
   loading,
   createUser,
   inviteUser,
@@ -185,7 +192,7 @@ async function handleDelete(done: (success: boolean) => void) {
               <TableEmpty v-else-if="activeUsers.length === 0" :colspan="5">
                 Keine aktiven Benutzer vorhanden.
               </TableEmpty>
-              <TableRow v-for="user in activeUsers" v-else :key="user.id">
+              <TableRow v-for="user in paginatedActiveUsers" v-else :key="user.id">
                 <TableCell>
                   <div class="font-medium">{{ user.email }}</div>
                   <div v-if="currentUserId === user.id" class="text-muted-foreground mt-1 text-xs">
@@ -252,6 +259,12 @@ async function handleDelete(done: (success: boolean) => void) {
             </TableBody>
           </Table>
         </div>
+        <DataTablePagination
+          :page="activePage"
+          :total-items="activeUsers.length"
+          :page-size="activePageSize"
+          @update:page="activePage = $event"
+        />
       </TabsContent>
 
       <TabsContent value="invites">
@@ -277,7 +290,7 @@ async function handleDelete(done: (success: boolean) => void) {
               <TableEmpty v-else-if="invitedUsers.length === 0" :colspan="4">
                 Keine ausstehenden Einladungen vorhanden.
               </TableEmpty>
-              <TableRow v-for="user in invitedUsers" v-else :key="user.id">
+              <TableRow v-for="user in paginatedInvitedUsers" v-else :key="user.id">
                 <TableCell>
                   <div class="font-medium">{{ user.email }}</div>
                   <div class="text-muted-foreground mt-1 text-xs">
@@ -316,6 +329,12 @@ async function handleDelete(done: (success: boolean) => void) {
             </TableBody>
           </Table>
         </div>
+        <DataTablePagination
+          :page="invitedPage"
+          :total-items="invitedUsers.length"
+          :page-size="invitedPageSize"
+          @update:page="invitedPage = $event"
+        />
       </TabsContent>
     </Tabs>
 

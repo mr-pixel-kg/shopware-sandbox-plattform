@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Download } from 'lucide-vue-next'
+import { Download } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 import AuditLogDetailDrawer from '@/components/modals/AuditLogDetailDrawer.vue'
+import DataTablePagination from '@/components/shared/DataTablePagination.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,7 +34,7 @@ const {
   meta,
   loading,
   page,
-  totalPages,
+  pageSize,
   userFilter,
   actionFilter,
   periodFilter,
@@ -246,17 +247,12 @@ function openDetails(log: AuditLog) {
       </Table>
     </div>
 
-    <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between">
-      <span class="text-muted-foreground text-sm"> Seite {{ page }} von {{ totalPages }} </span>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" :disabled="page <= 1" @click="page--">
-          <ChevronLeft class="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm" :disabled="page >= totalPages" @click="page++">
-          <ChevronRight class="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+    <DataTablePagination
+      :page="page"
+      :total-items="meta?.pagination.total ?? 0"
+      :page-size="pageSize"
+      @update:page="page = $event"
+    />
 
     <AuditLogDetailDrawer v-model:open="showDetailDrawer" :log="selectedLog" />
   </div>

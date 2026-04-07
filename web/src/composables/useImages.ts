@@ -2,6 +2,7 @@ import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, ref } from 'vue'
 
 import { imagesApi } from '@/api'
+import { usePagination } from '@/composables/usePagination'
 import { useAuthStore } from '@/stores/auth.store'
 import { type FetchMode, useImagesStore } from '@/stores/images.store'
 
@@ -95,12 +96,21 @@ export function useImages(mode: FetchMode = 'public') {
     })
   }
 
+  const {
+    page,
+    pageSize,
+    paginatedItems: paginatedImages,
+  } = usePagination({ pageSize: 20, source: images })
+
   async function fetchImages() {
     if (!store.initialized) loading.value = true
     error.value = null
     try {
-      images.value =
-        effectiveMode === 'all' ? await imagesApi.listAll() : await imagesApi.listPublic()
+      const response =
+        effectiveMode === 'all'
+          ? await imagesApi.listAll({ limit: 500 })
+          : await imagesApi.listPublic({ limit: 500 })
+      images.value = response.data
       store.initialized = true
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Fehler beim Laden'
@@ -211,6 +221,9 @@ export function useImages(mode: FetchMode = 'public') {
 
   return {
     images,
+    paginatedImages,
+    page,
+    pageSize,
     pendingImages,
     publicImages,
     loading,
