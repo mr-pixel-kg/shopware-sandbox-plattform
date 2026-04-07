@@ -9,7 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/manuel/shopware-testenv-platform/api/internal/config"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/handlers"
@@ -26,41 +27,40 @@ func TestAuthFlow_RegisterLoginMeAndLogout(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
+	s, authService := newIntegrationServer(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: newTestAuditService(db)}
 
-	router.POST("/api/auth/register", authHandler.Register)
-	router.POST("/api/auth/login", authHandler.Login)
+	public := fuego.Group(s, "/api")
+	authHandler.MountPublicRoutes(public)
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/me", authHandler.Me)
-	private.POST("/auth/logout", authHandler.Logout)
+	authed := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+	)
+	authHandler.MountAuthedRoutes(authed)
 
 	email := "api-auth-flow@example.com"
 	password := "Sup3rS3cret!"
 
 	registerBody := dto.RegisterRequest{Email: email, Password: password}
-	registerRec := performJSONRequest(t, router, http.MethodPost, "/api/auth/register", registerBody, "")
+	registerRec := performJSONRequest(t, s, http.MethodPost, "/api/auth/register", registerBody, "")
 	require.Equal(t, http.StatusCreated, registerRec.Code, registerRec.Body.String())
 
 	loginBody := dto.LoginRequest{Email: email, Password: password}
-	loginRec := performJSONRequest(t, router, http.MethodPost, "/api/auth/login", loginBody, "")
+	loginRec := performJSONRequest(t, s, http.MethodPost, "/api/auth/login", loginBody, "")
 	require.Equal(t, http.StatusOK, loginRec.Code, loginRec.Body.String())
 
-	var loginResp dto.AuthLoginResponse
+	var loginResp dto.LoginResponse
 	require.NoError(t, json.Unmarshal(loginRec.Body.Bytes(), &loginResp))
 	require.NotEmpty(t, loginResp.Token)
 	assert.Equal(t, email, loginResp.User.Email)
 
-	meRec := performJSONRequest(t, router, http.MethodGet, "/api/me", nil, "Bearer "+loginResp.Token)
+	meRec := performJSONRequest(t, s, http.MethodGet, "/api/auth/me", nil, "Bearer "+loginResp.Token)
 	require.Equal(t, http.StatusOK, meRec.Code, meRec.Body.String())
 
-	logoutRec := performJSONRequest(t, router, http.MethodPost, "/api/auth/logout", nil, "Bearer "+loginResp.Token)
+	logoutRec := performJSONRequest(t, s, http.MethodPost, "/api/auth/logout", nil, "Bearer "+loginResp.Token)
 	require.Equal(t, http.StatusNoContent, logoutRec.Code, logoutRec.Body.String())
 
-	meAfterLogoutRec := performJSONRequest(t, router, http.MethodGet, "/api/me", nil, "Bearer "+loginResp.Token)
+	meAfterLogoutRec := performJSONRequest(t, s, http.MethodGet, "/api/auth/me", nil, "Bearer "+loginResp.Token)
 	assert.Equal(t, http.StatusOK, meAfterLogoutRec.Code, meAfterLogoutRec.Body.String())
 }
 
@@ -68,15 +68,15 @@ func TestProtectedRouteRejectsMissingAuthorizationHeader(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
+	s, authService := newIntegrationServer(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: newTestAuditService(db)}
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/me", authHandler.Me)
+	authed := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+	)
+	authHandler.MountAuthedRoutes(authed)
 
-	rec := performJSONRequest(t, router, http.MethodGet, "/api/me", nil, "")
+	rec := performJSONRequest(t, s, http.MethodGet, "/api/auth/me", nil, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 }
 
@@ -97,7 +97,21 @@ func newTestAuthServices(db *gorm.DB) (*services.AuthService, *services.AuditSer
 	return authService, auditService
 }
 
-func performJSONRequest(t *testing.T, e *echo.Echo, method, target string, body any, authorization string) *httptest.ResponseRecorder {
+func newTestAuditService(db *gorm.DB) *services.AuditService {
+	return services.NewAuditService(repositories.NewAuditLogRepository(db))
+}
+
+func newIntegrationServer(db *gorm.DB) (*fuego.Server, *services.AuthService) {
+	authService, _ := newTestAuthServices(db)
+	s := fuego.NewServer(
+		fuego.WithAddr("localhost:0"),
+		fuego.WithoutAutoGroupTags(),
+		fuego.WithoutStartupMessages(),
+	)
+	return s, authService
+}
+
+func performJSONRequest(t *testing.T, s *fuego.Server, method, target string, body any, authorization string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	var reqBody []byte
@@ -110,18 +124,12 @@ func performJSONRequest(t *testing.T, e *echo.Echo, method, target string, body 
 	}
 
 	req := httptest.NewRequest(method, target, bytes.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Content-Type", "application/json")
 	if authorization != "" {
-		req.Header.Set(echo.HeaderAuthorization, authorization)
+		req.Header.Set("Authorization", authorization)
 	}
 
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	s.Mux.ServeHTTP(rec, req)
 	return rec
-}
-
-func newIntegrationRouter() *echo.Echo {
-	router := echo.New()
-	router.Validator = NewValidator()
-	return router
 }

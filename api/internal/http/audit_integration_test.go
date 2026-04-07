@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-fuego/fuego"
+	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/dto"
 	"github.com/manuel/shopware-testenv-platform/api/internal/http/handlers"
 	authmw "github.com/manuel/shopware-testenv-platform/api/internal/http/middleware"
@@ -28,19 +29,21 @@ func TestAuditLogsAdminCanListWithPaginationAndFilters(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
-	auditHandler := handlers.NewAuditHandler(auditService)
+	s, authService := newIntegrationServer(db)
+	auditService := newTestAuditService(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: auditService}
+	auditHandler := handlers.AuditHandler{Audit: auditService}
 
-	router.POST("/api/auth/login", authHandler.Login)
+	public := fuego.Group(s, "/api")
+	authHandler.MountPublicRoutes(public)
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
-	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
+	admin := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+		option.Middleware(authmw.RequireAdmin()),
+	)
+	auditHandler.MountRoutes(admin)
 
-	adminToken := createAdminToken(t, db, router)
+	adminToken := createAdminToken(t, db, s)
 	user := createAuditHTTPUser(t, db, "audit-http-user")
 	clientID := uuid.New()
 	resourceID := uuid.New()
@@ -84,7 +87,7 @@ func TestAuditLogsAdminCanListWithPaginationAndFilters(t *testing.T) {
 		resourceID.String(),
 		clientID.String(),
 	)
-	rec := performJSONRequest(t, router, http.MethodGet, target, nil, "Bearer "+adminToken)
+	rec := performJSONRequest(t, s, http.MethodGet, target, nil, "Bearer "+adminToken)
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
@@ -114,20 +117,22 @@ func TestAuditLogsRequireAdmin(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
-	auditHandler := handlers.NewAuditHandler(auditService)
+	s, authService := newIntegrationServer(db)
+	auditService := newTestAuditService(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: auditService}
+	auditHandler := handlers.AuditHandler{Audit: auditService}
 
-	router.POST("/api/auth/login", authHandler.Login)
+	public := fuego.Group(s, "/api")
+	authHandler.MountPublicRoutes(public)
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
-	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
+	admin := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+		option.Middleware(authmw.RequireAdmin()),
+	)
+	auditHandler.MountRoutes(admin)
 
-	userToken := createUserToken(t, db, router)
-	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs", nil, "Bearer "+userToken)
+	userToken := createUserToken(t, db, s)
+	rec := performJSONRequest(t, s, http.MethodGet, "/api/audit-logs", nil, "Bearer "+userToken)
 
 	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "Admin access required")
@@ -137,20 +142,22 @@ func TestAuditLogsRejectInvalidQueryParameters(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
-	auditHandler := handlers.NewAuditHandler(auditService)
+	s, authService := newIntegrationServer(db)
+	auditService := newTestAuditService(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: auditService}
+	auditHandler := handlers.AuditHandler{Audit: auditService}
 
-	router.POST("/api/auth/login", authHandler.Login)
+	public := fuego.Group(s, "/api")
+	authHandler.MountPublicRoutes(public)
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/audit-logs", auditHandler.List, authmw.RequireAdmin())
-	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
+	admin := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+		option.Middleware(authmw.RequireAdmin()),
+	)
+	auditHandler.MountRoutes(admin)
 
-	adminToken := createAdminToken(t, db, router)
-	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs?from=invalid", nil, "Bearer "+adminToken)
+	adminToken := createAdminToken(t, db, s)
+	rec := performJSONRequest(t, s, http.MethodGet, "/api/audit-logs?from=invalid", nil, "Bearer "+adminToken)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "Invalid from timestamp")
@@ -160,18 +167,21 @@ func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
 	db := testutil.OpenIntegrationDB(t)
 	testutil.ResetIntegrationDB(t, db)
 
-	router := newIntegrationRouter()
-	authService, auditService := newTestAuthServices(db)
-	authHandler := handlers.NewAuthHandler(authService, auditService)
-	auditHandler := handlers.NewAuditHandler(auditService)
+	s, authService := newIntegrationServer(db)
+	auditService := newTestAuditService(db)
+	authHandler := handlers.AuthHandler{Auth: authService, Audit: auditService}
+	auditHandler := handlers.AuditHandler{Audit: auditService}
 
-	router.POST("/api/auth/login", authHandler.Login)
+	public := fuego.Group(s, "/api")
+	authHandler.MountPublicRoutes(public)
 
-	private := router.Group("/api")
-	private.Use(authmw.Auth(authService))
-	private.GET("/audit-logs/facets", auditHandler.Facets, authmw.RequireAdmin())
+	admin := fuego.Group(s, "/api",
+		option.Middleware(authmw.Auth(authService)),
+		option.Middleware(authmw.RequireAdmin()),
+	)
+	auditHandler.MountRoutes(admin)
 
-	adminToken := createAdminToken(t, db, router)
+	adminToken := createAdminToken(t, db, s)
 	user := createAuditHTTPUser(t, db, "audit-facet-user")
 	repo := repositories.NewAuditLogRepository(db)
 	now := time.Now().UTC()
@@ -184,7 +194,7 @@ func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
 		Timestamp: now,
 	})
 
-	rec := performJSONRequest(t, router, http.MethodGet, "/api/audit-logs/facets?from="+now.Add(-time.Hour).Format(time.RFC3339), nil, "Bearer "+adminToken)
+	rec := performJSONRequest(t, s, http.MethodGet, "/api/audit-logs/facets?from="+now.Add(-time.Hour).Format(time.RFC3339), nil, "Bearer "+adminToken)
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
@@ -204,9 +214,9 @@ func createAuditHTTPLog(t *testing.T, repo *repositories.AuditLogRepository, ent
 	return entry
 }
 
-func createUserToken(t *testing.T, db *gorm.DB, router *echo.Echo) string {
+func createUserToken(t *testing.T, db *gorm.DB, s *fuego.Server) string {
 	t.Helper()
-	return createRoleToken(t, db, router, models.RoleUser)
+	return createRoleToken(t, db, s, models.RoleUser)
 }
 
 func createAuditHTTPUser(t *testing.T, db *gorm.DB, prefix string) *models.User {
@@ -226,7 +236,7 @@ func strPtrHTTP(value string) *string {
 	return &value
 }
 
-func createRoleToken(t *testing.T, db *gorm.DB, router *echo.Echo, role string) string {
+func createRoleToken(t *testing.T, db *gorm.DB, s *fuego.Server, role string) string {
 	t.Helper()
 
 	passwordService := services.NewPasswordService()
@@ -242,7 +252,7 @@ func createRoleToken(t *testing.T, db *gorm.DB, router *echo.Echo, role string) 
 	}
 	require.NoError(t, repositories.NewUserRepository(db).Create(user))
 
-	loginRec := performJSONRequest(t, router, http.MethodPost, "/api/auth/login", map[string]any{
+	loginRec := performJSONRequest(t, s, http.MethodPost, "/api/auth/login", map[string]any{
 		"email":    user.Email,
 		"password": password,
 	}, "")
@@ -255,4 +265,9 @@ func createRoleToken(t *testing.T, db *gorm.DB, router *echo.Echo, role string) 
 	require.NotEmpty(t, loginResp.Token)
 
 	return loginResp.Token
+}
+
+func createAdminToken(t *testing.T, db *gorm.DB, s *fuego.Server) string {
+	t.Helper()
+	return createRoleToken(t, db, s, models.RoleAdmin)
 }
