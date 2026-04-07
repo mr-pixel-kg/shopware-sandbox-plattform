@@ -569,4 +569,3 @@ func extractHostname(rawURL string) string {
 	}
 	return u.Hostname()
 }
-
