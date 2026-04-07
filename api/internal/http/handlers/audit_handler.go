@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -75,13 +74,7 @@ func (h AuditHandler) list(c fuego.ContextNoBody) (dto.AuditLogListResponse, err
 	return dto.AuditLogListResponse{
 		Data: response,
 		Meta: dto.AuditLogListMeta{
-			Pagination: dto.PaginationMeta{
-				Limit:   result.Limit,
-				Offset:  result.Offset,
-				Count:   len(response),
-				Total:   result.Total,
-				HasMore: int64(result.Offset+len(response)) < result.Total,
-			},
+			Pagination: buildPaginationMeta(len(response), result.Limit, result.Offset, result.Total),
 			Filters: dto.AuditLogListFilters{
 				UserID:       filters.UserID,
 				Action:       filters.Action,
@@ -117,24 +110,13 @@ func (h AuditHandler) facets(c fuego.ContextNoBody) (dto.AuditLogFacetsResponse,
 
 func parseAuditLogListInput(r *http.Request) (services.AuditLogListInput, error) {
 	q := r.URL.Query()
-	input := services.AuditLogListInput{Limit: 50, Offset: 0}
 
-	if v := strings.TrimSpace(q.Get("limit")); v != "" {
-		parsed, err := strconv.Atoi(v)
-		if err != nil || parsed <= 0 || parsed > 500 {
-			return input, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "limit must be between 1 and 500"}
-		}
-		input.Limit = parsed
+	limit, offset, err := parsePaginationParams(r)
+	if err != nil {
+		return services.AuditLogListInput{}, err
 	}
-	if v := strings.TrimSpace(q.Get("offset")); v != "" {
-		parsed, err := strconv.Atoi(v)
-		if err != nil || parsed < 0 {
-			return input, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "offset must be 0 or greater"}
-		}
-		input.Offset = parsed
-	}
+	input := services.AuditLogListInput{Limit: limit, Offset: offset}
 
-	var err error
 	input.UserID, err = parseOptionalUUIDQuery(q.Get("userId"), "Invalid userId")
 	if err != nil {
 		return input, err

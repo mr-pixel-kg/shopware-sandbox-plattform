@@ -26,6 +26,17 @@ func (r *UserRepository) List() ([]models.User, error) {
 	return users, nil
 }
 
+func (r *UserRepository) ListPaginated(limit, offset int) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+	query := r.db.Order("created_at DESC")
+	if err := query.Model(&models.User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Limit(limit).Offset(offset).Find(&users).Error
+	return users, total, err
+}
+
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {

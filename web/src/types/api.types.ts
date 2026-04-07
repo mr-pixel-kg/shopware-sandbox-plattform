@@ -131,6 +131,13 @@ export interface PaginationMeta {
   hasMore: boolean
 }
 
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    pagination: PaginationMeta
+  }
+}
+
 export interface AuditLogListFilters {
   userId?: string | null
   action?: string | null

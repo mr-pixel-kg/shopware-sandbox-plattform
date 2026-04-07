@@ -35,6 +35,30 @@ func (r *ImageRepository) ListAll() ([]models.Image, error) {
 	return images, err
 }
 
+func (r *ImageRepository) ListAllPaginated(limit, offset int) ([]models.Image, int64, error) {
+	var images []models.Image
+	var total int64
+	query := r.withOwner(r.db).Order("created_at desc")
+	if err := query.Model(&models.Image{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Limit(limit).Offset(offset).Find(&images).Error
+	return images, total, err
+}
+
+func (r *ImageRepository) ListPublicPaginated(limit, offset int) ([]models.Image, int64, error) {
+	var images []models.Image
+	var total int64
+	query := r.withOwner(r.db).
+		Where("is_public = ? AND status = ?", true, models.ImageStatusReady).
+		Order("created_at desc")
+	if err := query.Model(&models.Image{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Limit(limit).Offset(offset).Find(&images).Error
+	return images, total, err
+}
+
 func (r *ImageRepository) FindByID(id uuid.UUID) (*models.Image, error) {
 	var image models.Image
 	if err := r.withOwner(r.db).First(&image, "id = ?", id).Error; err != nil {

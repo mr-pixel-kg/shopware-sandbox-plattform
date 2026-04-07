@@ -11,6 +11,11 @@ type UserSummary struct {
 	Email string    `json:"email" example:"testmail@gmail.com"`
 }
 
+type UserListResponse struct {
+	Data []UserResponse `json:"data"`
+	Meta PaginatedMeta  `json:"meta"`
+}
+
 type UserResponse struct {
 	ID        uuid.UUID `json:"id" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
 	Email     string    `json:"email" example:"testmail@gmail.com"`

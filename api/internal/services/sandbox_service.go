@@ -128,6 +128,47 @@ func (s *SandboxService) ListByClientID(clientID uuid.UUID) ([]models.Sandbox, e
 	return sandboxes, nil
 }
 
+type SandboxListInput struct {
+	Limit    int
+	Offset   int
+	UserID   *uuid.UUID
+	ClientID *uuid.UUID
+}
+
+type SandboxListResult struct {
+	Sandboxes []models.Sandbox
+	Total     int64
+	Limit     int
+	Offset    int
+}
+
+func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResult, error) {
+	var (
+		sandboxes []models.Sandbox
+		total     int64
+		err       error
+	)
+
+	if input.ClientID != nil {
+		sandboxes, total, err = s.repo.ListAllByClientIDPaginated(*input.ClientID, input.Limit, input.Offset)
+	} else if input.UserID != nil {
+		sandboxes, total, err = s.repo.ListAllByUserPaginated(*input.UserID, input.Limit, input.Offset)
+	} else {
+		sandboxes, total, err = s.repo.ListAllPaginated(input.Limit, input.Offset)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	s.EnrichMetadata(sandboxes)
+	return &SandboxListResult{
+		Sandboxes: sandboxes,
+		Total:     total,
+		Limit:     input.Limit,
+		Offset:    input.Offset,
+	}, nil
+}
+
 func (s *SandboxService) FindByID(id uuid.UUID) (*models.Sandbox, error) {
 	sandbox, err := s.repo.FindByID(id)
 	if err != nil {

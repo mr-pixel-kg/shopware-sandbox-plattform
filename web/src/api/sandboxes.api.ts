@@ -5,14 +5,17 @@ import type {
   CreateSandboxRequest,
   CreateSnapshotRequest,
   Image,
+  PaginatedResponse,
   Sandbox,
   UpdateSandboxRequest,
 } from '@/types'
 
 export const sandboxesApi = {
   async list(): Promise<Sandbox[]> {
-    const { data } = await apiClient.get<Sandbox[]>('/api/sandboxes')
-    return data
+    const { data } = await apiClient.get<PaginatedResponse<Sandbox>>('/api/sandboxes', {
+      params: { limit: 500 },
+    })
+    return data.data
   },
 
   async get(id: string): Promise<Sandbox> {

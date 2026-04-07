@@ -28,6 +28,11 @@ type CreateSnapshotRequest struct {
 	ImagePayload
 }
 
+type SandboxListResponse struct {
+	Data []SandboxResponse `json:"data"`
+	Meta PaginatedMeta     `json:"meta"`
+}
+
 type SandboxResponse struct {
 	ID            uuid.UUID            `json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
 	ImageID       uuid.UUID            `json:"imageId" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`

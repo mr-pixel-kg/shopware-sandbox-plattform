@@ -72,6 +72,8 @@ func (h SandboxHandler) MountAuthedRoutes(s *fuego.Server) {
 		option.Tags("Sandboxes"),
 		option.Query("owner", "Filter: 'self' for own sandboxes"),
 		option.Query("clientId", "Filter by client ID"),
+		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
+		option.QueryInt("offset", "Offset for pagination (default 0)"),
 	)
 	fuego.Get(sandboxes, "/{id}", h.get,
 		option.Summary("Get sandbox by ID"),
@@ -103,38 +105,44 @@ func (h SandboxHandler) MountAuthedRoutes(s *fuego.Server) {
 	)
 }
 
-func (h SandboxHandler) list(c fuego.ContextNoBody) ([]dto.SandboxResponse, error) {
+func (h SandboxHandler) list(c fuego.ContextNoBody) (dto.SandboxListResponse, error) {
 	r := c.Request()
 	auth := mw.MustAuth(r)
 	user := mw.UserFromContext(r)
 
-	var (
-		sandboxes []models.Sandbox
-		err       error
-	)
+	limit, offset, err := parsePaginationParams(r)
+	if err != nil {
+		return dto.SandboxListResponse{}, err
+	}
+
+	input := services.SandboxListInput{Limit: limit, Offset: offset}
 
 	if clientIDStr := r.URL.Query().Get("clientId"); clientIDStr != "" {
 		parsed, parseErr := uuid.Parse(clientIDStr)
 		if parseErr != nil {
-			return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid clientId"}
+			return dto.SandboxListResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid clientId"}
 		}
-		sandboxes, err = h.Sandboxes.ListByClientID(parsed)
-	} else if user.IsAdmin() && r.URL.Query().Get("owner") != "self" {
-		sandboxes, err = h.Sandboxes.ListAll()
-	} else {
-		sandboxes, err = h.Sandboxes.ListByUser(auth.UserID)
+		input.ClientID = &parsed
+	} else if !user.IsAdmin() || r.URL.Query().Get("owner") == "self" {
+		input.UserID = &auth.UserID
 	}
 
+	result, err := h.Sandboxes.ListPaginated(input)
 	if err != nil {
-		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load sandboxes"}
+		return dto.SandboxListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load sandboxes"}
 	}
 
 	sshCfg := h.Sandboxes.SSHConfig()
-	out := make([]dto.SandboxResponse, len(sandboxes))
-	for i, sb := range sandboxes {
-		out[i] = sandboxToResponse(&sandboxes[i], sshCfg, h.Sandboxes.ResolveSSHEntry(sb.ImageID))
+	out := make([]dto.SandboxResponse, len(result.Sandboxes))
+	for i, sb := range result.Sandboxes {
+		out[i] = sandboxToResponse(&result.Sandboxes[i], sshCfg, h.Sandboxes.ResolveSSHEntry(sb.ImageID))
 	}
-	return out, nil
+	return dto.SandboxListResponse{
+		Data: out,
+		Meta: dto.PaginatedMeta{
+			Pagination: buildPaginationMeta(len(out), result.Limit, result.Offset, result.Total),
+		},
+	}, nil
 }
 
 func (h SandboxHandler) get(c fuego.ContextNoBody) (dto.SandboxResponse, error) {

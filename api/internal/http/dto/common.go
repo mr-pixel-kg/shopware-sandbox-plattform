@@ -8,6 +8,10 @@ type PaginationMeta struct {
 	HasMore bool  `json:"hasMore" example:"true"`
 }
 
+type PaginatedMeta struct {
+	Pagination PaginationMeta `json:"pagination"`
+}
+
 type ErrorDetail struct {
 	Code    string `json:"code" example:"VALIDATION_ERROR"`
 	Message string `json:"message" example:"Invalid request body"`

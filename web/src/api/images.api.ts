@@ -4,19 +4,24 @@ import type {
   CreateImageRequest,
   Image,
   MetadataItem,
+  PaginatedResponse,
   PendingImage,
   UpdateImageRequest,
 } from '@/types'
 
 export const imagesApi = {
   async listPublic(): Promise<Image[]> {
-    const { data } = await apiClient.get<Image[]>('/api/images/public')
-    return data
+    const { data } = await apiClient.get<PaginatedResponse<Image>>('/api/images/public', {
+      params: { limit: 500 },
+    })
+    return data.data
   },
 
   async listAll(): Promise<Image[]> {
-    const { data } = await apiClient.get<Image[]>('/api/images')
-    return data
+    const { data } = await apiClient.get<PaginatedResponse<Image>>('/api/images', {
+      params: { limit: 500 },
+    })
+    return data.data
   },
 
   async listPending(): Promise<PendingImage[]> {

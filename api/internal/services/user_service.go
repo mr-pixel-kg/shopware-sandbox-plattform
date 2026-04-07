@@ -23,6 +23,31 @@ func NewUserService(users *repositories.UserRepository, passwords *PasswordServi
 	}
 }
 
+type UserListInput struct {
+	Limit  int
+	Offset int
+}
+
+type UserListResult struct {
+	Users  []models.User
+	Total  int64
+	Limit  int
+	Offset int
+}
+
+func (s *UserService) ListPaginated(input UserListInput) (*UserListResult, error) {
+	users, total, err := s.users.ListPaginated(input.Limit, input.Offset)
+	if err != nil {
+		return nil, err
+	}
+	return &UserListResult{
+		Users:  users,
+		Total:  total,
+		Limit:  input.Limit,
+		Offset: input.Offset,
+	}, nil
+}
+
 func (s *UserService) List() ([]models.User, error) {
 	return s.users.List()
 }

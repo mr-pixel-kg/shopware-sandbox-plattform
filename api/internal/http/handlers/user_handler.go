@@ -27,6 +27,8 @@ func (h UserHandler) MountRoutes(s *fuego.Server) {
 		option.Summary("List users"),
 		option.Description("Return all users, including pending invited users"),
 		option.Tags("Users"),
+		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
+		option.QueryInt("offset", "Offset for pagination (default 0)"),
 	)
 	fuego.Get(users, "/{id}", h.get,
 		option.Summary("Get user"),
@@ -52,20 +54,30 @@ func (h UserHandler) MountRoutes(s *fuego.Server) {
 	)
 }
 
-func (h UserHandler) list(c fuego.ContextNoBody) ([]dto.UserResponse, error) {
-	users, err := h.Users.List()
+func (h UserHandler) list(c fuego.ContextNoBody) (dto.UserListResponse, error) {
+	limit, offset, err := parsePaginationParams(c.Request())
 	if err != nil {
-		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not list users"}
+		return dto.UserListResponse{}, err
 	}
 
-	out := make([]dto.UserResponse, len(users))
-	for i, u := range users {
+	result, err := h.Users.ListPaginated(services.UserListInput{Limit: limit, Offset: offset})
+	if err != nil {
+		return dto.UserListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not list users"}
+	}
+
+	out := make([]dto.UserResponse, len(result.Users))
+	for i, u := range result.Users {
 		out[i] = dto.UserResponse{
 			ID: u.ID, Email: u.Email, Role: u.Role,
 			IsPending: u.IsPending(), CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 		}
 	}
-	return out, nil
+	return dto.UserListResponse{
+		Data: out,
+		Meta: dto.PaginatedMeta{
+			Pagination: buildPaginationMeta(len(out), result.Limit, result.Offset, result.Total),
+		},
+	}, nil
 }
 
 func (h UserHandler) get(c fuego.ContextNoBody) (dto.UserResponse, error) {

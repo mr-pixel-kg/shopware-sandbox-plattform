@@ -99,6 +99,46 @@ func (s *ImageService) ReconcileOnStartup(ctx context.Context) {
 	}
 }
 
+type ImageListInput struct {
+	Limit  int
+	Offset int
+}
+
+type ImageListResult struct {
+	Images []models.Image
+	Total  int64
+	Limit  int
+	Offset int
+}
+
+func (s *ImageService) ListAllPaginated(input ImageListInput) (*ImageListResult, error) {
+	images, total, err := s.repo.ListAllPaginated(input.Limit, input.Offset)
+	if err != nil {
+		return nil, err
+	}
+	images = s.attachThumbnailURLs(images)
+	return &ImageListResult{
+		Images: images,
+		Total:  total,
+		Limit:  input.Limit,
+		Offset: input.Offset,
+	}, nil
+}
+
+func (s *ImageService) ListPublicPaginated(input ImageListInput) (*ImageListResult, error) {
+	images, total, err := s.repo.ListPublicPaginated(input.Limit, input.Offset)
+	if err != nil {
+		return nil, err
+	}
+	images = s.attachThumbnailURLs(images)
+	return &ImageListResult{
+		Images: images,
+		Total:  total,
+		Limit:  input.Limit,
+		Offset: input.Offset,
+	}, nil
+}
+
 func (s *ImageService) ListPublic() ([]models.Image, error) {
 	images, err := s.repo.ListPublic()
 	if err != nil {

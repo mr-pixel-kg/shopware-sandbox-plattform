@@ -36,6 +36,8 @@ func (h ImageHandler) MountPublicRoutes(s *fuego.Server) {
 		option.Summary("List public images"),
 		option.Description("Returns all images marked as public (no auth required)"),
 		option.Tags("Images"),
+		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
+		option.QueryInt("offset", "Offset for pagination (default 0)"),
 	)
 	fuego.Get(images, "/pending", h.listPending,
 		option.Summary("List pending image operations"),
@@ -62,6 +64,8 @@ func (h ImageHandler) MountAuthedRoutes(s *fuego.Server) {
 		option.Summary("List all images"),
 		option.Description("Returns all images including private ones"),
 		option.Tags("Images"),
+		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
+		option.QueryInt("offset", "Offset for pagination (default 0)"),
 	)
 	fuego.Post(images, "", h.create,
 		option.Summary("Create an image"),
@@ -92,30 +96,50 @@ func (h ImageHandler) MountAuthedRoutes(s *fuego.Server) {
 	)
 }
 
-func (h ImageHandler) listPublic(c fuego.ContextNoBody) ([]dto.ImageResponse, error) {
-	images, err := h.Images.ListPublic()
+func (h ImageHandler) listPublic(c fuego.ContextNoBody) (dto.ImageListResponse, error) {
+	limit, offset, err := parsePaginationParams(c.Request())
 	if err != nil {
-		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load public images"}
+		return dto.ImageListResponse{}, err
 	}
 
-	out := make([]dto.ImageResponse, len(images))
-	for i := range images {
-		out[i] = imageToResponse(&images[i])
+	result, err := h.Images.ListPublicPaginated(services.ImageListInput{Limit: limit, Offset: offset})
+	if err != nil {
+		return dto.ImageListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load public images"}
 	}
-	return out, nil
+
+	out := make([]dto.ImageResponse, len(result.Images))
+	for i := range result.Images {
+		out[i] = imageToResponse(&result.Images[i])
+	}
+	return dto.ImageListResponse{
+		Data: out,
+		Meta: dto.PaginatedMeta{
+			Pagination: buildPaginationMeta(len(out), result.Limit, result.Offset, result.Total),
+		},
+	}, nil
 }
 
-func (h ImageHandler) listAll(c fuego.ContextNoBody) ([]dto.ImageResponse, error) {
-	images, err := h.Images.ListAll()
+func (h ImageHandler) listAll(c fuego.ContextNoBody) (dto.ImageListResponse, error) {
+	limit, offset, err := parsePaginationParams(c.Request())
 	if err != nil {
-		return nil, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load images"}
+		return dto.ImageListResponse{}, err
 	}
 
-	out := make([]dto.ImageResponse, len(images))
-	for i := range images {
-		out[i] = imageToResponse(&images[i])
+	result, err := h.Images.ListAllPaginated(services.ImageListInput{Limit: limit, Offset: offset})
+	if err != nil {
+		return dto.ImageListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load images"}
 	}
-	return out, nil
+
+	out := make([]dto.ImageResponse, len(result.Images))
+	for i := range result.Images {
+		out[i] = imageToResponse(&result.Images[i])
+	}
+	return dto.ImageListResponse{
+		Data: out,
+		Meta: dto.PaginatedMeta{
+			Pagination: buildPaginationMeta(len(out), result.Limit, result.Offset, result.Total),
+		},
+	}, nil
 }
 
 func (h ImageHandler) create(c fuego.ContextWithBody[dto.CreateImageRequest]) (dto.ImageResponse, error) {
