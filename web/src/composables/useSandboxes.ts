@@ -265,15 +265,21 @@ export function useSandboxes() {
     return updated
   }
 
-  async function deleteSandbox(id: string) {
+  async function deleteSandbox(id: string, { skipRemove = false } = {}) {
     closeSse(id)
     if (authStore.isAuthenticated) {
       await sandboxesApi.remove(id)
     } else {
       await sandboxesApi.removeDemo(id)
     }
-    sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
+    if (!skipRemove) {
+      sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
+    }
     void fetchSandboxes()
+  }
+
+  function removeSandbox(id: string) {
+    sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
   }
 
   async function snapshotSandbox(id: string, req: CreateSnapshotRequest): Promise<Image> {
@@ -306,6 +312,7 @@ export function useSandboxes() {
     createDemo,
     updateSandbox,
     deleteSandbox,
+    removeSandbox,
     snapshotSandbox,
   }
 }

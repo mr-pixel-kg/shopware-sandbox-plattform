@@ -27,6 +27,7 @@ const {
   createDemo,
   createSandbox,
   deleteSandbox,
+  removeSandbox,
   refresh: refreshSandboxes,
 } = useSandboxes()
 const authStore = useAuthStore()
@@ -216,8 +217,9 @@ async function handleStopSandbox(sandbox: Sandbox) {
   busyIds.value.add(sandbox.id)
   try {
     const animationPromise = shredderRefs.value[sandbox.id]?.shred() ?? Promise.resolve()
-    const apiPromise = deleteSandbox(sandbox.id)
+    const apiPromise = deleteSandbox(sandbox.id, { skipRemove: true })
     await Promise.all([animationPromise, apiPromise])
+    removeSandbox(sandbox.id)
     toast.success('Sandbox wird gestoppt')
   } catch (e) {
     toast.error(getApiErrorMessage(e, 'Fehler beim Stoppen'))
