@@ -496,7 +496,7 @@ func mapSandboxError(err error) error {
 func sandboxToResponse(sb *models.Sandbox, sshCfg config.SSHConfig, sshEntry *registry.SSHEntry) dto.SandboxResponse {
 	var owner *dto.UserSummary
 	if sb.Owner != nil {
-		owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email}
+		owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email, AvatarURL: dto.GravatarURL(sb.Owner.Email, 80)}
 	}
 	var ssh *dto.SSHConnectionInfo
 	if sshCfg.Enabled {

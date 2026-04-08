@@ -378,7 +378,7 @@ func (h ImageHandler) registryLookup(c fuego.ContextNoBody) ([]registry.Metadata
 func imageToResponse(img *models.Image) dto.ImageResponse {
 	var owner *dto.UserSummary
 	if img.Owner != nil {
-		owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email}
+		owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email, AvatarURL: dto.GravatarURL(img.Owner.Email, 80)}
 	}
 	return dto.ImageResponse{
 		ID: img.ID, Name: img.Name, Tag: img.Tag,

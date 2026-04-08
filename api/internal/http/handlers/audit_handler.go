@@ -55,7 +55,7 @@ func (h AuditHandler) list(c fuego.ContextNoBody) (dto.AuditLogListResponse, err
 	for _, logEntry := range result.Logs {
 		var userSummary *dto.UserSummary
 		if logEntry.User != nil {
-			userSummary = &dto.UserSummary{ID: logEntry.User.ID, Email: logEntry.User.Email}
+			userSummary = &dto.UserSummary{ID: logEntry.User.ID, Email: logEntry.User.Email, AvatarURL: dto.GravatarURL(logEntry.User.Email, 80)}
 		}
 		response = append(response, dto.AuditLogResponse{
 			ID:           logEntry.ID,
@@ -102,7 +102,7 @@ func (h AuditHandler) facets(c fuego.ContextNoBody) (dto.AuditLogFacetsResponse,
 
 	users := make([]dto.UserSummary, 0, len(result.Users))
 	for _, user := range result.Users {
-		users = append(users, dto.UserSummary{ID: user.ID, Email: user.Email})
+		users = append(users, dto.UserSummary{ID: user.ID, Email: user.Email, AvatarURL: dto.GravatarURL(user.Email, 80)})
 	}
 
 	return dto.AuditLogFacetsResponse{Users: users, Actions: result.Actions}, nil

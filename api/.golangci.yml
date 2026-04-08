@@ -44,6 +44,8 @@ linters:
     gosec:
       excludes:
         - G118
+        - G401
+        - G501
         - G706
     gocritic:
       enabled-tags:

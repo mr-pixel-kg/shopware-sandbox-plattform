@@ -203,8 +203,9 @@ func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
 	assert.Contains(t, response.Actions, "sandbox.created")
 	assert.Contains(t, response.Actions, "image.created")
 	assert.Contains(t, response.Users, dto.UserSummary{
-		ID:    user.ID,
-		Email: user.Email,
+		ID:        user.ID,
+		Email:     user.Email,
+		AvatarURL: dto.GravatarURL(user.Email, 80),
 	})
 }
 
