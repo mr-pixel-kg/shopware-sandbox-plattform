@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 
 import logo from '@/assets/logo.png'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import UserAvatar from '@/components/shared/UserAvatar.vue'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -29,14 +29,6 @@ const adminTabs = [
   { name: 'Benutzer', to: '/admin/users' },
   { name: 'Protokoll', to: '/admin/audit' },
 ]
-
-function getInitials(email: string): string {
-  const parts = email.split('@')[0].split(/[._-]/)
-  return parts
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('')
-}
 
 async function handleLogout() {
   await authStore.logout()
@@ -80,9 +72,7 @@ async function handleLogout() {
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" class="relative h-8 w-8 rounded-full">
-                <Avatar class="h-8 w-8">
-                  <AvatarFallback>{{ getInitials(user.email) }}</AvatarFallback>
-                </Avatar>
+                <UserAvatar :src="user.avatarUrl" :alt="user.email" class="h-8 w-8" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-56">

@@ -6,6 +6,7 @@ interface BaseModel {
 export interface User extends BaseModel {
   id: string
   email: string
+  avatarUrl: string
   role: string
   isPending: boolean
 }
@@ -13,6 +14,7 @@ export interface User extends BaseModel {
 export interface UserSummary {
   id: string
   email: string
+  avatarUrl: string
 }
 
 export type ImageStatus = 'pulling' | 'committing' | 'ready' | 'failed'

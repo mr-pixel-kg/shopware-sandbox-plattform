@@ -9,6 +9,7 @@ import EditUserDrawer from '@/components/modals/EditUserDrawer.vue'
 import InviteUserDialog from '@/components/modals/InviteUserDialog.vue'
 import DataTablePagination from '@/components/shared/DataTablePagination.vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
+import UserAvatar from '@/components/shared/UserAvatar.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -194,9 +195,17 @@ async function handleDelete(done: (success: boolean) => void) {
               </TableEmpty>
               <TableRow v-for="user in paginatedActiveUsers" v-else :key="user.id">
                 <TableCell>
-                  <div class="font-medium">{{ user.email }}</div>
-                  <div v-if="currentUserId === user.id" class="text-muted-foreground mt-1 text-xs">
-                    Dein aktueller Account
+                  <div class="flex items-center gap-2">
+                    <UserAvatar :src="user.avatarUrl" :alt="user.email" class="h-8 w-8" />
+                    <div>
+                      <div class="font-medium">{{ user.email }}</div>
+                      <div
+                        v-if="currentUserId === user.id"
+                        class="text-muted-foreground mt-0.5 text-xs"
+                      >
+                        Dein aktueller Account
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -292,9 +301,14 @@ async function handleDelete(done: (success: boolean) => void) {
               </TableEmpty>
               <TableRow v-for="user in paginatedInvitedUsers" v-else :key="user.id">
                 <TableCell>
-                  <div class="font-medium">{{ user.email }}</div>
-                  <div class="text-muted-foreground mt-1 text-xs">
-                    Erstellt am {{ formatDateTime(user.createdAt) }}
+                  <div class="flex items-center gap-2">
+                    <UserAvatar :src="user.avatarUrl" :alt="user.email" class="h-8 w-8" />
+                    <div>
+                      <div class="font-medium">{{ user.email }}</div>
+                      <div class="text-muted-foreground mt-0.5 text-xs">
+                        Erstellt am {{ formatDateTime(user.createdAt) }}
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
