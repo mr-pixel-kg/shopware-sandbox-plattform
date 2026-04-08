@@ -75,12 +75,32 @@ images:
         timeout: 30s
         retries: 2
         retry_delay: 3s
+    logs:
+      - key: "container"
+        label: "Container Output"
+        type: "docker"
+      - key: "symfony_dev"
+        label: "Symfony Dev Log"
+        type: "file"
+        path: "/var/www/html/var/log/dev.log"
+      - key: "apache_access"
+        label: "Apache Access Log"
+        type: "file"
+        path: "/var/log/apache2/other_vhosts_access.log"
+      - key: "apache_error"
+        label: "Apache Error Log"
+        type: "file"
+        path: "/var/log/apache2/error.log"
     health_check:
       path: "/api/_info/health-check"
       timeout: 5s
       interval: 3s
   - match: "*"
     internal_port: 80
+    logs:
+      - key: "container"
+        label: "Container Output"
+        type: "docker"
     metadata:
       - key: "open"
         label: "Öffnen"

@@ -137,6 +137,22 @@ func renderEntry(entry ImageEntry, ctx TemplateContext) (*ResolvedImage, error) 
 
 	resolved.SSH = entry.SSH
 
+	for _, ls := range entry.Logs {
+		rendered := LogSource{
+			Key:   ls.Key,
+			Label: ls.Label,
+			Type:  ls.Type,
+		}
+		if ls.Path != "" {
+			p, err := renderTemplate(ls.Path, ctx)
+			if err != nil {
+				return nil, fmt.Errorf("render log path %s: %w", ls.Key, err)
+			}
+			rendered.Path = p
+		}
+		resolved.Logs = append(resolved.Logs, rendered)
+	}
+
 	return resolved, nil
 }
 

@@ -36,6 +36,7 @@ type runtimeServices struct {
 	sandbox       *services.SandboxService
 	sandboxHealth *services.SandboxHealthService
 	terminal      *services.TerminalService
+	log           *services.LogService
 	resolver      *registry.Resolver
 	userRepo      *repositories.UserRepository
 	dockerSDK     *client.Client
@@ -119,6 +120,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	userHandler := handlers.UserHandler{Users: runtime.user, Audit: runtime.audit}
 	whitelistHandler := handlers.WhitelistHandler{Users: runtime.user, Audit: runtime.audit}
 	terminalHandler := handlers.TerminalHandler{Terminals: runtime.terminal, Auth: runtime.auth, AllowedOrigins: cfg.Server.AllowedOrigins}
+	logHandler := handlers.LogHandler{Logs: runtime.log}
 
 	public := fuego.Group(s, "/api")
 	authHandler.MountPublicRoutes(public)
@@ -135,6 +137,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	authHandler.MountAuthedRoutes(authed)
 	imageHandler.MountAuthedRoutes(authed)
 	sandboxHandler.MountAuthedRoutes(authed)
+	logHandler.MountAuthedRoutes(authed)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(mw.Auth(runtime.auth)),
@@ -187,6 +190,7 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, cfg.SSH, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor)
 	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver)
 	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
+	logService := services.NewLogService(dockerClient, sandboxRepo, imageRepo, resolver)
 
 	return &runtimeServices{
 		auth:          authService,
@@ -196,6 +200,7 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 		sandbox:       sandboxService,
 		sandboxHealth: sandboxHealthService,
 		terminal:      terminalService,
+		log:           logService,
 		resolver:      resolver,
 		userRepo:      userRepo,
 		dockerSDK:     sdkClient,
