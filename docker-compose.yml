@@ -61,6 +61,30 @@ services:
       - "traefik.http.routers.sandbox-web.tls=true"
       - "traefik.http.routers.sandbox-web.tls.certresolver=production"
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: always
+    expose:
+      - 80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - sandbox-network
+      - internal
+    depends_on:
+      database:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=internal"
+      - "traefik.http.routers.sandbox-pgadmin.entrypoints=websecure"
+      - "traefik.http.routers.sandbox-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)"
+      - "traefik.http.routers.sandbox-pgadmin.tls=true"
+      - "traefik.http.routers.sandbox-pgadmin.tls.certresolver=production"
+
   database:
     image: postgres:17.4
     restart: always
@@ -90,4 +114,6 @@ volumes:
   database_data:
     driver: local
   api_storage:
+    driver: local
+  pgadmin_data:
     driver: local
