@@ -37,6 +37,7 @@ type runtimeServices struct {
 	sandboxHealth  *services.SandboxHealthService
 	terminal       *services.TerminalService
 	registrySearch *services.RegistrySearchService
+	log            *services.LogService
 	resolver       *registry.Resolver
 	userRepo       *repositories.UserRepository
 	dockerSDK      *client.Client
@@ -121,6 +122,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	whitelistHandler := handlers.WhitelistHandler{Users: runtime.user, Audit: runtime.audit}
 	registrySearchHandler := handlers.RegistrySearchHandler{Search: runtime.registrySearch}
 	terminalHandler := handlers.TerminalHandler{Terminals: runtime.terminal, Auth: runtime.auth, AllowedOrigins: cfg.Server.AllowedOrigins}
+	logHandler := handlers.LogHandler{Logs: runtime.log}
 
 	public := fuego.Group(s, "/api")
 	authHandler.MountPublicRoutes(public)
@@ -138,6 +140,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	imageHandler.MountAuthedRoutes(authed)
 	sandboxHandler.MountAuthedRoutes(authed)
 	registrySearchHandler.MountAuthedRoutes(authed)
+	logHandler.MountAuthedRoutes(authed)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(mw.Auth(runtime.auth)),
@@ -190,6 +193,7 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, cfg.SSH, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor)
 	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver)
 	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
+	logService := services.NewLogService(dockerClient, sandboxRepo, imageRepo, resolver)
 
 	registrySearchService := services.NewRegistrySearchService()
 
@@ -202,6 +206,7 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 		sandboxHealth:  sandboxHealthService,
 		terminal:       terminalService,
 		registrySearch: registrySearchService,
+		log:            logService,
 		resolver:       resolver,
 		userRepo:       userRepo,
 		dockerSDK:      sdkClient,
