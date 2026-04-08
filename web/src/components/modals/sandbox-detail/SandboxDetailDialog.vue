@@ -17,6 +17,7 @@ import AccessTab from './AccessTab.vue'
 import ConfigTab from './ConfigTab.vue'
 import FilesTab from './FilesTab.vue'
 import HealthTab from './HealthTab.vue'
+import LogsTab from './LogsTab.vue'
 import OverviewTab from './OverviewTab.vue'
 import TerminalTab from './TerminalTab.vue'
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 
 const configTabRef = ref<InstanceType<typeof ConfigTab> | null>(null)
 const terminalTabRef = ref<InstanceType<typeof TerminalTab> | null>(null)
+const logsTabRef = ref<InstanceType<typeof LogsTab> | null>(null)
 
 watch(
   () => props.open,
@@ -42,6 +44,7 @@ watch(
     if (!open) {
       configTabRef.value?.resetRevealed()
       terminalTabRef.value?.disconnect()
+      logsTabRef.value?.disconnect()
     }
   },
 )
@@ -89,6 +92,7 @@ const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
           <TabsTrigger v-if="hasAccessTab" value="access">Zugang</TabsTrigger>
           <TabsTrigger v-if="hasFilesTab" value="files">Dateien</TabsTrigger>
           <TabsTrigger v-if="isActive" value="health">Health</TabsTrigger>
+          <TabsTrigger v-if="isActive" value="logs">Logs</TabsTrigger>
           <TabsTrigger v-if="hasTerminalTab" value="terminal">Terminal</TabsTrigger>
         </TabsList>
 
@@ -122,6 +126,14 @@ const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
 
         <TabsContent v-if="isActive" value="health" class="flex-1 overflow-y-auto px-6 pt-4 pb-6">
           <HealthTab :health="health" />
+        </TabsContent>
+
+        <TabsContent
+          v-if="isActive"
+          value="logs"
+          class="flex min-h-0 flex-1 flex-col px-6 pt-4 pb-6"
+        >
+          <LogsTab ref="logsTabRef" :sandbox-id="sandbox!.id" />
         </TabsContent>
 
         <TabsContent

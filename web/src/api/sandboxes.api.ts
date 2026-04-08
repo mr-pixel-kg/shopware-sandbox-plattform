@@ -5,6 +5,7 @@ import type {
   CreateSandboxRequest,
   CreateSnapshotRequest,
   Image,
+  LogSource,
   PaginatedResponse,
   PaginationParams,
   Sandbox,
@@ -55,5 +56,10 @@ export const sandboxesApi = {
 
   async removeDemo(id: string): Promise<void> {
     await apiClient.delete(`/api/demos/${id}`)
+  },
+
+  async listLogSources(id: string): Promise<LogSource[]> {
+    const { data } = await apiClient.get<LogSource[]>(`/api/sandboxes/${id}/logs`)
+    return data
   },
 }

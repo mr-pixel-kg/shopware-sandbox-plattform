@@ -40,6 +40,7 @@ type ImageEntry struct {
 	Labels       map[string]string  `yaml:"labels,omitempty"`
 	SSH          *SSHEntry          `yaml:"ssh,omitempty"`
 	Metadata     []MetadataItem     `yaml:"metadata,omitempty"`
+	Logs         []LogSource        `yaml:"logs,omitempty"`
 }
 
 type MetadataItem struct {
@@ -95,6 +96,20 @@ type TemplateContext struct {
 	Meta           map[string]string
 }
 
+type LogSourceType string
+
+const (
+	LogSourceTypeDocker LogSourceType = "docker"
+	LogSourceTypeFile   LogSourceType = "file"
+)
+
+type LogSource struct {
+	Key   string        `yaml:"key"            json:"key"`
+	Label string        `yaml:"label"          json:"label"`
+	Type  LogSourceType `yaml:"type"           json:"type"`
+	Path  string        `yaml:"path,omitempty" json:"path,omitempty"`
+}
+
 type ResolvedImage struct {
 	InternalPort int
 	Env          []string
@@ -103,4 +118,5 @@ type ResolvedImage struct {
 	HealthCheck  *HealthCheckConfig
 	Labels       map[string]string
 	SSH          *SSHEntry
+	Logs         []LogSource
 }

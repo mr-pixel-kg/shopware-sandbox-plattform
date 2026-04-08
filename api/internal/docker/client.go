@@ -51,6 +51,8 @@ type Client interface {
 	ContainerExists(ctx context.Context, containerID string) bool
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
 	CreateExecSession(ctx context.Context, containerID string, opts ExecAttachOptions) (*ExecSession, error)
+	ContainerLogs(ctx context.Context, containerID string) (io.ReadCloser, error)
+	ExecFollow(ctx context.Context, containerID string, cmd []string) (io.ReadCloser, error)
 }
 
 type DockerClient struct {

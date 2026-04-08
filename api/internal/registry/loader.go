@@ -61,6 +61,29 @@ func validate(reg *ImageRegistry) error {
 			}
 			seen[item.Key] = true
 		}
+
+		seenLogKeys := make(map[string]bool)
+		for j, ls := range entry.Logs {
+			if ls.Key == "" {
+				return fmt.Errorf("entry %d: logs[%d]: key is required", i, j)
+			}
+			if ls.Label == "" {
+				return fmt.Errorf("entry %d: logs[%d]: label is required", i, j)
+			}
+			if ls.Type != LogSourceTypeDocker && ls.Type != LogSourceTypeFile {
+				return fmt.Errorf("entry %d: logs[%d]: type must be %q or %q", i, j, LogSourceTypeDocker, LogSourceTypeFile)
+			}
+			if ls.Type == LogSourceTypeFile && ls.Path == "" {
+				return fmt.Errorf("entry %d: logs[%d]: path is required for file log sources", i, j)
+			}
+			if ls.Type == LogSourceTypeDocker && ls.Path != "" {
+				return fmt.Errorf("entry %d: logs[%d]: path must not be set for docker log sources", i, j)
+			}
+			if seenLogKeys[ls.Key] {
+				return fmt.Errorf("entry %d: logs[%d]: duplicate key %q", i, j, ls.Key)
+			}
+			seenLogKeys[ls.Key] = true
+		}
 	}
 
 	return nil
