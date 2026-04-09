@@ -272,7 +272,8 @@ async function handleCreateSnapshot(
 ) {
   if (!selectedSandbox.value) return
   try {
-    const image = await snapshotSandbox(selectedSandbox.value.id, payload)
+    const { thumbnailFile: _, ...snapshotPayload } = payload
+    const image = await snapshotSandbox(selectedSandbox.value.id, snapshotPayload)
     trackPendingImage(image)
 
     if (payload.thumbnailFile) {
