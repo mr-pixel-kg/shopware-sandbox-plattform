@@ -95,17 +95,3 @@ images:
       path: "/api/_info/health-check"
       timeout: 5s
       interval: 3s
-  - match: "*"
-    internal_port: 80
-    logs:
-      - key: "container"
-        label: "Container Output"
-        type: "docker"
-    metadata:
-      - key: "open"
-        label: "Öffnen"
-        type: "action"
-        value: "{{.URL}}"
-        variant: "default"
-        condition: "ready"
-        icon: "external-link"

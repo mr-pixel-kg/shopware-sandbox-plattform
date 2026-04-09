@@ -313,17 +313,14 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
 	}
 
-	internalPort := s.cfg.InternalPort
-	if resolved.InternalPort > 0 {
-		internalPort = resolved.InternalPort
-	}
+	internalPort := resolved.InternalPort
 
 	// build labels: sandbox marker + resolved labels + traefik labels.
 	labels := map[string]string{"sandbox_container": "true"}
 	for k, v := range resolved.Labels {
 		labels[k] = v
 	}
-	if s.dockerCfg.Mode == config.DockerModeTraefik {
+	if s.dockerCfg.Mode == config.DockerModeTraefik && internalPort > 0 {
 		for k, v := range docker.BuildTraefikLabels(containerName, hostname, internalPort, s.dockerCfg) {
 			labels[k] = v
 		}

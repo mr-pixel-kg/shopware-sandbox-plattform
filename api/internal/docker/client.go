@@ -132,32 +132,41 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request ContainerCre
 }
 
 func (c *DockerClient) createPortContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error) {
-	internalPort := nat.Port(strconv.Itoa(request.InternalPort) + "/tcp")
-
 	containerConfig := &container.Config{
-		Image:  request.ImageName,
-		Labels: request.Labels,
-		ExposedPorts: nat.PortSet{
-			internalPort: struct{}{},
-		},
-		Env: request.Env,
+		Image:     request.ImageName,
+		Labels:    request.Labels,
+		Env:       request.Env,
+		Tty:       true,
+		OpenStdin: true,
 	}
 
 	// extract host port from the host (format: "localhost:prt")
 	_, hostPortStr, _ := net.SplitHostPort(request.Hostname)
 	hostPort, _ := strconv.Atoi(hostPortStr)
 
-	hostConfig := &container.HostConfig{
-		PortBindings: nat.PortMap{
+	hostConfig := &container.HostConfig{}
+
+	if request.InternalPort > 0 {
+		internalPort := nat.Port(strconv.Itoa(request.InternalPort) + "/tcp")
+		containerConfig.ExposedPorts = nat.PortSet{
+			internalPort: struct{}{},
+		}
+		hostConfig.PortBindings = nat.PortMap{
 			internalPort: []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: strconv.Itoa(hostPort)},
 			},
-		},
+		}
 	}
 
 	if request.SSHPort > 0 {
 		sshPort := nat.Port(strconv.Itoa(request.SSHPort) + "/tcp")
+		if containerConfig.ExposedPorts == nil {
+			containerConfig.ExposedPorts = nat.PortSet{}
+		}
 		containerConfig.ExposedPorts[sshPort] = struct{}{}
+		if hostConfig.PortBindings == nil {
+			hostConfig.PortBindings = nat.PortMap{}
+		}
 		hostConfig.PortBindings[sshPort] = []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: "0"},
 		}
@@ -183,9 +192,11 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 
 func (c *DockerClient) createTraefikContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error) {
 	containerConfig := &container.Config{
-		Image:  request.ImageName,
-		Labels: request.Labels,
-		Env:    request.Env,
+		Image:     request.ImageName,
+		Labels:    request.Labels,
+		Env:       request.Env,
+		Tty:       true,
+		OpenStdin: true,
 	}
 
 	var networkingConfig *network.NetworkingConfig

@@ -41,6 +41,7 @@ interface SseEvent {
 let pollInterval: ReturnType<typeof setInterval> | null = null
 let pollConsumers = 0
 const sseConnections = new Map<string, AbortController>()
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 export function useSandboxes() {
   const store = useSandboxesStore()
@@ -57,6 +58,24 @@ export function useSandboxes() {
 
   const busyIds = ref(new Set<string>())
   const healthBySandboxId = ref<Record<string, SandboxHealthEvent>>({})
+
+  function scheduleRefresh() {
+    if (refreshTimer) return
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null
+      void refreshAll()
+    }, 300)
+  }
+
+  function applySseStatus(id: string, status: SandboxStatus, stateReason?: string) {
+    for (const list of [sandboxes.value, adminSandboxes.value]) {
+      const sandbox = list.find((s) => s.id === id)
+      if (sandbox) {
+        sandbox.status = status
+        sandbox.stateReason = stateReason
+      }
+    }
+  }
 
   function subscribeSse(id: string) {
     if (sseConnections.has(id)) return
@@ -88,7 +107,7 @@ export function useSandboxes() {
           return reader.read().then(({ done, value }) => {
             if (done) {
               closeSse(id)
-              void fetchSandboxes()
+              scheduleRefresh()
               return
             }
 
@@ -101,15 +120,12 @@ export function useSandboxes() {
               try {
                 const data: SseEvent = JSON.parse(line.slice(6))
                 const mapped = KNOWN_SSE_STATUSES[data.status] ?? 'failed'
-                const sandbox = sandboxes.value.find((s) => s.id === id)
-                if (sandbox) {
-                  sandbox.status = mapped
-                  sandbox.stateReason = data.stateReason ?? undefined
-                }
+
+                applySseStatus(id, mapped, data.stateReason)
+                scheduleRefresh()
 
                 if (TERMINAL_STATUSES.has(mapped)) {
                   closeSse(id)
-                  void fetchSandboxes()
                   return
                 }
               } catch {
@@ -181,6 +197,13 @@ export function useSandboxes() {
     }
   }
 
+  async function refreshAll() {
+    await fetchSandboxes()
+    if (authStore.isAuthenticated && authStore.isAdmin) {
+      void fetchAdminSandboxes()
+    }
+  }
+
   async function fetchHealthForSandbox(id: string): Promise<SandboxHealthEvent | null> {
     const baseURL = import.meta.env.WEB_API_URL || ''
     const abort = new AbortController()
@@ -245,7 +268,7 @@ export function useSandboxes() {
   function startPolling() {
     pollConsumers++
     if (pollInterval) return
-    pollInterval = setInterval(fetchSandboxes, 5_000)
+    pollInterval = setInterval(refreshAll, 5_000)
   }
 
   function stopPolling() {
@@ -262,7 +285,7 @@ export function useSandboxes() {
   async function createSandbox(req: CreateSandboxRequest): Promise<Sandbox> {
     const sandbox = await sandboxesApi.create(req)
     sandboxes.value.unshift(sandbox)
-    void fetchSandboxes()
+    void refreshAll()
     return sandbox
   }
 
@@ -270,7 +293,9 @@ export function useSandboxes() {
     const updated = await sandboxesApi.update(id, req)
     const idx = sandboxes.value.findIndex((s) => s.id === id)
     if (idx !== -1) sandboxes.value[idx] = updated
-    void fetchSandboxes()
+    const adminIdx = adminSandboxes.value.findIndex((s) => s.id === id)
+    if (adminIdx !== -1) adminSandboxes.value[adminIdx] = updated
+    void refreshAll()
     return updated
   }
 
@@ -279,28 +304,34 @@ export function useSandboxes() {
     await sandboxesApi.remove(id)
     if (!skipRemove) {
       sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
+      adminSandboxes.value = adminSandboxes.value.filter((s) => s.id !== id)
     }
-    void fetchSandboxes()
+    void refreshAll()
   }
 
   function removeSandbox(id: string) {
     sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
+    adminSandboxes.value = adminSandboxes.value.filter((s) => s.id !== id)
   }
 
   async function snapshotSandbox(id: string, req: CreateSnapshotRequest): Promise<Image> {
     const image = await sandboxesApi.snapshot(id, req)
-    void fetchSandboxes()
+    void refreshAll()
     return image
   }
 
   onMounted(() => {
-    void fetchSandboxes()
+    void refreshAll()
     startPolling()
   })
 
   onUnmounted(() => {
     stopPolling()
     if (pollConsumers <= 0) closeAllSse()
+    if (refreshTimer) {
+      clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
   })
 
   return {
@@ -312,7 +343,7 @@ export function useSandboxes() {
     error,
     busyIds,
     healthBySandboxId,
-    refresh: fetchSandboxes,
+    refresh: refreshAll,
     fetchAdminSandboxes,
     createSandbox,
     updateSandbox,

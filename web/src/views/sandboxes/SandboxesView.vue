@@ -62,6 +62,7 @@ const authStore = useAuthStore()
 const { isAdmin } = storeToRefs(authStore)
 
 const {
+  sandboxes,
   activeSandboxes,
   healthBySandboxId,
   recentSandboxes,
@@ -126,7 +127,11 @@ const selectedSandboxId = ref<string | null>(null)
 
 const selectedSandbox = computed(() => {
   if (!selectedSandboxId.value) return null
-  return allSandboxes.value.find((s) => s.id === selectedSandboxId.value) ?? null
+  return (
+    sandboxes.value.find((s) => s.id === selectedSandboxId.value) ??
+    allSandboxes.value.find((s) => s.id === selectedSandboxId.value) ??
+    null
+  )
 })
 
 const hasActive = computed(() => activeSandboxes.value.length > 0)

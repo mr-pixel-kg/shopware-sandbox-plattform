@@ -360,13 +360,14 @@ func (h SandboxHandler) authorizeHealthAccess(w http.ResponseWriter, r *http.Req
 func mapSandboxError(err error) error {
 	switch {
 	case errors.Is(err, services.ErrSandboxLimitReached):
-		return fuego.HTTPError{Status: http.StatusConflict, Detail: "Maximum number of sandboxes reached"}
+		return fuego.HTTPError{Status: http.StatusConflict, Detail: "Maximum number of sandboxes reached", Err: err}
 	case errors.Is(err, services.ErrSandboxNotFound):
-		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "Sandbox not found"}
+		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "Sandbox not found", Err: err}
 	case errors.Is(err, services.ErrSandboxAccessDenied):
-		return fuego.HTTPError{Status: http.StatusForbidden, Detail: "Sandbox does not belong to the current user"}
+		return fuego.HTTPError{Status: http.StatusForbidden, Detail: "Sandbox does not belong to the current user", Err: err}
 	default:
-		return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Sandbox operation failed"}
+		slog.Error("sandbox operation failed", "error", err)
+		return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Sandbox operation failed", Err: err}
 	}
 }
 

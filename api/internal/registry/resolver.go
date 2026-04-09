@@ -42,7 +42,7 @@ func (r *Resolver) Resolve(imageName string, ctx TemplateContext) (*ResolvedImag
 		return renderEntry(ce.entry, ctx)
 	}
 
-	return nil, fmt.Errorf("no registry entry matches image %q", imageName)
+	return &ResolvedImage{}, nil
 }
 
 func (r *Resolver) ResolveEntry(imageName string) *ImageEntry {
