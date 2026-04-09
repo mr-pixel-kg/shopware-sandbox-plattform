@@ -51,15 +51,10 @@ type ImageResponse struct {
 }
 
 type PendingImageResponse struct {
-	ID      string  `json:"id" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
-	Name    string  `json:"name" example:"dockware/shopware"`
-	Tag     string  `json:"tag" example:"6.6.9.0"`
-	Title   *string `json:"title,omitempty" example:"Shopware Demo Image"`
-	Percent int     `json:"percent" example:"42"`
-	Status  string  `json:"status" example:"pulling"`
-}
-
-type ImageProgressEvent struct {
-	Percent int    `json:"percent" example:"75"`
-	Status  string `json:"status" example:"pulling"`
+	ID      uuid.UUID `json:"id" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
+	Name    string    `json:"name" example:"dockware/shopware"`
+	Tag     string    `json:"tag" example:"6.6.9.0"`
+	Title   *string   `json:"title,omitempty" example:"Shopware Demo Image"`
+	Percent int       `json:"percent" example:"42"`
+	Status  string    `json:"status" example:"pulling"`
 }

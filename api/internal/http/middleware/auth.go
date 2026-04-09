@@ -73,6 +73,34 @@ func RequireAdmin() func(http.Handler) http.Handler {
 	}
 }
 
+func OptionalAuth(authService *services.AuthService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+			if authHeader == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			token, ok := ParseAuthorizationHeader(authHeader)
+			if !ok {
+				errs.Write(w, http.StatusUnauthorized, "Invalid authorization header")
+				return
+			}
+
+			user, err := authService.Authenticate(token)
+			if err != nil {
+				errs.Write(w, http.StatusUnauthorized, "Invalid or expired token")
+				return
+			}
+
+			ctx := withAuth(r.Context(), types.AuthContext{UserID: user.ID})
+			ctx = withUser(ctx, user)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func ParseAuthorizationHeader(authHeader string) (string, bool) {
 	parts := strings.Fields(authHeader)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {

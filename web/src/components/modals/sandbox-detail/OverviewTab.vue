@@ -63,6 +63,11 @@ defineProps<{
         <td class="py-2">{{ sandbox.owner?.email ?? 'Gast' }}</td>
       </tr>
 
+      <tr v-if="sandbox.clientId">
+        <td class="text-muted-foreground w-1/3 py-2 pr-4 text-xs">Client ID</td>
+        <td class="py-2 font-mono text-xs">{{ sandbox.clientId }}</td>
+      </tr>
+
       <tr v-if="sandbox.port">
         <td class="text-muted-foreground w-1/3 py-2 pr-4 text-xs">Port</td>
         <td class="py-2">{{ sandbox.port }}</td>

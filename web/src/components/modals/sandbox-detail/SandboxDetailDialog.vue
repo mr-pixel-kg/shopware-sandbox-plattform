@@ -80,7 +80,9 @@ const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
           <StatusBadge v-if="sandbox" :status="sandbox.status" />
           <Badge v-if="isOffline" variant="destructive" class="text-xs">Offline</Badge>
         </div>
-        <DialogDescription v-if="image"> {{ image.name }}:{{ image.tag }} </DialogDescription>
+        <DialogDescription>
+          <template v-if="image">{{ image.name }}:{{ image.tag }}</template>
+        </DialogDescription>
       </DialogHeader>
 
       <Separator />

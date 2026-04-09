@@ -2,13 +2,11 @@ import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, ref } from 'vue'
 
 import { sandboxesApi } from '@/api'
-import { getClientId } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSandboxesStore } from '@/stores/sandboxes.store'
 import { getToken } from '@/utils/storage'
 
 import type {
-  CreateDemoRequest,
   CreateSandboxRequest,
   CreateSnapshotRequest,
   Image,
@@ -47,8 +45,15 @@ const sseConnections = new Map<string, AbortController>()
 export function useSandboxes() {
   const store = useSandboxesStore()
   const authStore = useAuthStore()
-  const { sandboxes, activeSandboxes, recentSandboxes, allSandboxes, loading, error } =
-    storeToRefs(store)
+  const {
+    sandboxes,
+    adminSandboxes,
+    activeSandboxes,
+    recentSandboxes,
+    allSandboxes,
+    loading,
+    error,
+  } = storeToRefs(store)
 
   const busyIds = ref(new Set<string>())
   const healthBySandboxId = ref<Record<string, SandboxHealthEvent>>({})
@@ -56,15 +61,17 @@ export function useSandboxes() {
   function subscribeSse(id: string) {
     if (sseConnections.has(id)) return
 
-    const token = getToken()
-    if (!token) return
-
     const abort = new AbortController()
     sseConnections.set(id, abort)
 
     const baseURL = import.meta.env.WEB_API_URL || ''
+    const headers: Record<string, string> = {}
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+
     fetch(`${baseURL}/api/sandboxes/${id}/stream`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
+      credentials: 'include',
       signal: abort.signal,
     })
       .then((res) => {
@@ -152,12 +159,8 @@ export function useSandboxes() {
     if (!store.initialized) loading.value = true
     error.value = null
     try {
-      if (authStore.isAuthenticated) {
-        const response = await sandboxesApi.list({ limit: 500 })
-        sandboxes.value = response.data
-      } else {
-        sandboxes.value = await sandboxesApi.listDemos(getClientId())
-      }
+      const response = await sandboxesApi.list({ limit: 500 })
+      sandboxes.value = response.data
       syncSseSubscriptions()
       void fetchHealth()
       store.initialized = true
@@ -168,17 +171,29 @@ export function useSandboxes() {
     }
   }
 
-  async function fetchHealthForSandbox(id: string): Promise<SandboxHealthEvent | null> {
-    const token = getToken()
-    if (!token) return null
+  async function fetchAdminSandboxes() {
+    if (!authStore.isAuthenticated || !authStore.isAdmin) return
+    try {
+      const response = await sandboxesApi.list({ scope: 'all', limit: 500 })
+      adminSandboxes.value = response.data
+    } catch {
+      adminSandboxes.value = []
+    }
+  }
 
+  async function fetchHealthForSandbox(id: string): Promise<SandboxHealthEvent | null> {
     const baseURL = import.meta.env.WEB_API_URL || ''
     const abort = new AbortController()
     const timeout = setTimeout(() => abort.abort(), 10_000)
 
+    const headers: Record<string, string> = {}
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+
     try {
       const res = await fetch(`${baseURL}/api/sandboxes/${id}/health`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
+        credentials: 'include',
         signal: abort.signal,
       })
       if (!res.ok || !res.body) return null
@@ -251,12 +266,6 @@ export function useSandboxes() {
     return sandbox
   }
 
-  async function createDemo(req: CreateDemoRequest): Promise<Sandbox> {
-    const sandbox = await sandboxesApi.createDemo(req)
-    sandboxes.value.unshift(sandbox)
-    return sandbox
-  }
-
   async function updateSandbox(id: string, req: UpdateSandboxRequest): Promise<Sandbox> {
     const updated = await sandboxesApi.update(id, req)
     const idx = sandboxes.value.findIndex((s) => s.id === id)
@@ -267,11 +276,7 @@ export function useSandboxes() {
 
   async function deleteSandbox(id: string, { skipRemove = false } = {}) {
     closeSse(id)
-    if (authStore.isAuthenticated) {
-      await sandboxesApi.remove(id)
-    } else {
-      await sandboxesApi.removeDemo(id)
-    }
+    await sandboxesApi.remove(id)
     if (!skipRemove) {
       sandboxes.value = sandboxes.value.filter((s) => s.id !== id)
     }
@@ -308,8 +313,8 @@ export function useSandboxes() {
     busyIds,
     healthBySandboxId,
     refresh: fetchSandboxes,
+    fetchAdminSandboxes,
     createSandbox,
-    createDemo,
     updateSandbox,
     deleteSandbox,
     removeSandbox,

@@ -73,8 +73,12 @@ export function useLogStream(containerRef: Ref<HTMLElement | null>) {
 
     abortController = new AbortController()
 
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+
     fetch(`${baseURL}/api/sandboxes/${sandboxId}/logs/${logKey}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
+      credentials: 'include',
       signal: abortController.signal,
     })
       .then((res) => {

@@ -33,6 +33,14 @@ func MustAuth(r *http.Request) types.AuthContext {
 	return r.Context().Value(authKey).(types.AuthContext)
 }
 
+func AuthFromContext(r *http.Request) *types.AuthContext {
+	auth, ok := r.Context().Value(authKey).(types.AuthContext)
+	if !ok {
+		return nil
+	}
+	return &auth
+}
+
 func UserFromContext(r *http.Request) *models.User {
 	u, _ := r.Context().Value(userKey).(*models.User)
 	return u

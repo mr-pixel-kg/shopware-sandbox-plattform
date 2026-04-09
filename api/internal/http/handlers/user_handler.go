@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/apperror"
 	auditcontracts "github.com/mr-pixel-kg/shopshredder/api/internal/auditlog"
@@ -21,40 +20,7 @@ type UserHandler struct {
 	Audit *services.AuditService
 }
 
-func (h UserHandler) MountRoutes(s *fuego.Server) {
-	users := fuego.Group(s, "/users")
-	fuego.Get(users, "", h.list,
-		option.Summary("List users"),
-		option.Description("Return all users, including pending invited users"),
-		option.Tags("Users"),
-		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
-		option.QueryInt("offset", "Offset for pagination (default 0)"),
-	)
-	fuego.Get(users, "/{id}", h.get,
-		option.Summary("Get user"),
-		option.Description("Return a single user by ID"),
-		option.Tags("Users"),
-	)
-	fuego.Post(users, "", h.create,
-		option.Summary("Create user"),
-		option.Description("Create an active user or invite a pending user when no password is provided"),
-		option.Tags("Users"),
-		option.DefaultStatusCode(http.StatusCreated),
-	)
-	fuego.Patch(users, "/{id}", h.update,
-		option.Summary("Update user"),
-		option.Description("Update a user's email, role, and optionally password"),
-		option.Tags("Users"),
-	)
-	fuego.Delete(users, "/{id}", h.delete,
-		option.Summary("Delete user"),
-		option.Description("Delete a user by ID"),
-		option.Tags("Users"),
-		option.DefaultStatusCode(http.StatusNoContent),
-	)
-}
-
-func (h UserHandler) list(c fuego.ContextNoBody) (dto.UserListResponse, error) {
+func (h UserHandler) List(c fuego.ContextNoBody) (dto.UserListResponse, error) {
 	limit, offset, err := parsePaginationParams(c.Request())
 	if err != nil {
 		return dto.UserListResponse{}, err
@@ -80,7 +46,7 @@ func (h UserHandler) list(c fuego.ContextNoBody) (dto.UserListResponse, error) {
 	}, nil
 }
 
-func (h UserHandler) get(c fuego.ContextNoBody) (dto.UserResponse, error) {
+func (h UserHandler) Get(c fuego.ContextNoBody) (dto.UserResponse, error) {
 	id, err := parsePathUUID(c, "id")
 	if err != nil {
 		return dto.UserResponse{}, err
@@ -97,7 +63,7 @@ func (h UserHandler) get(c fuego.ContextNoBody) (dto.UserResponse, error) {
 	}, nil
 }
 
-func (h UserHandler) create(c fuego.ContextWithBody[dto.CreateUserRequest]) (dto.UserResponse, error) {
+func (h UserHandler) Create(c fuego.ContextWithBody[dto.CreateUserRequest]) (dto.UserResponse, error) {
 	body, err := c.Body()
 	if err != nil {
 		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
@@ -121,7 +87,7 @@ func (h UserHandler) create(c fuego.ContextWithBody[dto.CreateUserRequest]) (dto
 	}, nil
 }
 
-func (h UserHandler) update(c fuego.ContextWithBody[dto.UpdateUserRequest]) (dto.UserResponse, error) {
+func (h UserHandler) Update(c fuego.ContextWithBody[dto.UpdateUserRequest]) (dto.UserResponse, error) {
 	id, err := parsePathUUID(c, "id")
 	if err != nil {
 		return dto.UserResponse{}, err
@@ -150,7 +116,7 @@ func (h UserHandler) update(c fuego.ContextWithBody[dto.UpdateUserRequest]) (dto
 	}, nil
 }
 
-func (h UserHandler) delete(c fuego.ContextNoBody) (any, error) {
+func (h UserHandler) Delete(c fuego.ContextNoBody) (any, error) {
 	id, err := parsePathUUID(c, "id")
 	if err != nil {
 		return nil, err

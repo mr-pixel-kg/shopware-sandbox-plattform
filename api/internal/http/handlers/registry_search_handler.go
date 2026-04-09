@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/services"
 )
@@ -13,24 +12,7 @@ type RegistrySearchHandler struct {
 	Search *services.RegistrySearchService
 }
 
-func (h RegistrySearchHandler) MountAuthedRoutes(s *fuego.Server) {
-	reg := fuego.Group(s, "/registry")
-	fuego.Get(reg, "/images/search", h.searchImages,
-		option.Summary("Search Docker Hub images"),
-		option.Description("Returns matching image repositories from Docker Hub for autocomplete"),
-		option.Tags("Registry"),
-		option.Query("q", "Search query (e.g. dockware/sh)"),
-	)
-	fuego.Get(reg, "/tags", h.searchTags,
-		option.Summary("Search Docker Hub tags"),
-		option.Description("Returns matching tags for a Docker Hub image for autocomplete"),
-		option.Tags("Registry"),
-		option.Query("image", "Full image name (e.g. dockware/shopware)"),
-		option.Query("q", "Tag prefix filter (e.g. 6.7)"),
-	)
-}
-
-func (h RegistrySearchHandler) searchImages(c fuego.ContextNoBody) (dto.RegistryImageSearchResponse, error) {
+func (h RegistrySearchHandler) SearchImages(c fuego.ContextNoBody) (dto.RegistryImageSearchResponse, error) {
 	q := c.Request().URL.Query().Get("q")
 	if len(q) < 2 {
 		return dto.RegistryImageSearchResponse{}, fuego.HTTPError{
@@ -50,7 +32,7 @@ func (h RegistrySearchHandler) searchImages(c fuego.ContextNoBody) (dto.Registry
 	return dto.RegistryImageSearchResponse{Results: results}, nil
 }
 
-func (h RegistrySearchHandler) searchTags(c fuego.ContextNoBody) (dto.RegistryTagSearchResponse, error) {
+func (h RegistrySearchHandler) SearchTags(c fuego.ContextNoBody) (dto.RegistryTagSearchResponse, error) {
 	image := c.Request().URL.Query().Get("image")
 	if image == "" {
 		return dto.RegistryTagSearchResponse{}, fuego.HTTPError{

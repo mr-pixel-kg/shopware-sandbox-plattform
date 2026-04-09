@@ -72,8 +72,11 @@ const {
   deleteSandbox,
   updateSandbox,
   snapshotSandbox,
+  fetchAdminSandboxes,
 } = useSandboxes()
 const { images, uploadThumbnail, trackPendingImage } = useImages('all')
+
+if (isAdmin.value) void fetchAdminSandboxes()
 
 const adminStatusFilter = ref<string>('all')
 
@@ -148,7 +151,9 @@ function getImageTag(imageId: string): string | undefined {
 }
 
 function getSandboxOwnerLabel(sandbox: Sandbox): string {
-  return sandbox.owner?.email ?? 'Gast'
+  if (sandbox.owner?.email) return sandbox.owner.email
+  if (sandbox.clientId) return `Gast (${sandbox.clientId.slice(0, 8)}…)`
+  return 'Gast'
 }
 
 function getLiveHealth(sandbox: Sandbox) {

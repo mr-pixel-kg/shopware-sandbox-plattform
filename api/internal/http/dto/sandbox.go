@@ -20,10 +20,6 @@ type UpdateSandboxRequest struct {
 	TTLMinutes  *int    `json:"ttlMinutes" validate:"omitempty,gte=0" example:"60"`
 }
 
-type CreateDemoRequest struct {
-	ImageID string `json:"imageId" validate:"required,uuid" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
-}
-
 type CreateSnapshotRequest struct {
 	ImagePayload
 }
@@ -63,19 +59,19 @@ type SSHConnectionInfo struct {
 }
 
 type SandboxStreamEvent struct {
-	ID          string `json:"id" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
-	Status      string `json:"status" example:"starting"`
-	StateReason string `json:"stateReason,omitempty" example:"Container wird gestartet"`
+	ID          uuid.UUID `json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
+	Status      string    `json:"status" example:"starting"`
+	StateReason string    `json:"stateReason,omitempty" example:"Container wird gestartet"`
 }
 
 type SandboxHealthEvent struct {
-	SandboxID     string `json:"sandboxId" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
-	Status        string `json:"status" example:"probing"`
-	Ready         bool   `json:"ready" example:"false"`
-	URL           string `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
-	HTTPStatus    int    `json:"httpStatus,omitempty" example:"200"`
-	LatencyMs     int64  `json:"latencyMs,omitempty" example:"412"`
-	FailureReason string `json:"failureReason,omitempty" example:"tls_handshake_failed"`
-	Message       string `json:"message,omitempty" example:"Sandbox URL is reachable"`
-	CheckedAt     string `json:"checkedAt" example:"2026-03-23T10:15:07Z"`
+	SandboxID     uuid.UUID `json:"sandboxId" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
+	Status        string    `json:"status" example:"probing"`
+	Ready         bool      `json:"ready" example:"false"`
+	URL           string    `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
+	HTTPStatus    int       `json:"httpStatus,omitempty" example:"200"`
+	LatencyMs     int64     `json:"latencyMs,omitempty" example:"412"`
+	FailureReason string    `json:"failureReason,omitempty" example:"tls_handshake_failed"`
+	Message       string    `json:"message,omitempty" example:"Sandbox URL is reachable"`
+	CheckedAt     time.Time `json:"checkedAt" example:"2026-03-23T10:15:07Z"`
 }

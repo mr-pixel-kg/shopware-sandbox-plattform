@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	auditcontracts "github.com/mr-pixel-kg/shopshredder/api/internal/auditlog"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
 	mw "github.com/mr-pixel-kg/shopshredder/api/internal/http/middleware"
@@ -18,37 +17,7 @@ type AuthHandler struct {
 	Audit *services.AuditService
 }
 
-func (h AuthHandler) MountPublicRoutes(s *fuego.Server) {
-	auth := fuego.Group(s, "/auth")
-	fuego.Post(auth, "/register", h.register,
-		option.Summary("Register a new user"),
-		option.Description("Create a new user account with email and password"),
-		option.Tags("Auth"),
-		option.DefaultStatusCode(http.StatusCreated),
-	)
-	fuego.Post(auth, "/login", h.login,
-		option.Summary("Log in"),
-		option.Description("Authenticate with email and password, receive a JWT token"),
-		option.Tags("Auth"),
-	)
-}
-
-func (h AuthHandler) MountAuthedRoutes(s *fuego.Server) {
-	auth := fuego.Group(s, "/auth")
-	fuego.Post(auth, "/logout", h.logout,
-		option.Summary("Log out"),
-		option.Description("Invalidate the current session token"),
-		option.Tags("Auth"),
-		option.DefaultStatusCode(http.StatusNoContent),
-	)
-	fuego.Get(auth, "/me", h.me,
-		option.Summary("Get current user"),
-		option.Description("Return the authenticated user's profile"),
-		option.Tags("Auth"),
-	)
-}
-
-func (h AuthHandler) register(c fuego.ContextWithBody[dto.RegisterRequest]) (dto.UserResponse, error) {
+func (h AuthHandler) Register(c fuego.ContextWithBody[dto.RegisterRequest]) (dto.UserResponse, error) {
 	body, err := c.Body()
 	if err != nil {
 		return dto.UserResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
@@ -73,7 +42,7 @@ func (h AuthHandler) register(c fuego.ContextWithBody[dto.RegisterRequest]) (dto
 	}, nil
 }
 
-func (h AuthHandler) login(c fuego.ContextWithBody[dto.LoginRequest]) (dto.LoginResponse, error) {
+func (h AuthHandler) Login(c fuego.ContextWithBody[dto.LoginRequest]) (dto.LoginResponse, error) {
 	body, err := c.Body()
 	if err != nil {
 		return dto.LoginResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
@@ -97,14 +66,14 @@ func (h AuthHandler) login(c fuego.ContextWithBody[dto.LoginRequest]) (dto.Login
 	}, nil
 }
 
-func (h AuthHandler) logout(c fuego.ContextNoBody) (any, error) {
+func (h AuthHandler) Logout(c fuego.ContextNoBody) (any, error) {
 	auth := mw.MustAuth(c.Request())
 	slog.Info("user logged out", "component", "auth", "user_id", auth.UserID)
 	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionAuthLoggedOut, nil, nil, map[string]any{}))
 	return nil, nil
 }
 
-func (h AuthHandler) me(c fuego.ContextNoBody) (dto.UserResponse, error) {
+func (h AuthHandler) Me(c fuego.ContextNoBody) (dto.UserResponse, error) {
 	user := mw.UserFromContext(c.Request())
 	return dto.UserResponse{
 		ID: user.ID, Email: user.Email, AvatarURL: dto.GravatarURL(user.Email, 80), Role: user.Role,

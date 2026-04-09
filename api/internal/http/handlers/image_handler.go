@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/apperror"
 	auditcontracts "github.com/mr-pixel-kg/shopshredder/api/internal/auditlog"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/errs"
@@ -30,102 +30,23 @@ type ImageHandler struct {
 	Resolver RegistryResolver
 }
 
-func (h ImageHandler) MountPublicRoutes(s *fuego.Server) {
-	images := fuego.Group(s, "/images")
-	fuego.Get(images, "/public", h.listPublic,
-		option.Summary("List public images"),
-		option.Description("Returns all images marked as public (no auth required)"),
-		option.Tags("Images"),
-		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
-		option.QueryInt("offset", "Offset for pagination (default 0)"),
-	)
-	fuego.Get(images, "/pending", h.listPending,
-		option.Summary("List pending image operations"),
-		option.Description("Returns all images with ongoing operations with optional progress percentage"),
-		option.Tags("Images"),
-	)
-	fuego.GetStd(images, "/{id}/progress", h.progress,
-		option.Summary("Stream image progress"),
-		option.Description("SSE endpoint streaming progress events for image operations"),
-		option.Tags("Images"),
-	)
-	fuego.Get(s, "/registry", h.registryLookup,
-		option.Summary("Lookup registry metadata"),
-		option.Description("Return registry-defined metadata for an image by name or ID"),
-		option.Tags("Images"),
-		option.Query("name", "Image name (e.g. dockware/dev:6.6.9.0)"),
-		option.Query("id", "Image ID"),
-	)
-}
+func (h ImageHandler) ListImages(c fuego.ContextNoBody) (dto.ImageListResponse, error) {
+	r := c.Request()
+	auth := mw.AuthFromContext(r)
 
-func (h ImageHandler) MountAuthedRoutes(s *fuego.Server) {
-	images := fuego.Group(s, "/images")
-	fuego.Get(images, "", h.listAll,
-		option.Summary("List all images"),
-		option.Description("Returns all images including private ones"),
-		option.Tags("Images"),
-		option.QueryInt("limit", "Max entries per page (1-500, default 50)"),
-		option.QueryInt("offset", "Offset for pagination (default 0)"),
-	)
-	fuego.Post(images, "", h.create,
-		option.Summary("Create an image"),
-		option.Description("Register a new Docker image. If not available locally, a background pull is started."),
-		option.Tags("Images"),
-		option.DefaultStatusCode(http.StatusCreated),
-	)
-	fuego.Patch(images, "/{id}", h.update,
-		option.Summary("Update an image"),
-		option.Description("Update image metadata and visibility"),
-		option.Tags("Images"),
-	)
-	fuego.Delete(images, "/{id}", h.delete,
-		option.Summary("Delete an image"),
-		option.Description("Remove a Docker image registration"),
-		option.Tags("Images"),
-		option.DefaultStatusCode(http.StatusNoContent),
-	)
-	fuego.PostStd(images, "/{id}/thumbnail", h.uploadThumbnail,
-		option.Summary("Upload an image thumbnail"),
-		option.Description("Upload or replace the thumbnail for an image"),
-		option.Tags("Images"),
-	)
-	fuego.DeleteStd(images, "/{id}/thumbnail", h.deleteThumbnail,
-		option.Summary("Delete an image thumbnail"),
-		option.Description("Remove the thumbnail associated with an image"),
-		option.Tags("Images"),
-	)
-}
-
-func (h ImageHandler) listPublic(c fuego.ContextNoBody) (dto.ImageListResponse, error) {
-	limit, offset, err := parsePaginationParams(c.Request())
+	limit, offset, err := parsePaginationParams(r)
 	if err != nil {
 		return dto.ImageListResponse{}, err
 	}
 
-	result, err := h.Images.ListPublicPaginated(services.ImageListInput{Limit: limit, Offset: offset})
-	if err != nil {
-		return dto.ImageListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load public images"}
-	}
+	input := services.ImageListInput{Limit: limit, Offset: offset}
 
-	out := make([]dto.ImageResponse, len(result.Images))
-	for i := range result.Images {
-		out[i] = imageToResponse(&result.Images[i])
+	var result *services.ImageListResult
+	if auth == nil || r.URL.Query().Get("visibility") == "public" {
+		result, err = h.Images.ListPublicPaginated(input)
+	} else {
+		result, err = h.Images.ListAllPaginated(input)
 	}
-	return dto.ImageListResponse{
-		Data: out,
-		Meta: dto.PaginatedMeta{
-			Pagination: buildPaginationMeta(len(out), result.Limit, result.Offset, result.Total),
-		},
-	}, nil
-}
-
-func (h ImageHandler) listAll(c fuego.ContextNoBody) (dto.ImageListResponse, error) {
-	limit, offset, err := parsePaginationParams(c.Request())
-	if err != nil {
-		return dto.ImageListResponse{}, err
-	}
-
-	result, err := h.Images.ListAllPaginated(services.ImageListInput{Limit: limit, Offset: offset})
 	if err != nil {
 		return dto.ImageListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load images"}
 	}
@@ -142,7 +63,7 @@ func (h ImageHandler) listAll(c fuego.ContextNoBody) (dto.ImageListResponse, err
 	}, nil
 }
 
-func (h ImageHandler) create(c fuego.ContextWithBody[dto.CreateImageRequest]) (dto.ImageResponse, error) {
+func (h ImageHandler) Create(c fuego.ContextWithBody[dto.CreateImageRequest]) (dto.ImageResponse, error) {
 	body, err := c.Body()
 	if err != nil {
 		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
@@ -161,7 +82,7 @@ func (h ImageHandler) create(c fuego.ContextWithBody[dto.CreateImageRequest]) (d
 		metadataJSON, nil,
 	)
 	if err != nil {
-		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: err.Error()}
+		return dto.ImageResponse{}, mapImageError(err)
 	}
 
 	resourceType := auditcontracts.ResourceTypeImage
@@ -173,7 +94,7 @@ func (h ImageHandler) create(c fuego.ContextWithBody[dto.CreateImageRequest]) (d
 	return imageToResponse(image), nil
 }
 
-func (h ImageHandler) update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (dto.ImageResponse, error) {
+func (h ImageHandler) Update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (dto.ImageResponse, error) {
 	auth := mw.MustAuth(c.Request())
 	id, err := parsePathUUID(c, "id")
 	if err != nil {
@@ -197,7 +118,7 @@ func (h ImageHandler) update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (d
 	return imageToResponse(image), nil
 }
 
-func (h ImageHandler) delete(c fuego.ContextNoBody) (any, error) {
+func (h ImageHandler) Delete(c fuego.ContextNoBody) (any, error) {
 	auth := mw.MustAuth(c.Request())
 	id, err := parsePathUUID(c, "id")
 	if err != nil {
@@ -215,7 +136,7 @@ func (h ImageHandler) delete(c fuego.ContextNoBody) (any, error) {
 	return nil, nil
 }
 
-func (h ImageHandler) uploadThumbnail(w http.ResponseWriter, r *http.Request) {
+func (h ImageHandler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	auth := mw.MustAuth(r)
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -249,7 +170,7 @@ func (h ImageHandler) uploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(imageToResponse(image))
 }
 
-func (h ImageHandler) deleteThumbnail(w http.ResponseWriter, r *http.Request) {
+func (h ImageHandler) DeleteThumbnail(w http.ResponseWriter, r *http.Request) {
 	auth := mw.MustAuth(r)
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -269,12 +190,12 @@ func (h ImageHandler) deleteThumbnail(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h ImageHandler) listPending(c fuego.ContextNoBody) ([]dto.PendingImageResponse, error) {
+func (h ImageHandler) ListPending(c fuego.ContextNoBody) ([]dto.PendingImageResponse, error) {
 	images, percents := h.Images.ListPendingImages()
 	out := make([]dto.PendingImageResponse, len(images))
 	for i, img := range images {
 		out[i] = dto.PendingImageResponse{
-			ID:      img.ID.String(),
+			ID:      img.ID,
 			Name:    img.Name,
 			Tag:     img.Tag,
 			Title:   img.Title,
@@ -285,7 +206,7 @@ func (h ImageHandler) listPending(c fuego.ContextNoBody) ([]dto.PendingImageResp
 	return out, nil
 }
 
-func (h ImageHandler) progress(w http.ResponseWriter, r *http.Request) {
+func (h ImageHandler) Progress(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		errs.Write(w, http.StatusBadRequest, "Invalid image id")
@@ -344,7 +265,7 @@ func (h ImageHandler) progress(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h ImageHandler) registryLookup(c fuego.ContextNoBody) ([]registry.MetadataItem, error) {
+func (h ImageHandler) RegistryLookup(c fuego.ContextNoBody) ([]registry.MetadataItem, error) {
 	r := c.Request()
 	name := r.URL.Query().Get("name")
 
@@ -392,10 +313,14 @@ func imageToResponse(img *models.Image) dto.ImageResponse {
 }
 
 func mapImageError(err error) error {
+	var appErr *apperror.AppError
+	if errors.As(err, &appErr) {
+		return fuego.HTTPError{Status: appErr.StatusCode, Detail: appErr.Message}
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return fuego.HTTPError{Status: http.StatusNotFound, Detail: "Image not found"}
 	}
-	return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: err.Error()}
+	return fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Image operation failed"}
 }
 
 func writeSSEHeaders(w http.ResponseWriter) {

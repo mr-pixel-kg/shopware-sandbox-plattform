@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/services"
@@ -16,30 +15,7 @@ type AuditHandler struct {
 	Audit *services.AuditService
 }
 
-func (h AuditHandler) MountRoutes(s *fuego.Server) {
-	logs := fuego.Group(s, "/audit-logs")
-	fuego.Get(logs, "", h.list,
-		option.Summary("List audit logs"),
-		option.Description("Returns recent audit log entries with pagination and filtering"),
-		option.Tags("AuditLogs"),
-		option.QueryInt("limit", "Max entries (1-500, default 50)"),
-		option.QueryInt("offset", "Offset for pagination"),
-		option.Query("userId", "Filter by user ID"),
-		option.Query("action", "Filter by action"),
-		option.Query("resourceType", "Filter by resource type"),
-		option.Query("resourceId", "Filter by resource ID"),
-		option.Query("clientId", "Filter by client ID"),
-		option.Query("from", "Filter from timestamp (inclusive, RFC3339)"),
-		option.Query("to", "Filter to timestamp (inclusive, RFC3339)"),
-	)
-	fuego.Get(logs, "/facets", h.facets,
-		option.Summary("List audit log facets"),
-		option.Description("Returns available audit filter values for the current query window"),
-		option.Tags("AuditLogs"),
-	)
-}
-
-func (h AuditHandler) list(c fuego.ContextNoBody) (dto.AuditLogListResponse, error) {
+func (h AuditHandler) List(c fuego.ContextNoBody) (dto.AuditLogListResponse, error) {
 	r := c.Request()
 	filters, err := parseAuditLogListInput(r)
 	if err != nil {
@@ -88,7 +64,7 @@ func (h AuditHandler) list(c fuego.ContextNoBody) (dto.AuditLogListResponse, err
 	}, nil
 }
 
-func (h AuditHandler) facets(c fuego.ContextNoBody) (dto.AuditLogFacetsResponse, error) {
+func (h AuditHandler) Facets(c fuego.ContextNoBody) (dto.AuditLogFacetsResponse, error) {
 	r := c.Request()
 	input, err := parseAuditLogFacetInput(r)
 	if err != nil {

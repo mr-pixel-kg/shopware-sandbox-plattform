@@ -11,14 +11,9 @@ import type {
 } from '@/types'
 
 export const imagesApi = {
-  async listPublic(params?: PaginationParams): Promise<PaginatedResponse<Image>> {
-    const { data } = await apiClient.get<PaginatedResponse<Image>>('/api/images/public', {
-      params,
-    })
-    return data
-  },
-
-  async listAll(params?: PaginationParams): Promise<PaginatedResponse<Image>> {
+  async list(
+    params?: PaginationParams & { visibility?: 'public' },
+  ): Promise<PaginatedResponse<Image>> {
     const { data } = await apiClient.get<PaginatedResponse<Image>>('/api/images', { params })
     return data
   },

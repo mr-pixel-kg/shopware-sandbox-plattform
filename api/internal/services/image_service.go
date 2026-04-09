@@ -117,6 +117,7 @@ func (s *ImageService) ListAllPaginated(input ImageListInput) (*ImageListResult,
 		return nil, err
 	}
 	images = s.attachThumbnailURLs(images)
+	s.enrichMetadata(images)
 	return &ImageListResult{
 		Images: images,
 		Total:  total,
@@ -131,6 +132,7 @@ func (s *ImageService) ListPublicPaginated(input ImageListInput) (*ImageListResu
 		return nil, err
 	}
 	images = s.attachThumbnailURLs(images)
+	s.enrichMetadata(images)
 	return &ImageListResult{
 		Images: images,
 		Total:  total,
@@ -164,7 +166,11 @@ func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.attachThumbnailURL(image), nil
+	image = s.attachThumbnailURL(image)
+	images := []models.Image{*image}
+	s.enrichMetadata(images)
+	*image = images[0]
+	return image, nil
 }
 
 func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, description *string, isPublic bool, metadata json.RawMessage, registryRef *string, status string) (*models.Image, error) {
@@ -297,7 +303,9 @@ func (s *ImageService) Update(id uuid.UUID, title, description *string, isPublic
 	}
 
 	image = s.attachThumbnailURL(image)
-	s.enrichMetadata([]models.Image{*image})
+	images := []models.Image{*image}
+	s.enrichMetadata(images)
+	*image = images[0]
 	return image, nil
 }
 

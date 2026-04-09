@@ -204,10 +204,6 @@ export interface UpdateSandboxRequest {
   ttlMinutes?: number
 }
 
-export interface CreateDemoRequest {
-  imageId: string
-}
-
 export interface CreateImageRequest {
   name: string
   tag: string

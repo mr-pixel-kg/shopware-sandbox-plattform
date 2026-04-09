@@ -150,6 +150,8 @@ func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResu
 	)
 
 	switch {
+	case input.UserID != nil && input.ClientID != nil:
+		sandboxes, total, err = s.repo.ListAllByOwnerPaginated(*input.UserID, *input.ClientID, input.Limit, input.Offset)
 	case input.ClientID != nil:
 		sandboxes, total, err = s.repo.ListAllByClientIDPaginated(*input.ClientID, input.Limit, input.Offset)
 	case input.UserID != nil:

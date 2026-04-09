@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { Loader2 } from 'lucide-vue-next'
-import { nextTick, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 
-import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInputBase as ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxViewport,
+} from '@/components/ui/combobox'
 
 export interface Suggestion {
   value: string
@@ -34,111 +41,89 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const localValue = ref(props.modelValue)
 const open = ref(false)
-const focused = ref(false)
-const selecting = ref(false)
+const isFocused = ref(false)
 
-watch(
-  () => props.modelValue,
-  (val) => {
-    if (val !== localValue.value) {
-      localValue.value = val
-    }
-  },
-)
-
-watch(localValue, (val) => {
-  emit('update:modelValue', val)
-  updateOpen()
-})
-
-watch([() => props.suggestions, () => props.loading], () => {
+watch([() => props.modelValue, () => props.suggestions, () => props.loading], () => {
   updateOpen()
 })
 
 function updateOpen() {
-  if (!focused.value) return
   open.value =
-    localValue.value.length >= props.minChars && (props.suggestions.length > 0 || props.loading)
+    isFocused.value &&
+    props.modelValue.length >= props.minChars &&
+    (props.suggestions.length > 0 || props.loading)
 }
 
 function onFocus() {
-  focused.value = true
+  isFocused.value = true
   updateOpen()
 }
 
 function onBlur() {
-  if (selecting.value) return
-  focused.value = false
+  isFocused.value = false
   open.value = false
 }
 
+function onInput(event: Event) {
+  emit('update:modelValue', (event.target as HTMLInputElement).value)
+}
+
 function onSelect(value: string) {
-  selecting.value = true
-  localValue.value = value
+  emit('update:modelValue', value)
   open.value = false
-  nextTick(() => {
-    selecting.value = false
-    focused.value = false
-  })
 }
 </script>
 
 <template>
-  <Popover :open="open">
-    <PopoverAnchor as-child>
-      <Input
+  <Combobox
+    v-model:open="open"
+    :ignore-filter="true"
+    :reset-search-term-on-blur="false"
+    :reset-search-term-on-select="false"
+  >
+    <ComboboxAnchor class="w-full">
+      <ComboboxInput
         :id="id"
-        v-model="localValue"
+        :value="props.modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
         autocomplete="off"
+        data-slot="input"
+        class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+        @input="onInput"
         @focus="onFocus"
         @blur="onBlur"
       />
-    </PopoverAnchor>
+    </ComboboxAnchor>
 
-    <PopoverContent
-      class="p-0"
-      :style="{ width: 'var(--reka-popover-trigger-width)' }"
-      @open-auto-focus.prevent
-      @close-auto-focus.prevent
-    >
-      <Command>
-        <CommandList class="max-h-[240px]">
-          <div
-            v-if="loading && suggestions.length === 0"
-            class="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm"
+    <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
+      <ComboboxViewport class="max-h-[240px]">
+        <div
+          v-if="loading && suggestions.length === 0"
+          class="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm"
+        >
+          <Loader2 class="h-4 w-4 animate-spin" />
+          Suche...
+        </div>
+
+        <ComboboxEmpty v-if="!loading">Keine Ergebnisse</ComboboxEmpty>
+
+        <ComboboxGroup v-if="suggestions.length > 0">
+          <ComboboxItem
+            v-for="item in suggestions"
+            :key="item.value"
+            :value="item.value"
+            class="flex-col items-start"
+            @select.prevent="onSelect(item.value)"
           >
-            <Loader2 class="h-4 w-4 animate-spin" />
-            Suche...
-          </div>
-
-          <div
-            v-else-if="suggestions.length === 0"
-            class="text-muted-foreground py-6 text-center text-sm"
-          >
-            Keine Ergebnisse
-          </div>
-
-          <CommandGroup v-if="suggestions.length > 0">
-            <CommandItem
-              v-for="item in suggestions"
-              :key="item.value"
-              :value="item.value"
-              class="flex-col items-start"
-              @pointerdown.prevent
-              @select="onSelect(item.value)"
-            >
-              <span>{{ item.label }}</span>
-              <span v-if="item.description" class="text-muted-foreground line-clamp-1 text-xs">{{
-                item.description
-              }}</span>
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    </PopoverContent>
-  </Popover>
+            <span>{{ item.label }}</span>
+            <span v-if="item.description" class="text-muted-foreground line-clamp-1 text-xs">{{
+              item.description
+            }}</span>
+          </ComboboxItem>
+        </ComboboxGroup>
+      </ComboboxViewport>
+    </ComboboxList>
+  </Combobox>
 </template>

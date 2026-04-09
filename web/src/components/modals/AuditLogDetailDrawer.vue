@@ -112,8 +112,10 @@ function actionBadgeConfig(action: string): { label: string; class: string } {
     <SheetContent side="right" class="overflow-y-auto sm:max-w-xl">
       <SheetHeader>
         <SheetTitle>Audit-Log-Details</SheetTitle>
-        <SheetDescription v-if="log">
-          {{ formatDateTime(log.timestamp) }} · {{ formatRelativeTime(log.timestamp) }}
+        <SheetDescription>
+          <template v-if="log"
+            >{{ formatDateTime(log.timestamp) }} · {{ formatRelativeTime(log.timestamp) }}</template
+          >
         </SheetDescription>
       </SheetHeader>
 

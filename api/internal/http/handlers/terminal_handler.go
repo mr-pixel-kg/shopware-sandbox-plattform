@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-fuego/fuego"
-	"github.com/go-fuego/fuego/option"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/docker"
@@ -53,18 +51,7 @@ func (h TerminalHandler) upgrader() *websocket.Upgrader {
 	}
 }
 
-func (h TerminalHandler) MountPublicRoutes(s *fuego.Server) {
-	fuego.GetStd(s, "/sandboxes/{id}/terminal", h.connect,
-		option.Summary("Open interactive terminal session"),
-		option.Description("Interactive shell (docker exec) into the sandbox container via WebSocket"),
-		option.Tags("Sandboxes"),
-		option.Query("access_token", "Bearer token"),
-		option.QueryInt("cols", "Initial terminal columns (default 80)"),
-		option.QueryInt("rows", "Initial terminal rows (default 24)"),
-	)
-}
-
-func (h TerminalHandler) connect(w http.ResponseWriter, r *http.Request) {
+func (h TerminalHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	sandboxID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		errs.Write(w, http.StatusBadRequest, "Invalid sandbox id")
@@ -94,7 +81,7 @@ func (h TerminalHandler) connect(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:   user.IsAdmin(),
 	})
 	if err != nil {
-		mapTerminalErrorStd(w, err)
+		writeTerminalError(w, err)
 		return
 	}
 
@@ -102,7 +89,7 @@ func (h TerminalHandler) connect(w http.ResponseWriter, r *http.Request) {
 
 	execSession, err := h.Terminals.OpenSession(r.Context(), sandbox, cols, rows)
 	if err != nil {
-		mapTerminalErrorStd(w, err)
+		writeTerminalError(w, err)
 		return
 	}
 
@@ -121,7 +108,7 @@ func (h TerminalHandler) connect(w http.ResponseWriter, r *http.Request) {
 	slog.Info("terminal session ended", "sandbox_id", sandboxID, "user_id", user.ID)
 }
 
-func mapTerminalErrorStd(w http.ResponseWriter, err error) {
+func writeTerminalError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, services.ErrSandboxNotFound):
 		errs.Write(w, http.StatusNotFound, "Sandbox not found")

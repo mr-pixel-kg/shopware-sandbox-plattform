@@ -10,7 +10,6 @@ import PageHeader from '@/components/shared/PageHeader.vue'
 import ShredderAnimation from '@/components/shared/ShredderAnimation.vue'
 import { useImages } from '@/composables/useImages'
 import { useSandboxes } from '@/composables/useSandboxes'
-import { useAuthStore } from '@/stores/auth.store'
 import { getApiErrorMessage } from '@/utils/error'
 import { resolveAssetUrl } from '@/utils/formatters'
 import { resolveIcon } from '@/utils/icons'
@@ -24,13 +23,11 @@ const {
   activeSandboxes,
   loading: sandboxesLoading,
   busyIds,
-  createDemo,
   createSandbox,
   deleteSandbox,
   removeSandbox,
   refresh: refreshSandboxes,
 } = useSandboxes()
-const authStore = useAuthStore()
 const shredderRefs = ref<Record<string, InstanceType<typeof ShredderAnimation>>>({})
 
 const hasActiveSandboxes = computed(() => activeSandboxes.value.length > 0)
@@ -246,11 +243,7 @@ async function handleDemo(imageId: string) {
   busyIds.value.add(imageId)
   try {
     const metadata = getMetadataDefaults(imageId)
-    if (authStore.isAuthenticated) {
-      await createSandbox({ imageId, metadata })
-    } else {
-      await createDemo({ imageId })
-    }
+    await createSandbox({ imageId, metadata })
     toast.success('Demo wird gestartet')
     refreshSandboxes()
   } catch (e) {

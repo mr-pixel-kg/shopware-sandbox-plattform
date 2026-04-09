@@ -146,6 +146,17 @@ func (r *SandboxRepository) ListAllByUserPaginated(userID uuid.UUID, limit, offs
 	return sandboxes, total, err
 }
 
+func (r *SandboxRepository) ListAllByOwnerPaginated(userID, clientID uuid.UUID, limit, offset int) ([]models.Sandbox, int64, error) {
+	var sandboxes []models.Sandbox
+	var total int64
+	query := r.withOwner(r.db).Where("owner_id = ? OR client_id = ?", userID, clientID).Order("created_at desc")
+	if err := query.Model(&models.Sandbox{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Limit(limit).Offset(offset).Find(&sandboxes).Error
+	return sandboxes, total, err
+}
+
 func (r *SandboxRepository) ListAllByClientIDPaginated(clientID uuid.UUID, limit, offset int) ([]models.Sandbox, int64, error) {
 	var sandboxes []models.Sandbox
 	var total int64
