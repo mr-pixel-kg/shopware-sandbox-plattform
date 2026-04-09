@@ -58,8 +58,3 @@ type PendingImageResponse struct {
 	Percent int       `json:"percent" example:"42"`
 	Status  string    `json:"status" example:"pulling"`
 }
-
-type ImageProgressEvent struct {
-	Percent int    `json:"percent" example:"75"`
-	Status  string `json:"status" example:"pulling"`
-}

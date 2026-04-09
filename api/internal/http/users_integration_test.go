@@ -33,13 +33,18 @@ func TestAdminUsersCRUD(t *testing.T) {
 	userHandler := handlers.UserHandler{Users: userService, Audit: auditService}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 		option.Middleware(authmw.RequireAdmin()),
 	)
-	userHandler.MountRoutes(admin)
+	fuego.Get(admin, "/users", userHandler.List)
+	fuego.Get(admin, "/users/{id}", userHandler.Get)
+	fuego.Post(admin, "/users", userHandler.Create, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Patch(admin, "/users/{id}", userHandler.Update)
+	fuego.Delete(admin, "/users/{id}", userHandler.Delete, option.DefaultStatusCode(http.StatusNoContent))
 
 	adminToken := createAdminToken(t, db, s)
 	password := "Sup3rS3cret!"

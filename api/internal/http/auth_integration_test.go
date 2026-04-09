@@ -31,12 +31,14 @@ func TestAuthFlow_RegisterLoginMeAndLogout(t *testing.T) {
 	authHandler := handlers.AuthHandler{Auth: authService, Audit: newTestAuditService(db)}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	authed := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 	)
-	authHandler.MountAuthedRoutes(authed)
+	fuego.Post(authed, "/auth/logout", authHandler.Logout, option.DefaultStatusCode(http.StatusNoContent))
+	fuego.Get(authed, "/auth/me", authHandler.Me)
 
 	email := "api-auth-flow@example.com"
 	password := "Sup3rS3cret!"
@@ -74,7 +76,7 @@ func TestProtectedRouteRejectsMissingAuthorizationHeader(t *testing.T) {
 	authed := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 	)
-	authHandler.MountAuthedRoutes(authed)
+	fuego.Get(authed, "/auth/me", authHandler.Me)
 
 	rec := performJSONRequest(t, s, http.MethodGet, "/api/auth/me", nil, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())

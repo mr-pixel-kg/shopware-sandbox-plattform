@@ -117,7 +117,7 @@ func (h SandboxHandler) Create(c fuego.ContextWithBody[dto.CreateSandboxRequest]
 		slog.Debug("sandbox creation requested", "component", "sandbox", "user_id", auth.UserID, "image_id", imageID, "ttl_minutes", body.TTLMinutes)
 	} else {
 		if clientID == nil {
-			return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "X-Client-Id header is required for guests"}
+			return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Client identification required for guests"}
 		}
 		input.AuditActor = newAuditActor(r, nil)
 		slog.Debug("guest sandbox creation requested", "component", "sandbox", "client_id", clientID, "image_id", imageID)
@@ -174,10 +174,9 @@ func (h SandboxHandler) Delete(c fuego.ContextNoBody) (any, error) {
 	auth := mw.AuthFromContext(r)
 
 	if auth == nil {
-		// Guest deletion: require X-Client-Id
 		clientID := mw.ClientIDFromContext(r)
 		if clientID == nil {
-			return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "X-Client-Id header is required for guests"}
+			return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Client identification required for guests"}
 		}
 		if err := h.Sandboxes.DeleteForGuest(r.Context(), id, *clientID, newAuditActor(r, nil)); err != nil {
 			return nil, mapSandboxError(err)
@@ -186,7 +185,6 @@ func (h SandboxHandler) Delete(c fuego.ContextNoBody) (any, error) {
 		return nil, nil
 	}
 
-	// Authenticated deletion
 	user := mw.UserFromContext(r)
 	sandbox, err := h.Sandboxes.FindByID(id)
 	if err != nil {

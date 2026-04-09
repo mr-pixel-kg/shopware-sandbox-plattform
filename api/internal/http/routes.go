@@ -11,6 +11,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-fuego/fuego"
 	"github.com/go-fuego/fuego/option"
+	"github.com/go-fuego/fuego/param"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/config"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/docker"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
@@ -161,6 +162,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 		option.Summary("Stream sandbox state"),
 		option.Description("SSE endpoint streaming real-time state updates for a single sandbox"),
 		option.Tags("Sandboxes"),
+		option.Query("access_token", "Bearer token fallback for EventSource"),
 	)
 	fuego.GetStd(public, "/sandboxes/{id}/terminal", terminal.Connect,
 		option.Summary("Open interactive terminal session"),
@@ -185,13 +187,13 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	)
 	fuego.Post(flex, "/sandboxes", sandbox.Create,
 		option.Summary("Create a sandbox"),
-		option.Description("Spin up a new sandbox. Guests must provide X-Client-Id header. Authenticated users get ownership via their user ID."),
+		option.Description("Spin up a new sandbox. Guests are identified by a server-managed client_id cookie. Authenticated users get ownership via their user ID."),
 		option.Tags("Sandboxes"),
 		option.DefaultStatusCode(http.StatusCreated),
 	)
 	fuego.Delete(flex, "/sandboxes/{id}", sandbox.Delete,
 		option.Summary("Delete a sandbox"),
-		option.Description("Stop and remove a sandbox. Guests must provide X-Client-Id header. Authenticated users are checked by user ID or X-Client-Id."),
+		option.Description("Stop and remove a sandbox. Guests are identified by a server-managed client_id cookie. Authenticated users are checked by user ID or client_id cookie."),
 		option.Tags("Sandboxes"),
 		option.DefaultStatusCode(http.StatusNoContent),
 	)
@@ -260,13 +262,15 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 	)
 	fuego.PostStd(authed, "/images/{id}/thumbnail", image.UploadThumbnail,
 		option.Summary("Upload an image thumbnail"),
-		option.Description("Upload or replace the thumbnail for an image"),
+		option.Description("Upload or replace the thumbnail for an image. Send as multipart/form-data with field name 'thumbnail'."),
 		option.Tags("Images"),
+		option.RequestContentType("multipart/form-data"),
 	)
 	fuego.DeleteStd(authed, "/images/{id}/thumbnail", image.DeleteThumbnail,
 		option.Summary("Delete an image thumbnail"),
 		option.Description("Remove the thumbnail associated with an image"),
 		option.Tags("Images"),
+		option.DefaultStatusCode(http.StatusNoContent),
 	)
 	fuego.Get(authed, "/sandboxes/{id}/logs", log.ListSources,
 		option.Summary("List available log sources"),
@@ -282,13 +286,13 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 		option.Summary("Search Docker Hub images"),
 		option.Description("Returns matching image repositories from Docker Hub for autocomplete"),
 		option.Tags("Registry"),
-		option.Query("q", "Search query (e.g. dockware/sh)"),
+		option.Query("q", "Search query, minimum 2 characters (e.g. dockware/sh)", param.Required()),
 	)
 	fuego.Get(authed, "/registry/tags", registrySearch.SearchTags,
 		option.Summary("Search Docker Hub tags"),
 		option.Description("Returns matching tags for a Docker Hub image for autocomplete"),
 		option.Tags("Registry"),
-		option.Query("image", "Full image name (e.g. dockware/shopware)"),
+		option.Query("image", "Full image name (e.g. dockware/shopware)", param.Required()),
 		option.Query("q", "Tag prefix filter (e.g. 6.7)"),
 	)
 
@@ -362,6 +366,12 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 		option.Summary("List audit log facets"),
 		option.Description("Returns available audit filter values for the current query window"),
 		option.Tags("AuditLogs"),
+		option.Query("action", "Filter by action"),
+		option.Query("resourceType", "Filter by resource type"),
+		option.Query("resourceId", "Filter by resource ID"),
+		option.Query("clientId", "Filter by client ID"),
+		option.Query("from", "Filter from timestamp (inclusive, RFC3339)"),
+		option.Query("to", "Filter to timestamp (inclusive, RFC3339)"),
 	)
 }
 

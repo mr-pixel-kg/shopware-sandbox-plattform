@@ -35,13 +35,15 @@ func TestAuditLogsAdminCanListWithPaginationAndFilters(t *testing.T) {
 	auditHandler := handlers.AuditHandler{Audit: auditService}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 		option.Middleware(authmw.RequireAdmin()),
 	)
-	auditHandler.MountRoutes(admin)
+	fuego.Get(admin, "/audit-logs", auditHandler.List)
+	fuego.Get(admin, "/audit-logs/facets", auditHandler.Facets)
 
 	adminToken := createAdminToken(t, db, s)
 	user := createAuditHTTPUser(t, db, "audit-http-user")
@@ -123,13 +125,15 @@ func TestAuditLogsRequireAdmin(t *testing.T) {
 	auditHandler := handlers.AuditHandler{Audit: auditService}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 		option.Middleware(authmw.RequireAdmin()),
 	)
-	auditHandler.MountRoutes(admin)
+	fuego.Get(admin, "/audit-logs", auditHandler.List)
+	fuego.Get(admin, "/audit-logs/facets", auditHandler.Facets)
 
 	userToken := createUserToken(t, db, s)
 	rec := performJSONRequest(t, s, http.MethodGet, "/api/audit-logs", nil, "Bearer "+userToken)
@@ -148,13 +152,15 @@ func TestAuditLogsRejectInvalidQueryParameters(t *testing.T) {
 	auditHandler := handlers.AuditHandler{Audit: auditService}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 		option.Middleware(authmw.RequireAdmin()),
 	)
-	auditHandler.MountRoutes(admin)
+	fuego.Get(admin, "/audit-logs", auditHandler.List)
+	fuego.Get(admin, "/audit-logs/facets", auditHandler.Facets)
 
 	adminToken := createAdminToken(t, db, s)
 	rec := performJSONRequest(t, s, http.MethodGet, "/api/audit-logs?from=invalid", nil, "Bearer "+adminToken)
@@ -173,13 +179,15 @@ func TestAuditLogFacetsReturnStableUsersAndActions(t *testing.T) {
 	auditHandler := handlers.AuditHandler{Audit: auditService}
 
 	public := fuego.Group(s, "/api")
-	authHandler.MountPublicRoutes(public)
+	fuego.Post(public, "/auth/register", authHandler.Register, option.DefaultStatusCode(http.StatusCreated))
+	fuego.Post(public, "/auth/login", authHandler.Login)
 
 	admin := fuego.Group(s, "/api",
 		option.Middleware(authmw.Auth(authService)),
 		option.Middleware(authmw.RequireAdmin()),
 	)
-	auditHandler.MountRoutes(admin)
+	fuego.Get(admin, "/audit-logs", auditHandler.List)
+	fuego.Get(admin, "/audit-logs/facets", auditHandler.Facets)
 
 	adminToken := createAdminToken(t, db, s)
 	user := createAuditHTTPUser(t, db, "audit-facet-user")
