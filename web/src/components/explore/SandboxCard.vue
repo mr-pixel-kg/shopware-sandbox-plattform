@@ -129,14 +129,13 @@ async function copyToClipboard(field: MetadataField) {
       </div>
     </CardContent>
     <CardFooter v-if="actions?.length" class="sandbox-actions flex items-center gap-2">
-      <div class="flex min-w-0 flex-1 gap-2 [&>*]:flex-1">
-        <ActionButton
-          v-for="action in primaryActions"
-          :key="action.label"
-          :action="action"
-          full-width
-        />
-      </div>
+      <ActionButton
+        v-for="action in primaryActions"
+        :key="action.label"
+        :action="action"
+        :full-width="action.size !== 'icon'"
+        :class="action.size === 'icon' ? 'shrink-0' : 'min-w-0 flex-1'"
+      />
       <ActionButton
         v-for="action in destructiveActions"
         :key="action.label"
