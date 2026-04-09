@@ -134,11 +134,9 @@ func (c *DockerClient) CreateContainer(ctx context.Context, request ContainerCre
 }
 
 func (c *DockerClient) createPortContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error) {
-	labels := c.buildLabels(ctx, request.ImageName, request.Labels)
-
 	containerConfig := &container.Config{
 		Image:     request.ImageName,
-		Labels:    labels,
+		Labels:    request.Labels,
 		Env:       request.Env,
 		Tty:       true,
 		OpenStdin: true,
@@ -198,11 +196,9 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 }
 
 func (c *DockerClient) createTraefikContainer(ctx context.Context, request ContainerCreateRequest) (*SandboxContainer, error) {
-	labels := c.buildLabels(ctx, request.ImageName, request.Labels)
-
 	containerConfig := &container.Config{
 		Image:     request.ImageName,
-		Labels:    labels,
+		Labels:    request.Labels,
 		Env:       request.Env,
 		Tty:       true,
 		OpenStdin: true,
@@ -273,11 +269,12 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		return fmt.Errorf("inspect container %s before commit: %w", containerID, err)
 	}
 
-	var changes []string
-	for k := range info.Config.Labels {
+	cleanLabels := make(map[string]string)
+	for k, v := range info.Config.Labels {
 		if strings.HasPrefix(k, "traefik.") || strings.HasPrefix(k, "sandbox_") {
-			changes = append(changes, fmt.Sprintf("LABEL %s=", k))
+			continue
 		}
+		cleanLabels[k] = v
 	}
 
 	if err := c.client.ContainerPause(ctx, containerID); err != nil {
@@ -292,7 +289,9 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		Author:    c.dockerCfg.SnapshotAuthor,
 		Comment:   c.dockerCfg.SnapshotComment,
 		Pause:     true,
-		Changes:   changes,
+		Config: &container.Config{
+			Labels: cleanLabels,
+		},
 	}); err != nil {
 		return fmt.Errorf("commit container %s to %s: %w", containerID, targetImage, err)
 	}
@@ -359,27 +358,6 @@ func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan Sandb
 	}()
 
 	return out, errOut
-}
-
-func (c *DockerClient) buildLabels(ctx context.Context, imageName string, containerLabels map[string]string) map[string]string {
-	inspect, _, err := c.client.ImageInspectWithRaw(ctx, imageName)
-	if err != nil {
-		return containerLabels
-	}
-
-	merged := make(map[string]string, len(inspect.Config.Labels)+len(containerLabels))
-
-	for k, v := range inspect.Config.Labels {
-		if strings.HasPrefix(k, "traefik.") || strings.HasPrefix(k, "sandbox_") {
-			continue
-		}
-		merged[k] = v
-	}
-
-	for k, v := range containerLabels {
-		merged[k] = v
-	}
-	return merged
 }
 
 func (c *DockerClient) scheme() string {
