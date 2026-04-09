@@ -181,11 +181,14 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
 	}
 
-	scheme := c.scheme()
+	var url string
+	if request.Hostname != "" {
+		url = c.scheme() + "://" + request.Hostname
+	}
 	return &SandboxContainer{
 		ID:   resp.ID,
 		Name: request.ContainerName,
-		URL:  scheme + "://" + request.Hostname,
+		URL:  url,
 		Port: &hostPort,
 	}, nil
 }
@@ -230,11 +233,14 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Conta
 		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
 	}
 
-	scheme := c.scheme()
+	var url string
+	if request.Hostname != "" {
+		url = c.scheme() + "://" + request.Hostname
+	}
 	return &SandboxContainer{
 		ID:   resp.ID,
 		Name: request.ContainerName,
-		URL:  scheme + "://" + request.Hostname,
+		URL:  url,
 	}, nil
 }
 

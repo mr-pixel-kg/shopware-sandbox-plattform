@@ -284,16 +284,29 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		expiresAt = &t
 	}
 
+	registryRef := image.RegistryName()
+	resolved, err := s.resolver.Resolve(registryRef, registry.TemplateContext{
+		ImageName: image.FullName(),
+		ImageRepo: image.Name,
+		ImageTag:  image.Tag,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
+	}
+	internalPort := resolved.InternalPort
+
 	// builds registry Configuration: env vars, labels, lifecycle hooks etc.
 	var hostname string
 	var hostPort int
 	if s.dockerCfg.Mode == config.DockerModePort {
-		hostPort, err = docker.FindFreePort()
-		if err != nil {
-			return nil, fmt.Errorf("find free port: %w", err)
+		if internalPort > 0 {
+			hostPort, err = docker.FindFreePort()
+			if err != nil {
+				return nil, fmt.Errorf("find free port: %w", err)
+			}
+			hostname = fmt.Sprintf("localhost:%d", hostPort)
 		}
-		hostname = fmt.Sprintf("localhost:%d", hostPort)
-	} else {
+	} else if internalPort > 0 {
 		hostname = fmt.Sprintf("%s%s", containerName, s.cfg.HostSuffix)
 	}
 
@@ -307,13 +320,10 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		input.ClientIP, strconv.Itoa(hostPort), input.Metadata,
 	)
 
-	registryRef := image.RegistryName()
-	resolved, err := s.resolver.Resolve(registryRef, tmplCtx)
+	resolved, err = s.resolver.Resolve(registryRef, tmplCtx)
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
 	}
-
-	internalPort := resolved.InternalPort
 
 	// build labels: sandbox marker + resolved labels + traefik labels.
 	labels := map[string]string{"sandbox_container": "true"}

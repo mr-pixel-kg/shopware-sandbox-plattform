@@ -176,28 +176,22 @@ func (s *SandboxHealthService) runProbe(sandboxID uuid.UUID) bool {
 		return true
 	}
 
+	hc := s.getHealthConfig(sandbox)
+
 	switch sandbox.Status {
 	case models.SandboxStatusStarting:
-		hc := s.getHealthConfig(sandbox)
 		if hc == nil {
 			sandbox.Status = models.SandboxStatusRunning
 			sandbox.StateReason = nil
 			if err := s.repo.Update(sandbox); err != nil {
-				s.broadcast(sandboxID, SandboxHealthEvent{
-					SandboxID: sandbox.ID,
-					Status:    "error",
-					Ready:     false,
-					Message:   fmt.Sprintf("Could not persist running state: %v", err),
-					CheckedAt: time.Now().UTC(),
-				})
+				slog.Error("could not persist running state", "sandbox_id", sandboxID, "error", err)
 				return false
 			}
-			s.broadcast(sandboxID, SandboxHealthEvent{
-				SandboxID: sandbox.ID,
+			s.broadcastFinal(sandboxID, SandboxHealthEvent{
+				SandboxID: sandboxID,
 				Status:    models.HealthStatusReady,
 				Ready:     true,
 				URL:       sandbox.URL,
-				Message:   "No health check configured, sandbox is ready",
 				CheckedAt: time.Now().UTC(),
 			})
 			return true
@@ -222,13 +216,12 @@ func (s *SandboxHealthService) runProbe(sandboxID uuid.UUID) bool {
 		return false
 
 	case models.SandboxStatusRunning:
-		if hc := s.getHealthConfig(sandbox); hc == nil {
-			s.broadcast(sandboxID, SandboxHealthEvent{
-				SandboxID: sandbox.ID,
+		if hc == nil {
+			s.broadcastFinal(sandboxID, SandboxHealthEvent{
+				SandboxID: sandboxID,
 				Status:    models.HealthStatusReady,
 				Ready:     true,
 				URL:       sandbox.URL,
-				Message:   "No health check configured, sandbox is ready",
 				CheckedAt: time.Now().UTC(),
 			})
 			return true
