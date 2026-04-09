@@ -5,6 +5,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.6.0] - 2026-04-09
+### Added
+- `OptionalAuth` middleware for endpoints serving both guests and authenticated users
+- `AuthFromContext` nil-safe accessor for optional authentication context
+- `?visibility=public` query parameter on `GET /api/images` for public image filtering
+- `?clientId=<uuid>` query parameter on `GET /api/sandboxes` for guest sandbox listing (now paginated)
+
+### Changed
+- Unified guest and authenticated sandbox endpoints into `/api/sandboxes` (removed `/api/demos`)
+- Unified image listing into `GET /api/images` (removed `GET /api/images/public`)
+- Centralized all route definitions in `routes.go` (removed per-handler Mount methods)
+- Exported all handler methods for cross-package route registration
+- DTO type consistency: `SandboxStreamEvent.ID`, `SandboxHealthEvent.SandboxID` use `uuid.UUID` instead of `string`
+- DTO type consistency: `SandboxHealthEvent.CheckedAt` uses `time.Time` instead of `string`
+- DTO type consistency: `PendingImageResponse.ID` uses `uuid.UUID` instead of `string`
+- Frontend API clients use unified endpoints with query-based filtering
+
+### Removed
+- `/api/demos` endpoints (replaced by `/api/sandboxes` with `OptionalAuth`)
+- `GET /api/images/public` endpoint (replaced by `GET /api/images?visibility=public`)
+- `CreateDemoRequest` DTO (backend and frontend)
+- `RoleGuest` constant (was defined but never used)
+- Per-handler `MountPublicRoutes`, `MountAuthedRoutes`, `MountRoutes` methods
+
+### Fixed
+- Guest sandbox listing is now paginated (was returning unpaginated raw array)
+
+## [1.5.0] - 2026-04-09
+### Changed
+- Major vendor and product name update (renamed to ShopShredder)
+- Auto-completion listing for tags and images
+- Real-time container time updates
+- HTTP package code quality improvements
+
+### Fixed
+- Shared autocompletion component
+
 ## [1.4.4] - 2026-04-08
 ### Added
 - Gravatar-based user avatars via API
