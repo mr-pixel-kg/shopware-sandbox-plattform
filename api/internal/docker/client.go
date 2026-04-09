@@ -50,6 +50,7 @@ type Client interface {
 	DeleteContainer(ctx context.Context, containerID string) error
 	CommitContainer(ctx context.Context, containerID, targetImage string) error
 	ContainerExists(ctx context.Context, containerID string) bool
+	ListSandboxContainerIDs(ctx context.Context) (map[string]struct{}, error)
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
 	CreateExecSession(ctx context.Context, containerID string, opts ExecAttachOptions) (*ExecSession, error)
 	ContainerLogs(ctx context.Context, containerID string) (io.ReadCloser, error)
@@ -296,6 +297,20 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 	}
 
 	return nil
+}
+
+func (c *DockerClient) ListSandboxContainerIDs(ctx context.Context) (map[string]struct{}, error) {
+	args := filters.NewArgs()
+	args.Add("label", "sandbox_container=true")
+	containers, err := c.client.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
+	if err != nil {
+		return nil, fmt.Errorf("list sandbox containers: %w", err)
+	}
+	ids := make(map[string]struct{}, len(containers))
+	for _, c := range containers {
+		ids[c.ID] = struct{}{}
+	}
+	return ids, nil
 }
 
 func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error) {

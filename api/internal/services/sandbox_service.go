@@ -592,21 +592,40 @@ func (s *SandboxService) commitSnapshot(sandboxID uuid.UUID, containerID string,
 }
 
 func (s *SandboxService) ReconcileOnStartup(ctx context.Context) {
-	stale, err := s.repo.ListByStatuses([]models.SandboxStatus{
-		models.SandboxStatusStopping,
-		models.SandboxStatusPaused,
-	})
+	dockerIDs, err := s.docker.ListSandboxContainerIDs(ctx)
 	if err != nil {
-		slog.Error("reconcile: failed to list stale sandboxes", "component", "reconcile", "error", err.Error())
+		slog.Error("reconcile: failed to list docker containers", "component", "reconcile", "error", err.Error())
 		return
 	}
-	for _, sb := range stale {
-		if s.docker.ContainerExists(ctx, sb.ContainerID) {
-			_ = s.setStatusByID(sb.ID, models.SandboxStatusRunning, nil)
-			slog.Info("reconcile: restored sandbox to running", "component", "reconcile", "sandbox_id", sb.ID.String())
+
+	active, err := s.repo.ListAllActive()
+	if err != nil {
+		slog.Error("reconcile: failed to list active sandboxes", "component", "reconcile", "error", err.Error())
+		return
+	}
+
+	dbContainerIDs := make(map[string]struct{}, len(active))
+	for _, sb := range active {
+		dbContainerIDs[sb.ContainerID] = struct{}{}
+
+		if _, exists := dockerIDs[sb.ContainerID]; exists {
+			if sb.Status == models.SandboxStatusStopping || sb.Status == models.SandboxStatusPaused {
+				_ = s.setStatusByID(sb.ID, models.SandboxStatusRunning, nil)
+				slog.Info("reconcile: restored sandbox to running", "component", "reconcile", "sandbox_id", sb.ID.String())
+			}
 		} else {
-			_ = s.setStatusByID(sb.ID, models.SandboxStatusFailed, strPtr("Vorgang durch API-Neustart unterbrochen"))
-			slog.Info("reconcile: marked sandbox as failed", "component", "reconcile", "sandbox_id", sb.ID.String())
+			_ = s.setStatusByID(sb.ID, models.SandboxStatusFailed, strPtr("Container nicht mehr vorhanden"))
+			slog.Info("reconcile: marked sandbox as failed (container gone)", "component", "reconcile", "sandbox_id", sb.ID.String())
+		}
+	}
+
+	for id := range dockerIDs {
+		if _, known := dbContainerIDs[id]; !known {
+			if err := s.docker.DeleteContainer(ctx, id); err != nil {
+				slog.Error("reconcile: failed to remove orphaned container", "component", "reconcile", "container_id", id, "error", err.Error())
+			} else {
+				slog.Info("reconcile: removed orphaned container", "component", "reconcile", "container_id", id)
+			}
 		}
 	}
 }
