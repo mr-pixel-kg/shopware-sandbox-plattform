@@ -268,6 +268,19 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		return fmt.Errorf("invalid target image reference")
 	}
 
+	info, err := c.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("inspect container %s before commit: %w", containerID, err)
+	}
+
+	cleanLabels := make(map[string]string, len(info.Config.Labels))
+	for k, v := range info.Config.Labels {
+		if strings.HasPrefix(k, "traefik.") || strings.HasPrefix(k, "sandbox_") {
+			continue
+		}
+		cleanLabels[k] = v
+	}
+
 	if err := c.client.ContainerPause(ctx, containerID); err != nil {
 		return fmt.Errorf("pause container %s before commit: %w", containerID, err)
 	}
@@ -275,11 +288,15 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		_ = c.client.ContainerUnpause(ctx, containerID)
 	}()
 
+	commitCfg := *info.Config
+	commitCfg.Labels = cleanLabels
+
 	if _, err := c.client.ContainerCommit(ctx, containerID, container.CommitOptions{
 		Reference: targetImage,
 		Author:    c.dockerCfg.SnapshotAuthor,
 		Comment:   c.dockerCfg.SnapshotComment,
 		Pause:     true,
+		Config:    &commitCfg,
 	}); err != nil {
 		return fmt.Errorf("commit container %s to %s: %w", containerID, targetImage, err)
 	}
