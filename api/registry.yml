@@ -60,7 +60,7 @@ images:
         timeout: 30s
         retries: 2
         retry_delay: 3s
-      - command: ["bash", "-c", "mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"DELETE FROM sales_channel_domain WHERE url LIKE 'https://%';\" && mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE sales_channel_domain SET url='{{.URL}}' WHERE url LIKE 'http://%' AND url <> '{{.URL}}';\""]
+      - command: ["bash", "-c", "mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE sales_channel_domain SET url='{{.URL}}' WHERE url <> '{{.URL}}';\""]
         delay: 10s
         timeout: 30s
         retries: 3

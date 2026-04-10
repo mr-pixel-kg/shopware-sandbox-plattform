@@ -324,7 +324,6 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
 	}
-	// build labels: sandbox marker + resolved labels + traefik labels.
 	labels := map[string]string{"sandbox_container": "true"}
 	for k, v := range resolved.Labels {
 		labels[k] = v
@@ -342,6 +341,12 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		labels["sandbox_ssh_username"] = resolved.SSH.Username
 		labels["sandbox_ssh_password"] = resolved.SSH.Password
 	}
+
+	imageLabels, err := s.docker.ImageLabels(ctx, image.FullName())
+	if err != nil {
+		return nil, fmt.Errorf("inspect image labels: %w", err)
+	}
+	labels = neutralizeStaleSandboxLabels(imageLabels, labels)
 
 	container, err := s.docker.CreateContainer(ctx, docker.ContainerCreateRequest{
 		ImageName:     image.FullName(),
@@ -1060,4 +1065,25 @@ func splitImageRef(ref string) (string, string) {
 		return ref[:i], ref[i+1:]
 	}
 	return ref, ""
+}
+
+func neutralizeStaleSandboxLabels(imageLabels, fresh map[string]string) map[string]string {
+	out := make(map[string]string, len(imageLabels)+len(fresh))
+	for k := range imageLabels {
+		if !isSandboxScopedLabel(k) {
+			continue
+		}
+		if _, overwritten := fresh[k]; overwritten {
+			continue
+		}
+		out[k] = ""
+	}
+	for k, v := range fresh {
+		out[k] = v
+	}
+	return out
+}
+
+func isSandboxScopedLabel(key string) bool {
+	return strings.HasPrefix(key, "traefik.") || strings.HasPrefix(key, "sandbox_")
 }
