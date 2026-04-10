@@ -1076,7 +1076,7 @@ func neutralizeStaleSandboxLabels(imageLabels, fresh map[string]string) map[stri
 		if _, overwritten := fresh[k]; overwritten {
 			continue
 		}
-		out[k] = "disabled"
+		out[k] = ""
 	}
 	for k, v := range fresh {
 		out[k] = v
