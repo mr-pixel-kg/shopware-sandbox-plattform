@@ -405,7 +405,7 @@ func (c *DockerClient) mergedCreateLabels(ctx context.Context, imageName string,
 	merged := make(map[string]string, len(img.Config.Labels)+len(requested))
 	for k := range img.Config.Labels {
 		if isEphemeralSandboxLabel(k) {
-			merged[k] = ""
+			merged[k] = "invalid"
 		}
 	}
 	for k, v := range requested {
@@ -428,6 +428,7 @@ func BuildTraefikLabels(containerName, hostname string, internalPort int, docker
 	routerPrefix := "traefik.http.routers." + containerName
 	servicePrefix := "traefik.http.services." + containerName
 	labels[routerPrefix+".rule"] = fmt.Sprintf("Host(`%s`)", hostname)
+	labels[routerPrefix+".service"] = containerName
 	labels[servicePrefix+".loadbalancer.server.port"] = strconv.Itoa(internalPort)
 
 	if dockerCfg.TraefikEntrypoints != "" {
