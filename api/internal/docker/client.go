@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	dockerevents "github.com/docker/docker/api/types/events"
@@ -259,9 +260,30 @@ func (c *DockerClient) DeleteContainer(ctx context.Context, containerID string) 
 	return nil
 }
 
+func isEphemeralLabel(key string) bool {
+	return strings.HasPrefix(key, "traefik.") || strings.HasPrefix(key, "sandbox_")
+}
+
 func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetImage string) error {
 	if targetImage == "" {
 		return fmt.Errorf("invalid target image reference")
+	}
+
+	inspect, err := c.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("inspect container %s: %w", containerID, err)
+	}
+	if inspect.Config == nil {
+		return fmt.Errorf("inspect container %s: missing config", containerID)
+	}
+
+	cleanConfig := *inspect.Config
+	cleanConfig.Labels = make(map[string]string, len(inspect.Config.Labels))
+	for k, v := range inspect.Config.Labels {
+		if isEphemeralLabel(k) {
+			continue
+		}
+		cleanConfig.Labels[k] = v
 	}
 
 	if err := c.client.ContainerPause(ctx, containerID); err != nil {
@@ -275,7 +297,8 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		Reference: targetImage,
 		Author:    c.dockerCfg.SnapshotAuthor,
 		Comment:   c.dockerCfg.SnapshotComment,
-		Pause:     true,
+		Pause:     false,
+		Config:    &cleanConfig,
 	}); err != nil {
 		return fmt.Errorf("commit container %s to %s: %w", containerID, targetImage, err)
 	}
