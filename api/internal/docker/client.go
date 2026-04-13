@@ -2,11 +2,11 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	dockerevents "github.com/docker/docker/api/types/events"
@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/config"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/types"
 )
 
 type ContainerCreateRequest struct {
@@ -43,7 +44,6 @@ type SandboxContainerEvent struct {
 
 type Client interface {
 	ImageExists(ctx context.Context, imageName string) bool
-	ImageLabels(ctx context.Context, imageName string) (map[string]string, error)
 	EnsureImage(ctx context.Context, imageName string) error
 	PullImage(ctx context.Context, imageName string) (io.ReadCloser, error)
 	RemoveImage(ctx context.Context, imageName string) error
@@ -86,15 +86,10 @@ func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error 
 	if imageName == "" {
 		return fmt.Errorf("invalid image reference")
 	}
-
-	// Reuse an already available image locally to avoid unnecessary pulls on
-	// every sandbox start.
 	if _, _, err := c.client.ImageInspectWithRaw(ctx, imageName); err == nil {
 		return nil
 	}
 
-	// Pulling here keeps image creation and sandbox creation idempotent from the
-	// caller's point of view.
 	reader, err := c.client.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("pull image %s: %w", imageName, err)
@@ -104,7 +99,6 @@ func (c *DockerClient) EnsureImage(ctx context.Context, imageName string) error 
 	if _, err := io.Copy(io.Discard, reader); err != nil {
 		return fmt.Errorf("consume image pull output for %s: %w", imageName, err)
 	}
-
 	return nil
 }
 
@@ -119,11 +113,9 @@ func (c *DockerClient) RemoveImage(ctx context.Context, imageName string) error 
 	if imageName == "" {
 		return fmt.Errorf("invalid image reference")
 	}
-
 	if _, err := c.client.ImageRemove(ctx, imageName, image.RemoveOptions{Force: false, PruneChildren: false}); err != nil {
 		return fmt.Errorf("remove image %s: %w", imageName, err)
 	}
-
 	return nil
 }
 
@@ -143,7 +135,6 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 		OpenStdin: true,
 	}
 
-	// extract host port from the host (format: "localhost:prt")
 	_, hostPortStr, _ := net.SplitHostPort(request.Hostname)
 	hostPort, _ := strconv.Atoi(hostPortStr)
 
@@ -151,13 +142,9 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 
 	if request.InternalPort > 0 {
 		internalPort := nat.Port(strconv.Itoa(request.InternalPort) + "/tcp")
-		containerConfig.ExposedPorts = nat.PortSet{
-			internalPort: struct{}{},
-		}
+		containerConfig.ExposedPorts = nat.PortSet{internalPort: struct{}{}}
 		hostConfig.PortBindings = nat.PortMap{
-			internalPort: []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: strconv.Itoa(hostPort)},
-			},
+			internalPort: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: strconv.Itoa(hostPort)}},
 		}
 	}
 
@@ -170,16 +157,13 @@ func (c *DockerClient) createPortContainer(ctx context.Context, request Containe
 		if hostConfig.PortBindings == nil {
 			hostConfig.PortBindings = nat.PortMap{}
 		}
-		hostConfig.PortBindings[sshPort] = []nat.PortBinding{
-			{HostIP: "0.0.0.0", HostPort: "0"},
-		}
+		hostConfig.PortBindings[sshPort] = []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}}
 	}
 
 	resp, err := c.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, request.ContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
 	}
-
 	if err := c.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
 	}
@@ -208,9 +192,7 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Conta
 	var networkingConfig *network.NetworkingConfig
 	if c.dockerCfg.Network != "" {
 		networkingConfig = &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				c.dockerCfg.Network: {},
-			},
+			EndpointsConfig: map[string]*network.EndpointSettings{c.dockerCfg.Network: {}},
 		}
 	}
 
@@ -220,9 +202,7 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Conta
 		containerConfig.ExposedPorts = nat.PortSet{sshPort: struct{}{}}
 		hostConfig = &container.HostConfig{
 			PortBindings: nat.PortMap{
-				sshPort: []nat.PortBinding{
-					{HostIP: "0.0.0.0", HostPort: "0"},
-				},
+				sshPort: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
 			},
 		}
 	}
@@ -231,7 +211,6 @@ func (c *DockerClient) createTraefikContainer(ctx context.Context, request Conta
 	if err != nil {
 		return nil, fmt.Errorf("create container %s: %w", request.ContainerName, err)
 	}
-
 	if err := c.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("start container %s: %w", resp.ID, err)
 	}
@@ -252,16 +231,10 @@ func (c *DockerClient) DeleteContainer(ctx context.Context, containerID string) 
 	if err := c.client.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("stop container %s: %w", containerID, err)
 	}
-
 	if err := c.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("remove container %s: %w", containerID, err)
 	}
-
 	return nil
-}
-
-func isEphemeralLabel(key string) bool {
-	return strings.HasPrefix(key, "traefik.") || strings.HasPrefix(key, "sandbox_")
 }
 
 func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetImage string) error {
@@ -277,46 +250,108 @@ func (c *DockerClient) CommitContainer(ctx context.Context, containerID, targetI
 		return fmt.Errorf("inspect container %s: missing config", containerID)
 	}
 
-	cleanConfig := *inspect.Config
-	cleanConfig.Labels = make(map[string]string, len(inspect.Config.Labels))
-	for k, v := range inspect.Config.Labels {
-		if isEphemeralLabel(k) {
-			continue
-		}
-		cleanConfig.Labels[k] = v
-	}
-
 	if err := c.client.ContainerPause(ctx, containerID); err != nil {
-		return fmt.Errorf("pause container %s before commit: %w", containerID, err)
+		return fmt.Errorf("pause container %s: %w", containerID, err)
 	}
 	defer func() {
 		_ = c.client.ContainerUnpause(ctx, containerID)
 	}()
 
-	if _, err := c.client.ContainerCommit(ctx, containerID, container.CommitOptions{
-		Reference: targetImage,
-		Author:    c.dockerCfg.SnapshotAuthor,
-		Comment:   c.dockerCfg.SnapshotComment,
-		Pause:     false,
-		Config:    &cleanConfig,
-	}); err != nil {
-		return fmt.Errorf("commit container %s to %s: %w", containerID, targetImage, err)
+	exportReader, err := c.client.ContainerExport(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("export container %s: %w", containerID, err)
 	}
+	defer exportReader.Close()
+
+	importResp, err := c.client.ImageImport(ctx, image.ImportSource{
+		Source:     exportReader,
+		SourceName: "-",
+	}, targetImage, image.ImportOptions{
+		Message: c.dockerCfg.SnapshotComment,
+		Changes: configToChanges(inspect.Config),
+	})
+	if err != nil {
+		return fmt.Errorf("import image %s: %w", targetImage, err)
+	}
+	defer importResp.Close()
+	_, _ = io.Copy(io.Discard, importResp)
 
 	return nil
 }
 
-func (c *DockerClient) ImageLabels(ctx context.Context, imageName string) (map[string]string, error) {
-	img, _, err := c.client.ImageInspectWithRaw(ctx, imageName)
-	if err != nil {
-		return nil, fmt.Errorf("inspect image %s: %w", imageName, err)
+func configToChanges(cfg *container.Config) []string {
+	var out []string
+
+	for _, e := range cfg.Env {
+		out = append(out, "ENV "+e)
 	}
-	return img.Config.Labels, nil
+	if cfg.WorkingDir != "" {
+		out = append(out, "WORKDIR "+cfg.WorkingDir)
+	}
+	if cfg.User != "" {
+		out = append(out, "USER "+cfg.User)
+	}
+	for port := range cfg.ExposedPorts {
+		out = append(out, "EXPOSE "+string(port))
+	}
+	for vol := range cfg.Volumes {
+		out = append(out, "VOLUME "+vol)
+	}
+	if cfg.StopSignal != "" {
+		out = append(out, "STOPSIGNAL "+cfg.StopSignal)
+	}
+	if len(cfg.Entrypoint) > 0 {
+		b, _ := json.Marshal(cfg.Entrypoint)
+		out = append(out, "ENTRYPOINT "+string(b))
+	}
+	if len(cfg.Cmd) > 0 {
+		b, _ := json.Marshal(cfg.Cmd)
+		out = append(out, "CMD "+string(b))
+	}
+	if hc := cfg.Healthcheck; hc != nil && len(hc.Test) > 0 {
+		s := "HEALTHCHECK"
+		if hc.Interval != 0 {
+			s += fmt.Sprintf(" --interval=%s", hc.Interval)
+		}
+		if hc.Timeout != 0 {
+			s += fmt.Sprintf(" --timeout=%s", hc.Timeout)
+		}
+		if hc.StartPeriod != 0 {
+			s += fmt.Sprintf(" --start-period=%s", hc.StartPeriod)
+		}
+		if hc.StartInterval != 0 {
+			s += fmt.Sprintf(" --start-interval=%s", hc.StartInterval)
+		}
+		if hc.Retries != 0 {
+			s += fmt.Sprintf(" --retries=%d", hc.Retries)
+		}
+		switch hc.Test[0] {
+		case "NONE":
+			s += " NONE"
+		case "CMD":
+			b, _ := json.Marshal(hc.Test[1:])
+			s += " CMD " + string(b)
+		case "CMD-SHELL":
+			s += " CMD " + hc.Test[1]
+		}
+		out = append(out, s)
+	}
+	for _, ob := range cfg.OnBuild {
+		out = append(out, "ONBUILD "+ob)
+	}
+	for k, v := range cfg.Labels {
+		if types.IsEphemeralLabel(k) {
+			continue
+		}
+		out = append(out, fmt.Sprintf("LABEL %q=%q", k, v))
+	}
+
+	return out
 }
 
 func (c *DockerClient) ListSandboxContainerIDs(ctx context.Context) (map[string]struct{}, error) {
 	args := filters.NewArgs()
-	args.Add("label", "sandbox_container=true")
+	args.Add("label", types.LabelSandboxContainer+"=true")
 	containers, err := c.client.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
 	if err != nil {
 		return nil, fmt.Errorf("list sandbox containers: %w", err)
@@ -331,7 +366,7 @@ func (c *DockerClient) ListSandboxContainerIDs(ctx context.Context) (map[string]
 func (c *DockerClient) SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error) {
 	args := filters.NewArgs()
 	args.Add("type", "container")
-	args.Add("label", "sandbox_container=true")
+	args.Add("label", types.LabelSandboxContainer+"=true")
 	args.Add("event", "start")
 	args.Add("event", "stop")
 	args.Add("event", "die")
@@ -382,7 +417,6 @@ func (c *DockerClient) scheme() string {
 	return "http"
 }
 
-// FindFreePort finds an available tcp port
 func FindFreePort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -392,35 +426,4 @@ func FindFreePort() (int, error) {
 		_ = l.Close()
 	}()
 	return l.Addr().(*net.TCPAddr).Port, nil
-}
-
-// BuildTraefikLabels builds the treafik routing labels
-func BuildTraefikLabels(containerName, hostname string, internalPort int, dockerCfg config.DockerConfig) map[string]string {
-	labels := map[string]string{
-		"sandbox_container": "true",
-		"traefik.enable":    strconv.FormatBool(dockerCfg.TraefikEnable),
-	}
-
-	if dockerCfg.Network != "" {
-		labels["traefik.docker.network"] = dockerCfg.Network
-	}
-
-	routerPrefix := "traefik.http.routers." + containerName
-	servicePrefix := "traefik.http.services." + containerName
-	labels[routerPrefix+".rule"] = fmt.Sprintf("Host(`%s`)", hostname)
-	labels[routerPrefix+".service"] = containerName
-	labels[servicePrefix+".loadbalancer.server.port"] = strconv.Itoa(internalPort)
-
-	if dockerCfg.TraefikEntrypoints != "" {
-		labels[routerPrefix+".entrypoints"] = dockerCfg.TraefikEntrypoints
-	}
-	if dockerCfg.TraefikCertResolver != "" {
-		labels[routerPrefix+".tls"] = "true"
-		labels[routerPrefix+".tls.certresolver"] = dockerCfg.TraefikCertResolver
-	}
-	if dockerCfg.TraefikMiddlewares != "" {
-		labels[routerPrefix+".middlewares"] = dockerCfg.TraefikMiddlewares
-	}
-
-	return labels
 }

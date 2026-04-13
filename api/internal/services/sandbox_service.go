@@ -17,6 +17,7 @@ import (
 	"github.com/mr-pixel-kg/shopshredder/api/internal/models"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/repositories"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/types"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -326,29 +327,28 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
 	}
-	labels := map[string]string{"sandbox_container": "true"}
-	for k, v := range resolved.Labels {
-		labels[k] = v
-	}
+	labelSets := []map[string]string{types.SandboxBaseLabels(), resolved.Labels}
+
 	if s.dockerCfg.Mode == config.DockerModeTraefik && internalPort > 0 {
-		for k, v := range docker.BuildTraefikLabels(containerName, hostname, internalPort, s.dockerCfg) {
-			labels[k] = v
-		}
+		labelSets = append(labelSets, types.TraefikLabels(types.TraefikLabelConfig{
+			ContainerName: containerName,
+			Hostname:      hostname,
+			InternalPort:  internalPort,
+			Network:       s.dockerCfg.Network,
+			Enable:        s.dockerCfg.TraefikEnable,
+			Entrypoints:   s.dockerCfg.TraefikEntrypoints,
+			CertResolver:  s.dockerCfg.TraefikCertResolver,
+			Middlewares:   s.dockerCfg.TraefikMiddlewares,
+		}))
 	}
 
 	sshPort := 0
 	if resolved.SSH != nil {
 		sshPort = resolved.SSH.Port
-		labels["sandbox_ssh_port"] = strconv.Itoa(resolved.SSH.Port)
-		labels["sandbox_ssh_username"] = resolved.SSH.Username
-		labels["sandbox_ssh_password"] = resolved.SSH.Password
+		labelSets = append(labelSets, types.SSHLabels(sshPort, resolved.SSH.Username, resolved.SSH.Password))
 	}
 
-	imageLabels, err := s.docker.ImageLabels(ctx, image.FullName())
-	if err != nil {
-		return nil, fmt.Errorf("inspect image labels: %w", err)
-	}
-	labels = neutralizeStaleSandboxLabels(imageLabels, labels)
+	labels := types.MergeLabels(labelSets...)
 
 	container, err := s.docker.CreateContainer(ctx, docker.ContainerCreateRequest{
 		ImageName:     image.FullName(),
@@ -589,7 +589,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 }
 
 func (s *SandboxService) commitSnapshot(sandboxID uuid.UUID, containerID string, imageID uuid.UUID, targetImage string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	commitErr := s.docker.CommitContainer(ctx, containerID, targetImage)
@@ -1089,25 +1089,4 @@ func splitImageRef(ref string) (string, string) {
 		return ref[:i], ref[i+1:]
 	}
 	return ref, ""
-}
-
-func neutralizeStaleSandboxLabels(imageLabels, fresh map[string]string) map[string]string {
-	out := make(map[string]string, len(imageLabels)+len(fresh))
-	for k := range imageLabels {
-		if !isSandboxScopedLabel(k) {
-			continue
-		}
-		if _, overwritten := fresh[k]; overwritten {
-			continue
-		}
-		out[k] = ""
-	}
-	for k, v := range fresh {
-		out[k] = v
-	}
-	return out
-}
-
-func isSandboxScopedLabel(key string) bool {
-	return strings.HasPrefix(key, "traefik.") || strings.HasPrefix(key, "sandbox_")
 }
