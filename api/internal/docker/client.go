@@ -54,7 +54,7 @@ type Client interface {
 	ListSandboxContainerIDs(ctx context.Context) (map[string]struct{}, error)
 	SubscribeSandboxEvents(ctx context.Context) (<-chan SandboxContainerEvent, <-chan error)
 	CreateExecSession(ctx context.Context, containerID string, opts ExecAttachOptions) (*ExecSession, error)
-	ContainerLogs(ctx context.Context, containerID string) (io.ReadCloser, error)
+	ContainerLogs(ctx context.Context, containerID string) (*LogStream, error)
 	ExecFollow(ctx context.Context, containerID string, cmd []string) (io.ReadCloser, error)
 }
 

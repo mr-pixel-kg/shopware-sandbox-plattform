@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/docker"
@@ -89,12 +88,16 @@ func (s *LogService) FindLogSource(sandbox *models.Sandbox, key string) (*regist
 	return nil, ErrLogSourceNotFound
 }
 
-func (s *LogService) StreamLog(ctx context.Context, containerID string, source registry.LogSource) (io.ReadCloser, error) {
+func (s *LogService) StreamLog(ctx context.Context, containerID string, source registry.LogSource) (*docker.LogStream, error) {
 	switch source.Type {
 	case registry.LogSourceTypeDocker:
 		return s.docker.ContainerLogs(ctx, containerID)
 	case registry.LogSourceTypeFile:
-		return s.docker.ExecFollow(ctx, containerID, []string{"tail", "-f", source.Path})
+		reader, err := s.docker.ExecFollow(ctx, containerID, []string{"tail", "-f", source.Path})
+		if err != nil {
+			return nil, err
+		}
+		return &docker.LogStream{Reader: reader, TTY: false}, nil
 	default:
 		return nil, fmt.Errorf("unsupported log source type: %s", source.Type)
 	}

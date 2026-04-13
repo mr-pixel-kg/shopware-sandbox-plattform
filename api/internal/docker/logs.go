@@ -8,7 +8,17 @@ import (
 	"github.com/docker/docker/api/types/container"
 )
 
-func (c *DockerClient) ContainerLogs(ctx context.Context, containerID string) (io.ReadCloser, error) {
+type LogStream struct {
+	Reader io.ReadCloser
+	TTY    bool
+}
+
+func (c *DockerClient) ContainerLogs(ctx context.Context, containerID string) (*LogStream, error) {
+	inspect, err := c.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return nil, fmt.Errorf("inspect container %s: %w", containerID, err)
+	}
+
 	reader, err := c.client.ContainerLogs(ctx, containerID, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -17,7 +27,7 @@ func (c *DockerClient) ContainerLogs(ctx context.Context, containerID string) (i
 	if err != nil {
 		return nil, fmt.Errorf("container logs %s: %w", containerID, err)
 	}
-	return reader, nil
+	return &LogStream{Reader: reader, TTY: inspect.Config.Tty}, nil
 }
 
 type execReadCloser struct {

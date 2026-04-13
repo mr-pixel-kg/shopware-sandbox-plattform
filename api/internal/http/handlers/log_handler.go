@@ -83,25 +83,30 @@ func (h LogHandler) StreamLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stream, err := h.Logs.StreamLog(r.Context(), sandbox.ContainerID, *source)
+	logStream, err := h.Logs.StreamLog(r.Context(), sandbox.ContainerID, *source)
 	if err != nil {
 		errs.Write(w, http.StatusInternalServerError, "Failed to open log stream")
 		return
 	}
-	defer stream.Close()
+	defer logStream.Reader.Close()
 
 	writeSSEHeaders(w)
 
-	pr, pw := io.Pipe()
-	defer func() { _ = pr.Close() }()
-
-	go func() {
-		defer func() { _ = pw.Close() }()
-		_, _ = stdcopy.StdCopy(pw, pw, stream)
-	}()
+	var reader io.Reader
+	if logStream.TTY {
+		reader = logStream.Reader
+	} else {
+		pr, pw := io.Pipe()
+		defer func() { _ = pr.Close() }()
+		go func() {
+			defer func() { _ = pw.Close() }()
+			_, _ = stdcopy.StdCopy(pw, pw, logStream.Reader)
+		}()
+		reader = pr
+	}
 
 	ctx := r.Context()
-	scanner := bufio.NewScanner(pr)
+	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 256*1024), 256*1024)
 
 	for scanner.Scan() {
