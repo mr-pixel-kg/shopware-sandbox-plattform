@@ -70,6 +70,11 @@ images:
         timeout: 60s
         retries: 3
         retry_delay: 10s
+      - command: ["bash", "-c", "cd /var/www/html && bin/console app:url-change:resolve move-shop-permanently"]
+        delay: 5s
+        timeout: 120s
+        retries: 3
+        retry_delay: 10s
       - command: ["bash", "-c", "cd /var/www/html && bin/console cache:clear"]
         delay: 6s
         timeout: 30s
