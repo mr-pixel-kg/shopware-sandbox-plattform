@@ -109,7 +109,7 @@ export interface SandboxHealthEvent {
   checkedAt: string
 }
 
-export type LogSourceType = 'docker' | 'file'
+export type LogSourceType = 'docker' | 'file' | 'lifecycle'
 
 export interface LogSource {
   key: string

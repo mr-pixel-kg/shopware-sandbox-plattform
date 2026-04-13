@@ -15,6 +15,14 @@ const props = defineProps<{
 const config = computed(() => {
   switch (props.status) {
     case 'running':
+      if (props.stateReason) {
+        return {
+          label: 'Eingeschränkt',
+          variant: 'outline' as const,
+          class: 'bg-orange-500/15 text-orange-700 border-orange-500/25',
+          spinner: false,
+        }
+      }
       return {
         label: 'Aktiv',
         variant: 'outline' as const,
