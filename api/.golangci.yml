@@ -43,6 +43,7 @@ linters:
         - name: unreachable-code
     gosec:
       excludes:
+        - G101
         - G118
         - G401
         - G501

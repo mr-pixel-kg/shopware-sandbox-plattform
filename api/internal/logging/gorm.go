@@ -20,8 +20,6 @@ func NewGormLogger(appLevel slog.Level) gormlogger.Interface {
 	var gormLevel gormlogger.LogLevel
 	switch {
 	case appLevel <= slog.LevelDebug:
-		gormLevel = gormlogger.Info
-	case appLevel <= slog.LevelInfo:
 		gormLevel = gormlogger.Warn
 	default:
 		gormLevel = gormlogger.Error

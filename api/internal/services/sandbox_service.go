@@ -17,6 +17,7 @@ import (
 	"github.com/mr-pixel-kg/shopshredder/api/internal/models"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/repositories"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/types"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -136,10 +137,11 @@ type SandboxListInput struct {
 }
 
 type SandboxListResult struct {
-	Sandboxes []models.Sandbox
-	Total     int64
-	Limit     int
-	Offset    int
+	Sandboxes  []models.Sandbox
+	SSHEntries map[uuid.UUID]*registry.SSHEntry
+	Total      int64
+	Limit      int
+	Offset     int
 }
 
 func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResult, error) {
@@ -163,12 +165,13 @@ func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResu
 		return nil, err
 	}
 
-	s.EnrichMetadata(sandboxes)
+	sshEntries := s.EnrichMetadata(sandboxes)
 	return &SandboxListResult{
-		Sandboxes: sandboxes,
-		Total:     total,
-		Limit:     input.Limit,
-		Offset:    input.Offset,
+		Sandboxes:  sandboxes,
+		SSHEntries: sshEntries,
+		Total:      total,
+		Limit:      input.Limit,
+		Offset:     input.Offset,
 	}, nil
 }
 
@@ -324,29 +327,28 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry for %s: %w", image.FullName(), err)
 	}
-	labels := map[string]string{"sandbox_container": "true"}
-	for k, v := range resolved.Labels {
-		labels[k] = v
-	}
+	labelSets := []map[string]string{types.SandboxBaseLabels(), resolved.Labels}
+
 	if s.dockerCfg.Mode == config.DockerModeTraefik && internalPort > 0 {
-		for k, v := range docker.BuildTraefikLabels(containerName, hostname, internalPort, s.dockerCfg) {
-			labels[k] = v
-		}
+		labelSets = append(labelSets, types.TraefikLabels(types.TraefikLabelConfig{
+			ContainerName: containerName,
+			Hostname:      hostname,
+			InternalPort:  internalPort,
+			Network:       s.dockerCfg.Network,
+			Enable:        s.dockerCfg.TraefikEnable,
+			Entrypoints:   s.dockerCfg.TraefikEntrypoints,
+			CertResolver:  s.dockerCfg.TraefikCertResolver,
+			Middlewares:   s.dockerCfg.TraefikMiddlewares,
+		}))
 	}
 
 	sshPort := 0
 	if resolved.SSH != nil {
 		sshPort = resolved.SSH.Port
-		labels["sandbox_ssh_port"] = strconv.Itoa(resolved.SSH.Port)
-		labels["sandbox_ssh_username"] = resolved.SSH.Username
-		labels["sandbox_ssh_password"] = resolved.SSH.Password
+		labelSets = append(labelSets, types.SSHLabels(sshPort, resolved.SSH.Username, resolved.SSH.Password))
 	}
 
-	imageLabels, err := s.docker.ImageLabels(ctx, image.FullName())
-	if err != nil {
-		return nil, fmt.Errorf("inspect image labels: %w", err)
-	}
-	labels = neutralizeStaleSandboxLabels(imageLabels, labels)
+	labels := types.MergeLabels(labelSets...)
 
 	container, err := s.docker.CreateContainer(ctx, docker.ContainerCreateRequest{
 		ImageName:     image.FullName(),
@@ -587,7 +589,7 @@ func (s *SandboxService) CreateSnapshot(ctx context.Context, input CreateSnapsho
 }
 
 func (s *SandboxService) commitSnapshot(sandboxID uuid.UUID, containerID string, imageID uuid.UUID, targetImage string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	commitErr := s.docker.CommitContainer(ctx, containerID, targetImage)
@@ -982,52 +984,74 @@ func (s *SandboxService) ResolveSSHEntry(imageID uuid.UUID) *registry.SSHEntry {
 	return entry.SSH
 }
 
-func (s *SandboxService) EnrichMetadata(sandboxes []models.Sandbox) {
+func (s *SandboxService) EnrichMetadata(sandboxes []models.Sandbox) map[uuid.UUID]*registry.SSHEntry {
 	type cachedEntry struct {
 		metadata []registry.MetadataItem
 		ssh      *registry.SSHEntry
 	}
-	cache := make(map[uuid.UUID]*cachedEntry)
+
+	seen := make(map[uuid.UUID]struct{})
+	var imageIDs []uuid.UUID
+	for i := range sandboxes {
+		if _, ok := seen[sandboxes[i].ImageID]; !ok {
+			seen[sandboxes[i].ImageID] = struct{}{}
+			imageIDs = append(imageIDs, sandboxes[i].ImageID)
+		}
+	}
+
+	sshEntries := make(map[uuid.UUID]*registry.SSHEntry, len(imageIDs))
+
+	images, err := s.images.FindByIDs(imageIDs)
+	if err != nil {
+		slog.Warn("enrich sandbox: failed to batch-load images", "error", err)
+		return sshEntries
+	}
+	imageMap := make(map[uuid.UUID]*models.Image, len(images))
+	for i := range images {
+		imageMap[images[i].ID] = &images[i]
+	}
+
+	cache := make(map[uuid.UUID]*cachedEntry, len(imageIDs))
+	for _, id := range imageIDs {
+		img, ok := imageMap[id]
+		if !ok {
+			slog.Warn("enrich sandbox: image not found", "image_id", id)
+			cache[id] = nil
+			continue
+		}
+		regEntry := s.resolver.ResolveEntry(img.RegistryName())
+		if regEntry != nil {
+			meta := mergeRegistryAndDB(regEntry.Metadata, img.Metadata)
+			cache[id] = &cachedEntry{metadata: meta, ssh: regEntry.SSH}
+			sshEntries[id] = regEntry.SSH
+		} else {
+			cache[id] = nil
+		}
+	}
 
 	for idx := range sandboxes {
 		sb := &sandboxes[idx]
-
-		entry, ok := cache[sb.ImageID]
-		if !ok {
-			img, err := s.images.FindByID(sb.ImageID)
-			if err != nil {
-				slog.Warn("enrich sandbox: image not found", "image_id", sb.ImageID)
-				cache[sb.ImageID] = nil
-				continue
-			}
-			regEntry := s.resolver.ResolveEntry(img.RegistryName())
-			if regEntry != nil {
-				meta := mergeRegistryAndDB(regEntry.Metadata, img.Metadata)
-				entry = &cachedEntry{metadata: meta, ssh: regEntry.SSH}
-			}
-			cache[sb.ImageID] = entry
-		}
-
-		if entry == nil {
+		entry := cache[sb.ImageID]
+		if entry == nil || len(entry.metadata) == 0 {
 			continue
 		}
 
-		if len(entry.metadata) > 0 {
-			var values map[string]string
-			if len(sb.Metadata) > 0 {
-				_ = json.Unmarshal(sb.Metadata, &values)
-			}
-			enriched := make([]registry.MetadataItem, len(entry.metadata))
-			copy(enriched, entry.metadata)
-			for j := range enriched {
-				if v, exists := values[enriched[j].Key]; exists {
-					enriched[j].Value = v
-				}
-			}
-			data, _ := json.Marshal(enriched)
-			sb.Metadata = datatypes.JSON(data)
+		var values map[string]string
+		if len(sb.Metadata) > 0 {
+			_ = json.Unmarshal(sb.Metadata, &values)
 		}
+		enriched := make([]registry.MetadataItem, len(entry.metadata))
+		copy(enriched, entry.metadata)
+		for j := range enriched {
+			if v, exists := values[enriched[j].Key]; exists {
+				enriched[j].Value = v
+			}
+		}
+		data, _ := json.Marshal(enriched)
+		sb.Metadata = datatypes.JSON(data)
 	}
+
+	return sshEntries
 }
 
 func mergeRegistryAndDB(reg []registry.MetadataItem, dbJSON datatypes.JSON) []registry.MetadataItem {
@@ -1065,25 +1089,4 @@ func splitImageRef(ref string) (string, string) {
 		return ref[:i], ref[i+1:]
 	}
 	return ref, ""
-}
-
-func neutralizeStaleSandboxLabels(imageLabels, fresh map[string]string) map[string]string {
-	out := make(map[string]string, len(imageLabels)+len(fresh))
-	for k := range imageLabels {
-		if !isSandboxScopedLabel(k) {
-			continue
-		}
-		if _, overwritten := fresh[k]; overwritten {
-			continue
-		}
-		out[k] = ""
-	}
-	for k, v := range fresh {
-		out[k] = v
-	}
-	return out
-}
-
-func isSandboxScopedLabel(key string) bool {
-	return strings.HasPrefix(key, "traefik.") || strings.HasPrefix(key, "sandbox_")
 }

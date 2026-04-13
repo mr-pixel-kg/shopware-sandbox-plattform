@@ -67,6 +67,15 @@ func (r *ImageRepository) FindByID(id uuid.UUID) (*models.Image, error) {
 	return &image, nil
 }
 
+func (r *ImageRepository) FindByIDs(ids []uuid.UUID) ([]models.Image, error) {
+	var images []models.Image
+	if len(ids) == 0 {
+		return images, nil
+	}
+	err := r.withOwner(r.db).Where("id IN ?", ids).Find(&images).Error
+	return images, err
+}
+
 func (r *ImageRepository) Create(image *models.Image) error {
 	return r.db.Create(image).Error
 }

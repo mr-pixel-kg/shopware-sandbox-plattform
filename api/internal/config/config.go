@@ -263,15 +263,6 @@ func MustLoad() Config {
 	if cfg.Docker.TrustedProxies == "" {
 		cfg.Docker.TrustedProxies = "0.0.0.0/0"
 	}
-	if cfg.Docker.TraefikEntrypoints == "" {
-		cfg.Docker.TraefikEntrypoints = "websecure"
-	}
-	if cfg.Docker.TraefikCertResolver == "" {
-		cfg.Docker.TraefikCertResolver = "production"
-	}
-	if cfg.Docker.TraefikMiddlewares == "" {
-		cfg.Docker.TraefikMiddlewares = "sandbox-middleware@file,https-redirect@file"
-	}
 	if cfg.Docker.SnapshotAuthor == "" {
 		cfg.Docker.SnapshotAuthor = "shopshredder-api"
 	}

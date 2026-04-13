@@ -173,6 +173,10 @@ func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
 	return image, nil
 }
 
+func (s *ImageService) FindByIDs(ids []uuid.UUID) ([]models.Image, error) {
+	return s.repo.FindByIDs(ids)
+}
+
 func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, description *string, isPublic bool, metadata json.RawMessage, registryRef *string, status string) (*models.Image, error) {
 	img := &models.Image{
 		ID:          uuid.New(),

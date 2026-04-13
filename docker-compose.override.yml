@@ -1,13 +1,18 @@
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v2.11
     restart: always
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
     ports:
       - "80:80"
       - "9000:8080"
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
-      - ./proxy/traefik:/etc/traefik
     networks:
       - sandbox-network
       - internal
@@ -54,5 +59,4 @@ services:
 
 networks:
   internal:
-    external: false
-    driver: bridge
+    external: true

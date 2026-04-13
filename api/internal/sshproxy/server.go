@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	glssh "github.com/gliderlabs/ssh"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/types"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -249,11 +250,11 @@ func (s *Server) resolveTarget(ctx context.Context, containerName string) (addr,
 		return "", "", fmt.Errorf("container %q not found", containerName)
 	}
 
-	portStr := info.Config.Labels["sandbox_ssh_port"]
+	portStr := info.Config.Labels[types.LabelSSHPort]
 	if portStr == "" {
 		return "", "", fmt.Errorf("container %q does not support SSH", containerName)
 	}
-	labelUser = info.Config.Labels["sandbox_ssh_username"]
+	labelUser = info.Config.Labels[types.LabelSSHUsername]
 
 	targetPort, _ := strconv.Atoi(portStr)
 	if s.network != "" {

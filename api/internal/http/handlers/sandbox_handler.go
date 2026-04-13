@@ -61,8 +61,8 @@ func (h SandboxHandler) List(c fuego.ContextNoBody) (dto.SandboxListResponse, er
 
 	sshCfg := h.Sandboxes.SSHConfig()
 	out := make([]dto.SandboxResponse, len(result.Sandboxes))
-	for i, sb := range result.Sandboxes {
-		out[i] = sandboxToResponse(&result.Sandboxes[i], sshCfg, h.Sandboxes.ResolveSSHEntry(sb.ImageID))
+	for i := range result.Sandboxes {
+		out[i] = sandboxToResponse(&result.Sandboxes[i], sshCfg, result.SSHEntries[result.Sandboxes[i].ImageID])
 	}
 	return dto.SandboxListResponse{
 		Data: out,

@@ -7,7 +7,7 @@ tasks:
   dev:
     desc: Start all dev servers
     run:
-      - cmd: docker compose up -d --wait database
+      - cmd: docker compose up -d --wait database traefik
         silent: true
       - task: db:migrate
       - parallel:
@@ -40,7 +40,7 @@ tasks:
   docker:infra:
     desc: Start infrastructure only
     run:
-      - cmd: docker compose up -d database
+      - cmd: docker compose up -d database traefik
 
   docker:down:
     desc: Stop containers
