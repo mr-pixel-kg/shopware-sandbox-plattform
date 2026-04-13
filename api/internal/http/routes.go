@@ -414,7 +414,7 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker, cfg.Server.BaseURL, cfg.Storage.ThumbnailDir, resolver)
 	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, cfg.SSH, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor)
-	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver)
+	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver, executor)
 	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
 	logService := services.NewLogService(dockerClient, sandboxRepo, imageRepo, resolver)
 

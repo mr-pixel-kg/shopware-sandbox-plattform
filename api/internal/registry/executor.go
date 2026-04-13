@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,9 +15,48 @@ const defaultExecTimeout = 5 * time.Minute
 
 type Executor struct {
 	Client *client.Client
+
+	mu        sync.Mutex
+	postStart map[string]chan struct{}
+}
+
+func (e *Executor) PostStartDone(containerID string) bool {
+	e.mu.Lock()
+	ch, ok := e.postStart[containerID]
+	e.mu.Unlock()
+	if !ok {
+		return true
+	}
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *Executor) PostStartWait(containerID string) <-chan struct{} {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.postStart[containerID]
 }
 
 func (e *Executor) RunPostStart(ctx context.Context, containerID string, commands []ExecCommand) {
+	done := make(chan struct{})
+	e.mu.Lock()
+	if e.postStart == nil {
+		e.postStart = make(map[string]chan struct{})
+	}
+	e.postStart[containerID] = done
+	e.mu.Unlock()
+
+	defer func() {
+		close(done)
+		e.mu.Lock()
+		delete(e.postStart, containerID)
+		e.mu.Unlock()
+	}()
+
 	slog.Debug("post-start starting", "container_id", containerID, "commands", len(commands))
 	for i, cmd := range commands {
 		slog.Debug("post-start executing", "container_id", containerID, "index", i, "command", cmd.Command, "delay", cmd.Delay.Duration, "timeout", cmd.Timeout.Duration)
