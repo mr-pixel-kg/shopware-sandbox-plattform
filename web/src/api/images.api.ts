@@ -3,7 +3,7 @@ import { apiClient } from './client'
 import type {
   CreateImageRequest,
   Image,
-  MetadataItem,
+  MetadataSchema,
   PaginatedResponse,
   PaginationParams,
   PendingImage,
@@ -50,10 +50,14 @@ export const imagesApi = {
     await apiClient.delete(`/api/images/${id}`)
   },
 
-  async lookupRegistry(imageName: string): Promise<MetadataItem[]> {
-    const { data } = await apiClient.get<MetadataItem[]>('/api/registry', {
-      params: { name: imageName },
-    })
-    return data
+  async lookupRegistry(imageName: string): Promise<MetadataSchema | null> {
+    try {
+      const { data } = await apiClient.get<MetadataSchema>('/api/registry', {
+        params: { name: imageName },
+      })
+      return data
+    } catch {
+      return null
+    }
   },
 }

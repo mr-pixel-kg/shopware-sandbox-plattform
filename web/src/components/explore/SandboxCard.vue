@@ -1,61 +1,46 @@
 <script setup lang="ts">
-import { Check, Copy, Eye, EyeOff, Package } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { Package } from 'lucide-vue-next'
+import { computed } from 'vue'
 
+import MetadataActionRenderer from '@/components/metadata/MetadataActionRenderer.vue'
+import MetadataSection from '@/components/metadata/MetadataSection.vue'
 import TtlChip from '@/components/sandboxes/TtlChip.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { resolveIcon } from '@/utils/icons'
+import { extractFieldValues, itemsForContext } from '@/utils/metadata'
 
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
-import type { Sandbox } from '@/types'
-
-export interface MetadataField {
-  label: string
-  value: string
-  secret?: boolean
-  icon?: string
-  loading?: boolean
-}
-
-export interface MetadataGroup {
-  title: string
-  fields: MetadataField[]
-}
+import type { ActionItem, MetadataContext, Sandbox } from '@/types'
 
 const props = defineProps<{
   sandbox: Sandbox
   title: string
   thumbnailUrl?: string
-  actions?: CardAction[]
-  metadata?: MetadataGroup[]
+  extraActions?: CardAction[]
   stateReason?: string
+  context?: MetadataContext
 }>()
 
-const primaryActions = computed(() =>
-  (props.actions ?? []).filter((a) => a.variant !== 'destructive'),
-)
-const destructiveActions = computed(() =>
-  (props.actions ?? []).filter((a) => a.variant === 'destructive'),
+const ctx = computed<MetadataContext>(() => props.context ?? 'sandbox.card')
+const values = computed(() => extractFieldValues(props.sandbox.metadata))
+const schemaActions = computed(() =>
+  itemsForContext(props.sandbox.metadata, ctx.value).filter(
+    (i): i is ActionItem => i.type === 'action',
+  ),
 )
 
-const copiedKey = ref<string>()
-const revealedKeys = ref<Set<string>>(new Set())
-
-async function copyToClipboard(field: MetadataField) {
-  await navigator.clipboard.writeText(field.value)
-  copiedKey.value = field.label
-  setTimeout(() => {
-    copiedKey.value = undefined
-  }, 1500)
-}
+const destructiveExtras = computed(() =>
+  (props.extraActions ?? []).filter((a) => a.variant === 'destructive'),
+)
+const primaryExtras = computed(() =>
+  (props.extraActions ?? []).filter((a) => a.variant !== 'destructive'),
+)
 </script>
 
 <template>
-  <Card class="flex h-[460px] flex-col overflow-hidden pt-0">
+  <Card class="flex h-full flex-col overflow-hidden pt-0">
     <div class="bg-muted relative flex h-36 shrink-0 items-center justify-center">
       <img
         v-if="thumbnailUrl"
@@ -79,65 +64,34 @@ async function copyToClipboard(field: MetadataField) {
         :expires-at="sandbox.expiresAt"
         :created-at="sandbox.createdAt"
       />
-      <div
-        v-for="group in metadata"
-        :key="group.title"
-        class="bg-muted/50 space-y-1.5 rounded-md border px-3 py-2"
-      >
-        <p class="text-muted-foreground/70 text-[11px] font-medium tracking-wider uppercase">
-          {{ group.title }}
-        </p>
-        <div
-          v-for="field in group.fields"
-          :key="field.label"
-          class="flex items-center justify-between gap-2 text-xs"
-        >
-          <span class="text-muted-foreground flex items-center gap-1">
-            <component :is="resolveIcon(field.icon)" v-if="field.icon" class="h-3 w-3" />
-            {{ field.label }}
-          </span>
-          <div class="flex items-center gap-1">
-            <template v-if="field.loading">
-              <Skeleton class="h-3 w-16 rounded" />
-            </template>
-            <template v-else>
-              <span class="font-mono text-[11px]">
-                {{ field.secret && !revealedKeys.has(field.label) ? '••••••••' : field.value }}
-              </span>
-              <button
-                v-if="field.secret"
-                class="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
-                @click="
-                  revealedKeys.has(field.label)
-                    ? revealedKeys.delete(field.label)
-                    : revealedKeys.add(field.label)
-                "
-              >
-                <EyeOff v-if="revealedKeys.has(field.label)" class="h-3 w-3" />
-                <Eye v-else class="h-3 w-3" />
-              </button>
-              <button
-                class="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
-                @click="copyToClipboard(field)"
-              >
-                <Check v-if="copiedKey === field.label" class="h-3 w-3 text-green-500" />
-                <Copy v-else class="h-3 w-3" />
-              </button>
-            </template>
-          </div>
-        </div>
-      </div>
+      <MetadataSection
+        :metadata="sandbox.metadata"
+        :context="ctx"
+        :model-value="values"
+        view="card"
+        hide-actions
+      />
     </CardContent>
-    <CardFooter v-if="actions?.length" class="sandbox-actions flex items-center gap-2">
+    <CardFooter
+      v-if="schemaActions.length || extraActions?.length"
+      class="sandbox-actions flex items-center gap-2"
+    >
+      <MetadataActionRenderer
+        v-for="item in schemaActions"
+        :key="item.key"
+        :item="item"
+        :disabled="sandbox.status !== 'running'"
+        class="min-w-0 flex-1"
+      />
       <ActionButton
-        v-for="action in primaryActions"
+        v-for="action in primaryExtras"
         :key="action.label"
         :action="action"
         :full-width="action.size !== 'icon'"
         :class="action.size === 'icon' ? 'shrink-0' : 'min-w-0 flex-1'"
       />
       <ActionButton
-        v-for="action in destructiveActions"
+        v-for="action in destructiveExtras"
         :key="action.label"
         :action="action"
         class="shrink-0"

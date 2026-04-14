@@ -23,6 +23,12 @@ export const useImagesStore = defineStore('images', () => {
     error.value = null
   }
 
+  function upsertImage(image: Image) {
+    const idx = images.value.findIndex((i) => i.id === image.id)
+    if (idx === -1) images.value.push(image)
+    else images.value[idx] = image
+  }
+
   return {
     images,
     pendingImages,
@@ -32,5 +38,6 @@ export const useImagesStore = defineStore('images', () => {
     fetchMode,
     publicImages,
     $reset,
+    upsertImage,
   }
 })

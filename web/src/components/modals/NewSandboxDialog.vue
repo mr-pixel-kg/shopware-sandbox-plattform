@@ -2,6 +2,7 @@
 import { Loader2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 
+import MetadataSection from '@/components/metadata/MetadataSection.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { extractFieldValues, stripHiddenValues } from '@/utils/metadata'
 
 import type { Image } from '@/types'
 
@@ -55,22 +57,10 @@ const ttlOptions = [
 ]
 
 const selectedImage = computed(() => props.images.find((i) => i.id === selectedImageId.value))
+const metadata = computed(() => selectedImage.value?.metadata ?? null)
 
-const imageMeta = computed(() => selectedImage.value?.metadata ?? [])
-
-const editableFields = computed(() => imageMeta.value.filter((m) => m.type === 'field'))
-const readOnlyItems = computed(() =>
-  imageMeta.value.filter((m) => m.type === 'setting' || m.type === 'info'),
-)
-
-function populateMetadataDefaults() {
-  const defaults: Record<string, string> = {}
-  for (const item of imageMeta.value) {
-    if (item.type === 'field' || item.type === 'setting') {
-      defaults[item.key] = item.value ?? ''
-    }
-  }
-  metadataValues.value = defaults
+function resetValues() {
+  metadataValues.value = { ...extractFieldValues(metadata.value) }
 }
 
 watch(
@@ -81,19 +71,18 @@ watch(
       displayName.value = ''
       ttlMinutes.value = '120'
       submitting.value = false
-      populateMetadataDefaults()
+      resetValues()
     }
   },
 )
 
-watch(selectedImageId, populateMetadataDefaults)
+watch(selectedImageId, resetValues)
 
 function handleSubmit() {
   if (!selectedImageId.value) return
   submitting.value = true
 
-  const metadata =
-    Object.keys(metadataValues.value).length > 0 ? { ...metadataValues.value } : undefined
+  const payload = stripHiddenValues(metadata.value, metadataValues.value)
 
   const trimmedName = displayName.value.trim()
   emit(
@@ -102,7 +91,7 @@ function handleSubmit() {
       imageId: selectedImageId.value,
       ttlMinutes: ttlMinutes.value === 'unlimited' ? 0 : Number(ttlMinutes.value),
       displayName: trimmedName || undefined,
-      metadata,
+      metadata: Object.keys(payload).length > 0 ? payload : undefined,
     },
     (success: boolean) => {
       submitting.value = false
@@ -116,14 +105,14 @@ function handleSubmit() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="gap-0 p-0 sm:max-w-170">
+    <DialogContent class="flex h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[80vw]">
       <DialogHeader class="p-6 pb-4">
         <DialogTitle>Neue Sandbox</DialogTitle>
         <DialogDescription>Wähle eine Vorlage und konfiguriere die Laufzeit.</DialogDescription>
       </DialogHeader>
 
-      <div class="flex h-85 overflow-hidden border-t">
-        <div class="w-55 shrink-0 border-r">
+      <div class="flex min-h-0 flex-1 overflow-hidden border-t">
+        <div class="w-64 shrink-0 border-r">
           <ScrollArea class="h-full">
             <div class="p-2">
               <button
@@ -184,38 +173,12 @@ function handleSubmit() {
               </div>
             </div>
 
-            <div v-if="editableFields.length > 0" class="space-y-3">
-              <Label class="block">Konfiguration</Label>
-              <div v-for="item in editableFields" :key="item.key" class="grid gap-1.5">
-                <Label :for="'field-' + item.key" class="text-xs">
-                  {{ item.label }}
-                  <span v-if="item.required" class="text-destructive">*</span>
-                </Label>
-                <Input
-                  :id="'field-' + item.key"
-                  v-model="metadataValues[item.key]"
-                  :type="item.input === 'password' ? 'password' : 'text'"
-                  :placeholder="item.value"
-                  :disabled="submitting"
-                />
-              </div>
-            </div>
-
-            <div
-              v-if="readOnlyItems.length > 0"
-              class="bg-muted/50 space-y-1.5 rounded-md border px-3 py-2"
-            >
-              <div
-                v-for="item in readOnlyItems"
-                :key="item.key"
-                class="flex justify-between text-xs"
-              >
-                <span class="text-muted-foreground">{{ item.label }}</span>
-                <span class="font-mono text-[11px]">{{
-                  metadataValues[item.key] || item.value
-                }}</span>
-              </div>
-            </div>
+            <MetadataSection
+              v-model="metadataValues"
+              :metadata="metadata"
+              context="sandbox.create"
+              :disabled="submitting"
+            />
           </div>
 
           <div v-else class="text-muted-foreground flex h-full items-center justify-center text-sm">

@@ -19,21 +19,105 @@ export interface UserSummary {
 
 export type ImageStatus = 'pulling' | 'committing' | 'ready' | 'failed'
 
-export type MetadataType = 'field' | 'setting' | 'info' | 'action'
+export type MetadataContext =
+  | 'image.create'
+  | 'image.edit'
+  | 'image.card'
+  | 'sandbox.create'
+  | 'sandbox.card'
+  | 'sandbox.details'
 
-export interface MetadataItem {
+export type FieldInput =
+  | 'text'
+  | 'password'
+  | 'number'
+  | 'email'
+  | 'url'
+  | 'select'
+  | 'multiselect'
+  | 'toggle'
+  | 'textarea'
+
+export type DisplayFormat = 'text' | 'code' | 'badge' | 'link' | 'password'
+
+export type ActionVariant = 'default' | 'outline' | 'destructive'
+export type ActionSize = 'default' | 'icon'
+export type ActionTarget = '_blank' | '_self'
+
+export interface SelectOption {
+  value: string
+  label: string
+}
+
+export interface FieldDependency {
+  field: string
+  value: string
+}
+
+export interface VisibilityRule {
+  contexts?: MetadataContext[]
+  condition?: string
+  dependsOn?: FieldDependency
+}
+
+export interface FieldSpec {
+  input: FieldInput
+  default?: string
+  placeholder?: string
+  helpText?: string
+  required?: boolean
+  readOnly?: boolean
+  options?: SelectOption[]
+}
+
+export interface ActionSpec {
+  url: string
+  variant?: ActionVariant
+  size?: ActionSize
+  target?: ActionTarget
+  confirm?: string
+}
+
+export interface DisplaySpec {
+  value: string
+  format?: DisplayFormat
+  copyable?: boolean
+}
+
+interface BaseMetadataItem {
   key: string
   label: string
-  type: MetadataType
-  value?: string
-  input?: string
-  required?: boolean
-  options?: string[]
-  variant?: string
-  show?: 'sandbox' | 'template' | 'both'
-  condition?: 'ready' | 'always'
   icon?: string
-  size?: 'default' | 'icon'
+  group?: string
+  visibility?: VisibilityRule
+}
+
+export interface FieldItem extends BaseMetadataItem {
+  type: 'field'
+  field: FieldSpec
+}
+
+export interface ActionItem extends BaseMetadataItem {
+  type: 'action'
+  action: ActionSpec
+}
+
+export interface DisplayItem extends BaseMetadataItem {
+  type: 'display'
+  display: DisplaySpec
+}
+
+export type MetadataItem = FieldItem | ActionItem | DisplayItem
+
+export interface MetadataGroup {
+  key: string
+  label: string
+  description?: string
+}
+
+export interface MetadataSchema {
+  groups?: MetadataGroup[]
+  items: MetadataItem[]
 }
 
 export interface Image extends BaseModel {
@@ -46,7 +130,7 @@ export interface Image extends BaseModel {
   isPublic: boolean
   status: ImageStatus
   error?: string
-  metadata?: MetadataItem[]
+  metadata: MetadataItem[]
   registryRef?: string
   owner?: UserSummary | null
 }
@@ -92,7 +176,7 @@ export interface Sandbox extends BaseModel {
   port?: number
   ssh?: SSHConnection
   clientIp: string
-  metadata?: MetadataItem[]
+  metadata: MetadataItem[]
   expiresAt?: string
   lastSeenAt?: string
 }

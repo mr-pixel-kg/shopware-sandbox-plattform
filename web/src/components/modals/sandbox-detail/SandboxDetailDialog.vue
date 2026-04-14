@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { itemsForContext } from '@/utils/metadata'
 
 import AccessTab from './AccessTab.vue'
 import ConfigTab from './ConfigTab.vue'
@@ -58,12 +59,10 @@ const isOffline = computed(
   () => props.sandbox?.status === 'running' && props.health && !props.health.ready,
 )
 
-const visibleMetadata = computed(() => {
-  if (!Array.isArray(props.sandbox?.metadata)) return []
-  return props.sandbox.metadata.filter((m) => m.show !== 'template' && m.type !== 'action')
+const hasConfigTab = computed(() => {
+  const items = itemsForContext(props.sandbox?.metadata, 'sandbox.details')
+  return items.length > 0
 })
-
-const hasConfigTab = computed(() => visibleMetadata.value.length > 0)
 const hasAccessTab = computed(() => isActive.value && !!props.sandbox?.ssh)
 const hasFilesTab = computed(() => isActive.value)
 const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
@@ -111,7 +110,7 @@ const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
           value="config"
           class="flex-1 overflow-y-auto px-6 pt-4 pb-6"
         >
-          <ConfigTab ref="configTabRef" :items="visibleMetadata" />
+          <ConfigTab v-if="sandbox" ref="configTabRef" :sandbox="sandbox" />
         </TabsContent>
 
         <TabsContent
