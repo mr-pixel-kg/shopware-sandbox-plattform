@@ -70,14 +70,14 @@ func validate(reg *ImageRegistry) error {
 			if ls.Label == "" {
 				return fmt.Errorf("entry %d: logs[%d]: label is required", i, j)
 			}
-			if ls.Type != LogSourceTypeDocker && ls.Type != LogSourceTypeFile {
-				return fmt.Errorf("entry %d: logs[%d]: type must be %q or %q", i, j, LogSourceTypeDocker, LogSourceTypeFile)
+			if ls.Type != LogSourceTypeDocker && ls.Type != LogSourceTypeFile && ls.Type != LogSourceTypeLifecycle {
+				return fmt.Errorf("entry %d: logs[%d]: type must be %q, %q, or %q", i, j, LogSourceTypeDocker, LogSourceTypeFile, LogSourceTypeLifecycle)
 			}
 			if ls.Type == LogSourceTypeFile && ls.Path == "" {
 				return fmt.Errorf("entry %d: logs[%d]: path is required for file log sources", i, j)
 			}
-			if ls.Type == LogSourceTypeDocker && ls.Path != "" {
-				return fmt.Errorf("entry %d: logs[%d]: path must not be set for docker log sources", i, j)
+			if (ls.Type == LogSourceTypeDocker || ls.Type == LogSourceTypeLifecycle) && ls.Path != "" {
+				return fmt.Errorf("entry %d: logs[%d]: path must not be set for %s log sources", i, j, ls.Type)
 			}
 			if seenLogKeys[ls.Key] {
 				return fmt.Errorf("entry %d: logs[%d]: duplicate key %q", i, j, ls.Key)

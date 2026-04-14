@@ -38,6 +38,7 @@ export function useLogStream(containerRef: Ref<HTMLElement | null>) {
       fontSize: 13,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       convertEol: true,
+      smoothScrollDuration: 0,
       theme: {
         background: LOG_TERMINAL_BG,
         foreground: '#d4d4d4',
@@ -59,7 +60,7 @@ export function useLogStream(containerRef: Ref<HTMLElement | null>) {
     resizeObserver.observe(el)
   }
 
-  function connect(sandboxId: string, logKey: string) {
+  function connect(sandboxId: string, logKey: string, opts?: { verbose?: boolean }) {
     disconnect()
     error.value = null
 
@@ -76,7 +77,12 @@ export function useLogStream(containerRef: Ref<HTMLElement | null>) {
     const headers: Record<string, string> = {}
     if (token) headers.Authorization = `Bearer ${token}`
 
-    fetch(`${baseURL}/api/sandboxes/${sandboxId}/logs/${logKey}`, {
+    const params = new URLSearchParams()
+    if (opts?.verbose) params.set('verbose', 'true')
+    const qs = params.toString()
+    const url = `${baseURL}/api/sandboxes/${sandboxId}/logs/${logKey}${qs ? `?${qs}` : ''}`
+
+    fetch(url, {
       headers,
       credentials: 'include',
       signal: abortController.signal,

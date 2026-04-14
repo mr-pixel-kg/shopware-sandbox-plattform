@@ -14,6 +14,7 @@ import (
 	auditcontracts "github.com/mr-pixel-kg/shopshredder/api/internal/auditlog"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/config"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/docker"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/lifecycle"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/models"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/repositories"
@@ -41,6 +42,7 @@ type SandboxService struct {
 	docker    docker.Client
 	resolver  *registry.Resolver
 	executor  *registry.Executor
+	lifecycle *lifecycle.Store
 }
 
 func NewSandboxService(
@@ -56,6 +58,7 @@ func NewSandboxService(
 	dockerClient docker.Client,
 	resolver *registry.Resolver,
 	executor *registry.Executor,
+	lifecycleStore *lifecycle.Store,
 ) *SandboxService {
 	return &SandboxService{
 		cfg:       cfg,
@@ -70,6 +73,7 @@ func NewSandboxService(
 		docker:    dockerClient,
 		resolver:  resolver,
 		executor:  executor,
+		lifecycle: lifecycleStore,
 	}
 }
 
@@ -363,6 +367,8 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		return nil, err
 	}
 
+	s.lifecycle.Log(container.ID, "setup", lifecycle.LevelInfo, "Container created ("+image.FullName()+")")
+
 	if len(resolved.PostStart) > 0 {
 		go s.executor.RunPostStart(context.Background(), container.ID, resolved.PostStart)
 	}
@@ -498,13 +504,19 @@ func (s *SandboxService) deleteContainerAsync(sandboxID uuid.UUID, containerID s
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
+	s.lifecycle.Log(containerID, "shutdown", lifecycle.LevelInfo, "Stopping sandbox")
+
 	s.runPreStop(ctx, containerID, imageID)
 
+	s.lifecycle.Log(containerID, "shutdown", lifecycle.LevelInfo, "Removing container")
 	if err := s.docker.DeleteContainer(ctx, containerID); err != nil {
+		s.lifecycle.Log(containerID, "shutdown", lifecycle.LevelError, "Container removal failed — "+err.Error())
 		_ = s.setStatusByID(sandboxID, models.SandboxStatusFailed, strPtr(fmt.Sprintf("Fehler beim Beenden: %v", err)))
 		return
 	}
 
+	s.lifecycle.Log(containerID, "shutdown", lifecycle.LevelSuccess, "Sandbox deleted")
+	s.lifecycle.Remove(containerID)
 	_ = s.setStatusByID(sandboxID, models.SandboxStatusDeleted, nil)
 	_ = s.addEvent(sandboxID, "deleted", map[string]any{})
 	s.logSandboxDeleted(sandboxID, auditActor)
@@ -592,8 +604,16 @@ func (s *SandboxService) commitSnapshot(sandboxID uuid.UUID, containerID string,
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
+	s.lifecycle.Log(containerID, "snapshot", lifecycle.LevelInfo, "Creating snapshot ("+targetImage+")")
+
 	commitErr := s.docker.CommitContainer(ctx, containerID, targetImage)
 	s.images.FinishCommit(imageID, commitErr)
+
+	if commitErr != nil {
+		s.lifecycle.Log(containerID, "snapshot", lifecycle.LevelError, "Snapshot failed — "+commitErr.Error())
+	} else {
+		s.lifecycle.Log(containerID, "snapshot", lifecycle.LevelSuccess, "Snapshot created ("+targetImage+")")
+	}
 
 	_ = s.setStatusByID(sandboxID, models.SandboxStatusRunning, nil)
 }
@@ -631,6 +651,7 @@ func (s *SandboxService) ReconcileOnStartup(ctx context.Context) {
 			if err := s.docker.DeleteContainer(ctx, id); err != nil {
 				slog.Error("reconcile: failed to remove orphaned container", "component", "reconcile", "container_id", id, "error", err.Error())
 			} else {
+				s.lifecycle.Remove(id)
 				slog.Info("reconcile: removed orphaned container", "component", "reconcile", "container_id", id)
 			}
 		}
@@ -702,6 +723,8 @@ func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 	// Expiration is database-driven so a process restart does not lose the
 	// deletion schedule for previously created sandboxes.
 	for _, sandbox := range expired {
+		s.lifecycle.Log(sandbox.ContainerID, "expired", lifecycle.LevelInfo, "TTL expired, removing sandbox")
+
 		s.runPreStop(ctx, sandbox.ContainerID, sandbox.ImageID)
 
 		if err := s.docker.DeleteContainer(ctx, sandbox.ContainerID); err != nil {
@@ -713,6 +736,8 @@ func (s *SandboxService) CleanupExpired(ctx context.Context) error {
 			)
 			continue
 		}
+
+		s.lifecycle.Remove(sandbox.ContainerID)
 
 		now := time.Now().UTC()
 		expiredReason := "Laufzeit abgelaufen"
@@ -752,6 +777,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 	switch event.Action {
 	case "start":
 		if sandbox.Status == models.SandboxStatusStopped {
+			s.lifecycle.Log(event.ContainerID, "event", lifecycle.LevelInfo, "Container started")
 			reason := "Container wird gestartet"
 			sandbox.Status = models.SandboxStatusStarting
 			sandbox.StateReason = &reason
@@ -767,6 +793,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 
 	case "pause":
 		if sandbox.Status == models.SandboxStatusRunning {
+			s.lifecycle.Log(event.ContainerID, "event", lifecycle.LevelInfo, "Container paused")
 			sandbox.Status = models.SandboxStatusPaused
 			if sandbox.StateReason == nil {
 				sandbox.StateReason = strPtr("Container pausiert")
@@ -779,6 +806,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 
 	case "unpause":
 		if sandbox.Status == models.SandboxStatusPaused {
+			s.lifecycle.Log(event.ContainerID, "event", lifecycle.LevelInfo, "Container resumed")
 			sandbox.Status = models.SandboxStatusRunning
 			sandbox.StateReason = nil
 			if err := s.repo.Update(sandbox); err != nil {
@@ -793,6 +821,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 			return nil
 		}
 		if sandbox.Status != models.SandboxStatusStopped {
+			s.lifecycle.Log(event.ContainerID, "event", lifecycle.LevelError, "Container stopped ("+event.Action+")")
 			sandbox.Status = models.SandboxStatusStopped
 			sandbox.StateReason = nil
 			if err := s.repo.Update(sandbox); err != nil {
@@ -809,6 +838,7 @@ func (s *SandboxService) handleDockerContainerEvent(event docker.SandboxContaine
 		if sandbox.Status == models.SandboxStatusDeleted || sandbox.Status == models.SandboxStatusExpired {
 			return nil
 		}
+		s.lifecycle.Log(event.ContainerID, "event", lifecycle.LevelError, "Container destroyed externally")
 		sandbox.Status = models.SandboxStatusDeleted
 		sandbox.StateReason = nil
 		now := time.Now().UTC()

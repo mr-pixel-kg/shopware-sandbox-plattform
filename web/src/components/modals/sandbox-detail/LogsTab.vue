@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { sandboxesApi } from '@/api'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { LOG_TERMINAL_BG, useLogStream } from '@/composables/useLogStream'
 
 import '@xterm/xterm/css/xterm.css'
@@ -22,10 +23,23 @@ const props = defineProps<{
 
 const sources = ref<LogSource[]>([])
 const selectedKey = ref<string>('')
+const verbose = ref(false)
 const loadingMeta = ref(true)
 const containerRef = ref<HTMLElement | null>(null)
 
 const { isStreaming, error, connect, dispose } = useLogStream(containerRef)
+
+const selectedSource = computed(() => sources.value.find((s) => s.key === selectedKey.value))
+
+const isLifecycle = computed(() => selectedSource.value?.type === 'lifecycle')
+
+function reconnect() {
+  if (selectedKey.value) {
+    connect(props.sandboxId, selectedKey.value, {
+      verbose: isLifecycle.value && verbose.value,
+    })
+  }
+}
 
 async function loadSources() {
   loadingMeta.value = true
@@ -41,10 +55,9 @@ async function loadSources() {
   }
 }
 
-watch(selectedKey, (key) => {
-  if (key) {
-    connect(props.sandboxId, key)
-  }
+watch(selectedKey, () => reconnect())
+watch(verbose, () => {
+  if (isLifecycle.value) reconnect()
 })
 
 onMounted(loadSources)
@@ -66,12 +79,15 @@ defineExpose({ disconnect: dispose })
         </SelectContent>
       </Select>
 
-      <Button
-        v-if="error && !isStreaming"
-        variant="outline"
-        size="sm"
-        @click="connect(sandboxId, selectedKey)"
+      <label
+        v-if="isLifecycle"
+        class="text-muted-foreground flex items-center gap-1.5 text-xs select-none"
       >
+        <Switch v-model="verbose" />
+        Verbose
+      </label>
+
+      <Button v-if="error && !isStreaming" variant="outline" size="sm" @click="reconnect">
         Erneut verbinden
       </Button>
     </div>
@@ -82,7 +98,7 @@ defineExpose({ disconnect: dispose })
         class="absolute inset-0 z-10 flex items-center justify-center"
         :style="{ backgroundColor: LOG_TERMINAL_BG }"
       >
-        <span class="text-sm text-neutral-400">Lade Log-Quellen…</span>
+        <span class="text-sm text-neutral-400">Lade Log-Quellen...</span>
       </div>
 
       <div
@@ -98,7 +114,7 @@ defineExpose({ disconnect: dispose })
         class="absolute inset-0 z-10 flex items-center justify-center"
         :style="{ backgroundColor: LOG_TERMINAL_BG }"
       >
-        <span class="text-sm text-neutral-400">Verbindung wird hergestellt…</span>
+        <span class="text-sm text-neutral-400">Verbindung wird hergestellt...</span>
       </div>
 
       <div

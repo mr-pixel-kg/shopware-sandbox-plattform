@@ -60,6 +60,7 @@ type MetadataItem struct {
 
 type ExecCommand struct {
 	Command    []string `yaml:"command"`
+	Label      string   `yaml:"label,omitempty"`
 	Delay      Duration `yaml:"delay,omitempty"`
 	Timeout    Duration `yaml:"timeout,omitempty"`
 	Retries    int      `yaml:"retries,omitempty"`
@@ -99,8 +100,9 @@ type TemplateContext struct {
 type LogSourceType string
 
 const (
-	LogSourceTypeDocker LogSourceType = "docker"
-	LogSourceTypeFile   LogSourceType = "file"
+	LogSourceTypeDocker    LogSourceType = "docker"
+	LogSourceTypeFile      LogSourceType = "file"
+	LogSourceTypeLifecycle LogSourceType = "lifecycle"
 )
 
 type LogSource struct {

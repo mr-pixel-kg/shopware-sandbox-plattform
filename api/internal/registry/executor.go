@@ -1,35 +1,59 @@
 package registry
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/lifecycle"
 )
 
 const defaultExecTimeout = 5 * time.Minute
 
+type postStartState struct {
+	done   chan struct{}
+	failed bool
+}
+
 type Executor struct {
-	Client *client.Client
+	Client    *client.Client
+	Lifecycle *lifecycle.Store
 
 	mu        sync.Mutex
-	postStart map[string]chan struct{}
+	postStart map[string]*postStartState
 }
 
 func (e *Executor) PostStartDone(containerID string) bool {
 	e.mu.Lock()
-	ch, ok := e.postStart[containerID]
+	state, ok := e.postStart[containerID]
 	e.mu.Unlock()
 	if !ok {
 		return true
 	}
 	select {
-	case <-ch:
+	case <-state.done:
 		return true
+	default:
+		return false
+	}
+}
+
+func (e *Executor) PostStartFailed(containerID string) bool {
+	e.mu.Lock()
+	state, ok := e.postStart[containerID]
+	e.mu.Unlock()
+	if !ok {
+		return false
+	}
+	select {
+	case <-state.done:
+		return state.failed
 	default:
 		return false
 	}
@@ -38,52 +62,85 @@ func (e *Executor) PostStartDone(containerID string) bool {
 func (e *Executor) PostStartWait(containerID string) <-chan struct{} {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.postStart[containerID]
+	if state, ok := e.postStart[containerID]; ok {
+		return state.done
+	}
+	return nil
 }
 
 func (e *Executor) RunPostStart(ctx context.Context, containerID string, commands []ExecCommand) {
-	done := make(chan struct{})
+	state := &postStartState{done: make(chan struct{})}
 	e.mu.Lock()
 	if e.postStart == nil {
-		e.postStart = make(map[string]chan struct{})
+		e.postStart = make(map[string]*postStartState)
 	}
-	e.postStart[containerID] = done
+	e.postStart[containerID] = state
 	e.mu.Unlock()
 
 	defer func() {
-		close(done)
-		e.mu.Lock()
-		delete(e.postStart, containerID)
-		e.mu.Unlock()
+		close(state.done)
 	}()
 
-	slog.Debug("post-start starting", "container_id", containerID, "commands", len(commands))
-	for i, cmd := range commands {
-		slog.Debug("post-start executing", "container_id", containerID, "index", i, "command", cmd.Command, "delay", cmd.Delay.Duration, "timeout", cmd.Timeout.Duration)
-		if err := e.execWithRetry(ctx, containerID, cmd); err != nil {
-			slog.Warn("post-start command failed", "container_id", containerID, "index", i, "command", cmd.Command, "error", err)
-		} else {
-			slog.Debug("post-start command succeeded", "container_id", containerID, "index", i)
-		}
-	}
-	slog.Debug("post-start finished", "container_id", containerID)
+	buf := e.getBuffer(containerID)
+	failed := e.runCommands(ctx, containerID, commands, buf, "post_start")
+
+	e.mu.Lock()
+	state.failed = failed > 0
+	e.mu.Unlock()
 }
 
 func (e *Executor) RunPreStop(ctx context.Context, containerID string, commands []ExecCommand) {
-	slog.Debug("pre-stop starting", "container_id", containerID, "commands", len(commands))
-	for i, cmd := range commands {
-		slog.Debug("pre-stop executing", "container_id", containerID, "index", i, "command", cmd.Command)
-		if err := e.execWithRetry(ctx, containerID, cmd); err != nil {
-			slog.Warn("pre-stop command failed", "container_id", containerID, "index", i, "command", cmd.Command, "error", err)
-		} else {
-			slog.Debug("pre-stop command succeeded", "container_id", containerID, "index", i)
-		}
-	}
-	slog.Debug("pre-stop finished", "container_id", containerID)
+	buf := e.getBuffer(containerID)
+	e.runCommands(ctx, containerID, commands, buf, "pre_stop")
 }
 
-func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd ExecCommand) error {
+func (e *Executor) runCommands(ctx context.Context, containerID string, commands []ExecCommand, buf *lifecycle.Buffer, phase string) int {
+	total := len(commands)
+	totalStart := time.Now()
+	slog.Debug(phase+" starting", "container_id", containerID, "commands", total)
+
+	failed := 0
+	for i, cmd := range commands {
+		step := fmt.Sprintf("[%d/%d]", i+1, total)
+		name := cmd.Label
+		rawCmd := strings.Join(cmd.Command, " ")
+
+		if name != "" {
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelInfo, Message: step + " " + name})
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelDetail, Message: rawCmd})
+		} else {
+			name = rawCmd
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelInfo, Message: step + " " + name})
+		}
+
+		slog.Debug(phase+" executing", "container_id", containerID, "index", i, "command", cmd.Command)
+
+		start := time.Now()
+		if err := e.execWithRetry(ctx, containerID, cmd, buf, phase); err != nil {
+			elapsed := time.Since(start).Truncate(100 * time.Millisecond)
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelError, Message: fmt.Sprintf("%s failed (%s) — %v", step, elapsed, err)})
+			slog.Warn(phase+" command failed", "container_id", containerID, "index", i, "command", cmd.Command, "error", err)
+			failed++
+		} else {
+			elapsed := time.Since(start).Truncate(100 * time.Millisecond)
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelSuccess, Message: fmt.Sprintf("%s done (%s)", step, elapsed)})
+			slog.Debug(phase+" command succeeded", "container_id", containerID, "index", i)
+		}
+	}
+
+	totalElapsed := time.Since(totalStart).Truncate(100 * time.Millisecond)
+	if failed == 0 {
+		buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelInfo, Message: fmt.Sprintf("All %d commands completed (%s)", total, totalElapsed)})
+	} else {
+		buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelError, Message: fmt.Sprintf("%d/%d commands failed (%s)", failed, total, totalElapsed)})
+	}
+	slog.Debug(phase+" finished", "container_id", containerID)
+	return failed
+}
+
+func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd ExecCommand, buf *lifecycle.Buffer, phase string) error {
 	if cmd.Delay.Duration > 0 {
+		buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelWait, Message: fmt.Sprintf("Waiting %s", cmd.Delay.Duration)})
 		slog.Debug("exec waiting for delay", "container_id", containerID, "delay", cmd.Delay.Duration)
 		select {
 		case <-ctx.Done():
@@ -97,6 +154,7 @@ func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd Ex
 
 	for attempt := range attempts {
 		if attempt > 0 && cmd.RetryDelay.Duration > 0 {
+			buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelWait, Message: fmt.Sprintf("Retry %d/%d in %s", attempt, cmd.Retries, cmd.RetryDelay.Duration)})
 			slog.Debug("exec retry waiting", "container_id", containerID, "attempt", attempt+1, "retry_delay", cmd.RetryDelay.Duration)
 			select {
 			case <-ctx.Done():
@@ -106,7 +164,7 @@ func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd Ex
 		}
 
 		start := time.Now()
-		lastErr = e.exec(ctx, containerID, cmd)
+		lastErr = e.exec(ctx, containerID, cmd, buf, phase)
 		elapsed := time.Since(start)
 
 		if lastErr == nil {
@@ -120,7 +178,7 @@ func (e *Executor) execWithRetry(ctx context.Context, containerID string, cmd Ex
 	return lastErr
 }
 
-func (e *Executor) exec(ctx context.Context, containerID string, cmd ExecCommand) error {
+func (e *Executor) exec(ctx context.Context, containerID string, cmd ExecCommand, buf *lifecycle.Buffer, phase string) error {
 	timeout := cmd.Timeout.Duration
 	if timeout <= 0 {
 		timeout = defaultExecTimeout
@@ -131,35 +189,55 @@ func (e *Executor) exec(ctx context.Context, containerID string, cmd ExecCommand
 
 	resp, err := e.Client.ContainerExecCreate(execCtx, containerID, container.ExecOptions{
 		Cmd:          cmd.Command,
-		AttachStdout: false,
-		AttachStderr: false,
+		Tty:          true,
+		AttachStdout: true,
+		AttachStderr: true,
 	})
 	if err != nil {
 		return fmt.Errorf("create exec: %w", err)
 	}
 
-	if err := e.Client.ContainerExecStart(execCtx, resp.ID, container.ExecStartOptions{}); err != nil {
-		return fmt.Errorf("start exec: %w", err)
+	attachResp, err := e.Client.ContainerExecAttach(execCtx, resp.ID, container.ExecAttachOptions{
+		Tty: true,
+	})
+	if err != nil {
+		return fmt.Errorf("attach exec: %w", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
-	for {
-		inspect, err := e.Client.ContainerExecInspect(execCtx, resp.ID)
-		if err != nil {
-			return fmt.Errorf("inspect exec: %w", err)
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				return fmt.Errorf("exec exited with code %d", inspect.ExitCode)
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		scanner := bufio.NewScanner(attachResp.Reader)
+		scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
+		for scanner.Scan() {
+			if line := scanner.Text(); line != "" {
+				buf.Write(lifecycle.Entry{Time: time.Now(), Phase: phase, Level: lifecycle.LevelOutput, Message: line})
 			}
-			return nil
 		}
+		if err := scanner.Err(); err != nil && ctx.Err() == nil {
+			slog.Debug("exec scanner error", "container_id", containerID, "error", err)
+		}
+	}()
 
-		select {
-		case <-execCtx.Done():
-			return execCtx.Err()
-		case <-time.After(500 * time.Millisecond):
-		}
+	select {
+	case <-readDone:
+		attachResp.Close()
+	case <-execCtx.Done():
+		attachResp.Close()
+		<-readDone
+		return fmt.Errorf("timed out after %s", timeout)
 	}
+
+	inspect, err := e.Client.ContainerExecInspect(context.Background(), resp.ID)
+	if err != nil {
+		return fmt.Errorf("inspect exec: %w", err)
+	}
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("exit code %d", inspect.ExitCode)
+	}
+	return nil
+}
+
+func (e *Executor) getBuffer(containerID string) *lifecycle.Buffer {
+	return e.Lifecycle.GetOrCreate(containerID)
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/dto"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/http/handlers"
 	mw "github.com/mr-pixel-kg/shopshredder/api/internal/http/middleware"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/lifecycle"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/repositories"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/services"
@@ -281,6 +282,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 		option.Summary("Stream log output"),
 		option.Description("SSE endpoint streaming live log output for a specific log source"),
 		option.Tags("Sandboxes"),
+		option.Query("verbose", "Show raw commands and command output (lifecycle logs only)"),
 	)
 	fuego.Get(authed, "/registry/images/search", registrySearch.SearchImages,
 		option.Summary("Search Docker Hub images"),
@@ -410,13 +412,14 @@ func buildRuntimeServices(cfg config.Config, db *gorm.DB) (*runtimeServices, err
 	}
 
 	dockerClient := docker.NewClient(sdkClient, cfg.Sandbox, cfg.Docker)
-	executor := &registry.Executor{Client: sdkClient}
+	lifecycleStore := lifecycle.NewStore(10_000)
+	executor := &registry.Executor{Client: sdkClient, Lifecycle: lifecycleStore}
 	pullTracker := docker.NewPullTracker()
 	imageService := services.NewImageService(imageRepo, sandboxRepo, dockerClient, pullTracker, cfg.Server.BaseURL, cfg.Storage.ThumbnailDir, resolver)
-	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, cfg.SSH, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor)
-	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver, executor)
+	sandboxService := services.NewSandboxService(cfg.Sandbox, cfg.Docker, cfg.Guard, cfg.SSH, sandboxRepo, imageRepo, imageService, eventRepo, auditService, dockerClient, resolver, executor, lifecycleStore)
+	sandboxHealthService := services.NewSandboxHealthService(sandboxRepo, imageRepo, resolver, executor, lifecycleStore)
 	terminalService := services.NewTerminalService(cfg.Terminal, dockerClient, sandboxRepo)
-	logService := services.NewLogService(dockerClient, sandboxRepo, imageRepo, resolver)
+	logService := services.NewLogService(dockerClient, sandboxRepo, imageRepo, resolver, lifecycleStore)
 
 	registrySearchService := services.NewRegistrySearchService()
 

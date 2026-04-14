@@ -51,7 +51,7 @@ watch(
 
 const isActive = computed(() => {
   const s = props.sandbox?.status
-  return s === 'running' || s === 'starting'
+  return s === 'running' || s === 'starting' || s === 'paused' || s === 'stopping'
 })
 
 const isOffline = computed(
@@ -71,13 +71,17 @@ const hasTerminalTab = computed(() => isActive.value && !!props.sandbox?.owner)
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="flex h-180 flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+    <DialogContent class="flex h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[80vw]">
       <DialogHeader class="shrink-0 px-6 pt-6 pb-4">
         <div class="flex items-center gap-3">
           <DialogTitle class="truncate text-lg">
             {{ sandbox?.displayName || image?.title || image?.name || 'Sandbox' }}
           </DialogTitle>
-          <StatusBadge v-if="sandbox" :status="sandbox.status" />
+          <StatusBadge
+            v-if="sandbox"
+            :status="sandbox.status"
+            :state-reason="sandbox.stateReason"
+          />
           <Badge v-if="isOffline" variant="destructive" class="text-xs">Offline</Badge>
         </div>
         <DialogDescription>

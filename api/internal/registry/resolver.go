@@ -158,6 +158,7 @@ func renderEntry(entry ImageEntry, ctx TemplateContext) (*ResolvedImage, error) 
 
 func renderExecCommand(cmd ExecCommand, ctx TemplateContext) (ExecCommand, error) {
 	rendered := ExecCommand{
+		Label:      cmd.Label,
 		Delay:      cmd.Delay,
 		Timeout:    cmd.Timeout,
 		Retries:    cmd.Retries,
