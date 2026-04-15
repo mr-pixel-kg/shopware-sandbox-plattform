@@ -98,39 +98,19 @@ type UpdateSandboxInput struct {
 }
 
 func (s *SandboxService) ListAll() ([]models.Sandbox, error) {
-	sandboxes, err := s.repo.ListAll()
-	if err != nil {
-		return nil, err
-	}
-	s.EnrichMetadata(sandboxes)
-	return sandboxes, nil
+	return s.repo.ListAll()
 }
 
 func (s *SandboxService) ListActive() ([]models.Sandbox, error) {
-	sandboxes, err := s.repo.ListAllActive()
-	if err != nil {
-		return nil, err
-	}
-	s.EnrichMetadata(sandboxes)
-	return sandboxes, nil
+	return s.repo.ListAllActive()
 }
 
 func (s *SandboxService) ListByUser(userID uuid.UUID) ([]models.Sandbox, error) {
-	sandboxes, err := s.repo.ListAllByUser(userID)
-	if err != nil {
-		return nil, err
-	}
-	s.EnrichMetadata(sandboxes)
-	return sandboxes, nil
+	return s.repo.ListAllByUser(userID)
 }
 
 func (s *SandboxService) ListByClientID(clientID uuid.UUID) ([]models.Sandbox, error) {
-	sandboxes, err := s.repo.ListAllByClientID(clientID)
-	if err != nil {
-		return nil, err
-	}
-	s.EnrichMetadata(sandboxes)
-	return sandboxes, nil
+	return s.repo.ListAllByClientID(clientID)
 }
 
 type SandboxListInput struct {
@@ -141,11 +121,10 @@ type SandboxListInput struct {
 }
 
 type SandboxListResult struct {
-	Sandboxes  []models.Sandbox
-	SSHEntries map[uuid.UUID]*registry.SSHEntry
-	Total      int64
-	Limit      int
-	Offset     int
+	Sandboxes []models.Sandbox
+	Total     int64
+	Limit     int
+	Offset    int
 }
 
 func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResult, error) {
@@ -169,13 +148,11 @@ func (s *SandboxService) ListPaginated(input SandboxListInput) (*SandboxListResu
 		return nil, err
 	}
 
-	sshEntries := s.EnrichMetadata(sandboxes)
 	return &SandboxListResult{
-		Sandboxes:  sandboxes,
-		SSHEntries: sshEntries,
-		Total:      total,
-		Limit:      input.Limit,
-		Offset:     input.Offset,
+		Sandboxes: sandboxes,
+		Total:     total,
+		Limit:     input.Limit,
+		Offset:    input.Offset,
 	}, nil
 }
 
@@ -238,10 +215,6 @@ func (s *SandboxService) UpdateSandbox(input UpdateSandboxInput) (*models.Sandbo
 		ResourceID:   &sandbox.ID,
 		Details:      details,
 	})
-
-	enriched := []models.Sandbox{*sandbox}
-	s.EnrichMetadata(enriched)
-	*sandbox = enriched[0]
 
 	return sandbox, nil
 }
@@ -373,7 +346,6 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		go s.executor.RunPostStart(context.Background(), container.ID, resolved.PostStart)
 	}
 
-	fieldsJSON, _ := json.Marshal(input.Metadata)
 	displayName := ""
 	if input.DisplayName != nil {
 		displayName = *input.DisplayName
@@ -392,7 +364,7 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 		URL:           nil,
 		Port:          container.Port,
 		ClientIP:      input.ClientIP,
-		Metadata:      datatypes.JSON(fieldsJSON),
+		Metadata:      registry.ValuesToJSONMap(input.Metadata),
 		ExpiresAt:     expiresAt,
 	}
 	if container.URL != "" {
@@ -423,10 +395,6 @@ func (s *SandboxService) Create(ctx context.Context, input CreateSandboxInput) (
 			"actor":   sandboxActorType(sandbox),
 		},
 	})
-
-	enriched := []models.Sandbox{*sandbox}
-	s.EnrichMetadata(enriched)
-	*sandbox = enriched[0]
 
 	return sandbox, nil
 }
@@ -573,7 +541,7 @@ type CreateSnapshotInput struct {
 	IsPublic    bool
 	ClientIP    string
 	UserID      *uuid.UUID
-	Metadata    json.RawMessage
+	Metadata    []registry.MetadataItem
 	AuditActor  AuditActor
 }
 
@@ -1043,11 +1011,13 @@ func (s *SandboxService) ResolveSSHEntry(imageID uuid.UUID) *registry.SSHEntry {
 	return entry.SSH
 }
 
-func (s *SandboxService) EnrichMetadata(sandboxes []models.Sandbox) map[uuid.UUID]*registry.SSHEntry {
-	type cachedEntry struct {
-		metadata []registry.MetadataItem
-		ssh      *registry.SSHEntry
-	}
+type SandboxEnrichment struct {
+	SSH      *registry.SSHEntry
+	Metadata []registry.MetadataItem
+}
+
+func (s *SandboxService) EnrichMetadata(sandboxes []models.Sandbox) map[uuid.UUID]SandboxEnrichment {
+	out := make(map[uuid.UUID]SandboxEnrichment, len(sandboxes))
 
 	seen := make(map[uuid.UUID]struct{})
 	var imageIDs []uuid.UUID
@@ -1058,86 +1028,61 @@ func (s *SandboxService) EnrichMetadata(sandboxes []models.Sandbox) map[uuid.UUI
 		}
 	}
 
-	sshEntries := make(map[uuid.UUID]*registry.SSHEntry, len(imageIDs))
+	type imageCache struct {
+		registryName string
+		metadata     []registry.MetadataItem
+		ssh          *registry.SSHEntry
+	}
+	cache := make(map[uuid.UUID]imageCache, len(imageIDs))
 
 	images, err := s.images.FindByIDs(imageIDs)
 	if err != nil {
 		slog.Warn("enrich sandbox: failed to batch-load images", "error", err)
-		return sshEntries
+		return out
 	}
-	imageMap := make(map[uuid.UUID]*models.Image, len(images))
 	for i := range images {
-		imageMap[images[i].ID] = &images[i]
+		img := &images[i]
+		c := imageCache{
+			registryName: img.RegistryName(),
+			metadata:     decodeMetadata(img.Metadata),
+		}
+		if entry := s.resolver.ResolveEntry(c.registryName); entry != nil {
+			c.ssh = entry.SSH
+		}
+		cache[img.ID] = c
 	}
 
-	cache := make(map[uuid.UUID]*cachedEntry, len(imageIDs))
-	for _, id := range imageIDs {
-		img, ok := imageMap[id]
+	for i := range sandboxes {
+		sb := &sandboxes[i]
+		c, ok := cache[sb.ImageID]
 		if !ok {
-			slog.Warn("enrich sandbox: image not found", "image_id", id)
-			cache[id] = nil
 			continue
 		}
-		regEntry := s.resolver.ResolveEntry(img.RegistryName())
-		if regEntry != nil {
-			meta := mergeRegistryAndDB(regEntry.Metadata, img.Metadata)
-			cache[id] = &cachedEntry{metadata: meta, ssh: regEntry.SSH}
-			sshEntries[id] = regEntry.SSH
-		} else {
-			cache[id] = nil
+		values := registry.ValuesFromJSONMap(sb.Metadata)
+		tctx := registry.TemplateContext{
+			Hostname:      registry.HostnameFromURL(sb.GetURL()),
+			URL:           sb.GetURL(),
+			ContainerID:   sb.ContainerID,
+			ContainerName: sb.ContainerName,
+			SandboxID:     sb.ID.String(),
+			Status:        string(sb.Status),
+			ClientIP:      sb.ClientIP,
 		}
-	}
-
-	for idx := range sandboxes {
-		sb := &sandboxes[idx]
-		entry := cache[sb.ImageID]
-		if entry == nil || len(entry.metadata) == 0 {
+		schema, err := s.resolver.RenderMetadata(c.registryName, values, c.metadata, tctx)
+		if err != nil {
+			slog.Error("metadata render failed",
+				"component", "registry",
+				"sandbox_id", sb.ID,
+				"image_id", sb.ImageID,
+				"registry_match", c.registryName,
+				"error", err)
+			out[sb.ID] = SandboxEnrichment{SSH: c.ssh}
 			continue
 		}
-
-		var values map[string]string
-		if len(sb.Metadata) > 0 {
-			_ = json.Unmarshal(sb.Metadata, &values)
-		}
-		enriched := make([]registry.MetadataItem, len(entry.metadata))
-		copy(enriched, entry.metadata)
-		for j := range enriched {
-			if v, exists := values[enriched[j].Key]; exists {
-				enriched[j].Value = v
-			}
-		}
-		data, _ := json.Marshal(enriched)
-		sb.Metadata = datatypes.JSON(data)
+		out[sb.ID] = SandboxEnrichment{SSH: c.ssh, Metadata: schema}
 	}
 
-	return sshEntries
-}
-
-func mergeRegistryAndDB(reg []registry.MetadataItem, dbJSON datatypes.JSON) []registry.MetadataItem {
-	var dbItems []registry.MetadataItem
-	if len(dbJSON) > 0 {
-		_ = json.Unmarshal(dbJSON, &dbItems)
-	}
-	dbMap := make(map[string]registry.MetadataItem)
-	for _, item := range dbItems {
-		dbMap[item.Key] = item
-	}
-	var merged []registry.MetadataItem
-	for _, item := range reg {
-		if dbItem, ok := dbMap[item.Key]; ok {
-			if dbItem.Value != "" {
-				item.Value = dbItem.Value
-			}
-			delete(dbMap, item.Key)
-		}
-		merged = append(merged, item)
-	}
-	for _, item := range dbItems {
-		if _, ok := dbMap[item.Key]; ok {
-			merged = append(merged, item)
-		}
-	}
-	return merged
+	return out
 }
 
 func splitImageRef(ref string) (string, string) {

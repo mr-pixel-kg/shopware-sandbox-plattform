@@ -21,7 +21,7 @@ import (
 )
 
 type RegistryResolver interface {
-	ResolveEntry(imageName string) *registry.ImageEntry
+	SchemaFor(imageName string) *registry.MetadataSchema
 }
 
 type ImageHandler struct {
@@ -51,9 +51,11 @@ func (h ImageHandler) ListImages(c fuego.ContextNoBody) (dto.ImageListResponse, 
 		return dto.ImageListResponse{}, fuego.HTTPError{Status: http.StatusInternalServerError, Detail: "Could not load images"}
 	}
 
+	meta := h.Images.EnrichMetadata(result.Images)
 	out := make([]dto.ImageResponse, len(result.Images))
 	for i := range result.Images {
-		out[i] = imageToResponse(&result.Images[i])
+		img := &result.Images[i]
+		out[i] = imageToResponse(img, meta[img.ID])
 	}
 	return dto.ImageListResponse{
 		Data: out,
@@ -72,14 +74,13 @@ func (h ImageHandler) Create(c fuego.ContextWithBody[dto.CreateImageRequest]) (d
 	auth := mw.MustAuth(c.Request())
 	slog.Debug("image creation requested", "component", "image", "user_id", auth.UserID, "name", body.Name, "tag", body.Tag)
 
-	metadataJSON, _ := json.Marshal(body.Metadata)
 	image, err := h.Images.CreateForUser(
 		c.Request().Context(),
 		&auth.UserID,
 		body.Name, body.Tag,
 		body.Title, body.Description,
 		body.IsPublic,
-		metadataJSON, nil,
+		body.Metadata, nil,
 	)
 	if err != nil {
 		return dto.ImageResponse{}, mapImageError(err)
@@ -91,7 +92,7 @@ func (h ImageHandler) Create(c fuego.ContextWithBody[dto.CreateImageRequest]) (d
 	}))
 
 	slog.Info("image created", "component", "image", "user_id", auth.UserID, "image_id", image.ID, "image", image.FullName(), "status", image.Status)
-	return imageToResponse(image), nil
+	return imageResponseFor(h.Images, image), nil
 }
 
 func (h ImageHandler) Update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (dto.ImageResponse, error) {
@@ -106,8 +107,7 @@ func (h ImageHandler) Update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (d
 		return dto.ImageResponse{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid request body"}
 	}
 
-	metadataJSON, _ := json.Marshal(body.Metadata)
-	image, err := h.Images.Update(id, body.Title, body.Description, body.IsPublic, metadataJSON)
+	image, err := h.Images.Update(id, body.Title, body.Description, body.IsPublic, body.Metadata)
 	if err != nil {
 		return dto.ImageResponse{}, mapImageError(err)
 	}
@@ -115,7 +115,7 @@ func (h ImageHandler) Update(c fuego.ContextWithBody[dto.UpdateImageRequest]) (d
 	slog.Info("image updated", "component", "image", "user_id", auth.UserID, "image_id", image.ID)
 	resourceType := auditcontracts.ResourceTypeImage
 	_ = h.Audit.Log(newAuditLogInput(c.Request(), &auth.UserID, auditcontracts.ActionImageUpdated, &resourceType, &image.ID, map[string]any{}))
-	return imageToResponse(image), nil
+	return imageResponseFor(h.Images, image), nil
 }
 
 func (h ImageHandler) Delete(c fuego.ContextNoBody) (any, error) {
@@ -167,7 +167,7 @@ func (h ImageHandler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	_ = h.Audit.Log(newAuditLogInput(r, &auth.UserID, auditcontracts.ActionImageThumbnailUploaded, &resourceType, &image.ID, map[string]any{}))
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(imageToResponse(image))
+	_ = json.NewEncoder(w).Encode(imageResponseFor(h.Images, image))
 }
 
 func (h ImageHandler) DeleteThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -265,7 +265,7 @@ func (h ImageHandler) Progress(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h ImageHandler) RegistryLookup(c fuego.ContextNoBody) ([]registry.MetadataItem, error) {
+func (h ImageHandler) RegistryLookup(c fuego.ContextNoBody) (registry.MetadataSchema, error) {
 	r := c.Request()
 	name := r.URL.Query().Get("name")
 
@@ -273,40 +273,45 @@ func (h ImageHandler) RegistryLookup(c fuego.ContextNoBody) ([]registry.Metadata
 		if idStr := r.URL.Query().Get("id"); idStr != "" {
 			id, err := uuid.Parse(idStr)
 			if err != nil {
-				return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid image id"}
+				return registry.MetadataSchema{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "Invalid image id"}
 			}
 			image, err := h.Images.FindByID(id)
 			if err != nil {
-				return nil, fuego.HTTPError{Status: http.StatusNotFound, Detail: "Image not found"}
+				return registry.MetadataSchema{}, fuego.HTTPError{Status: http.StatusNotFound, Detail: "Image not found"}
 			}
 			name = image.RegistryName()
 		}
 	}
 
 	if name == "" {
-		return nil, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "name or id query parameter is required"}
+		return registry.MetadataSchema{}, fuego.HTTPError{Status: http.StatusBadRequest, Detail: "name or id query parameter is required"}
 	}
 
-	entry := h.Resolver.ResolveEntry(name)
-	if entry == nil {
-		return []registry.MetadataItem{}, nil
+	if schema := h.Resolver.SchemaFor(name); schema != nil {
+		return *schema, nil
 	}
-	meta := make([]registry.MetadataItem, len(entry.Metadata))
-	copy(meta, entry.Metadata)
-	return meta, nil
+	return registry.MetadataSchema{Items: []registry.MetadataItem{}}, nil
 }
 
-func imageToResponse(img *models.Image) dto.ImageResponse {
+func imageResponseFor(s *services.ImageService, img *models.Image) dto.ImageResponse {
+	meta := s.EnrichMetadata([]models.Image{*img})
+	return imageToResponse(img, meta[img.ID])
+}
+
+func imageToResponse(img *models.Image, metadata []registry.MetadataItem) dto.ImageResponse {
 	var owner *dto.UserSummary
 	if img.Owner != nil {
 		owner = &dto.UserSummary{ID: img.Owner.ID, Email: img.Owner.Email, AvatarURL: dto.GravatarURL(img.Owner.Email, 80)}
+	}
+	if metadata == nil {
+		metadata = []registry.MetadataItem{}
 	}
 	return dto.ImageResponse{
 		ID: img.ID, Name: img.Name, Tag: img.Tag,
 		Title: img.Title, Description: img.Description,
 		ThumbnailURL: img.ThumbnailURL, IsPublic: img.IsPublic,
 		Status: img.Status, Error: img.Error,
-		Metadata: img.Metadata, RegistryRef: img.RegistryRef,
+		Metadata: metadata, RegistryRef: img.RegistryRef,
 		Owner:     owner,
 		CreatedAt: img.CreatedAt, UpdatedAt: img.UpdatedAt,
 	}

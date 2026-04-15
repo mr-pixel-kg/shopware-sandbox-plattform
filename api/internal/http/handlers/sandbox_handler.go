@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,6 +23,7 @@ import (
 
 type SandboxHandler struct {
 	Sandboxes *services.SandboxService
+	Images    *services.ImageService
 	Health    *services.SandboxHealthService
 	Auth      *services.AuthService
 }
@@ -60,9 +60,11 @@ func (h SandboxHandler) List(c fuego.ContextNoBody) (dto.SandboxListResponse, er
 	}
 
 	sshCfg := h.Sandboxes.SSHConfig()
+	enrichment := h.Sandboxes.EnrichMetadata(result.Sandboxes)
 	out := make([]dto.SandboxResponse, len(result.Sandboxes))
 	for i := range result.Sandboxes {
-		out[i] = sandboxToResponse(&result.Sandboxes[i], sshCfg, result.SSHEntries[result.Sandboxes[i].ImageID])
+		sb := &result.Sandboxes[i]
+		out[i] = sandboxToResponse(sb, sshCfg, enrichment[sb.ID])
 	}
 	return dto.SandboxListResponse{
 		Data: out,
@@ -83,8 +85,7 @@ func (h SandboxHandler) Get(c fuego.ContextNoBody) (dto.SandboxResponse, error) 
 		return dto.SandboxResponse{}, fuego.HTTPError{Status: http.StatusNotFound, Detail: "Sandbox not found"}
 	}
 
-	sshCfg := h.Sandboxes.SSHConfig()
-	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
+	return h.sandboxResponseFor(sandbox), nil
 }
 
 func (h SandboxHandler) Create(c fuego.ContextWithBody[dto.CreateSandboxRequest]) (dto.SandboxResponse, error) {
@@ -130,8 +131,7 @@ func (h SandboxHandler) Create(c fuego.ContextWithBody[dto.CreateSandboxRequest]
 	h.Health.StartMonitoring(sandbox.ID)
 
 	slog.Info("sandbox created", "component", "sandbox", "sandbox_id", sandbox.ID, "image_id", sandbox.ImageID, "expires_at", sandbox.ExpiresAt)
-	sshCfg := h.Sandboxes.SSHConfig()
-	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
+	return h.sandboxResponseFor(sandbox), nil
 }
 
 func (h SandboxHandler) Update(c fuego.ContextWithBody[dto.UpdateSandboxRequest]) (dto.SandboxResponse, error) {
@@ -160,8 +160,7 @@ func (h SandboxHandler) Update(c fuego.ContextWithBody[dto.UpdateSandboxRequest]
 	}
 
 	slog.Info("sandbox updated", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id)
-	sshCfg := h.Sandboxes.SSHConfig()
-	return sandboxToResponse(sandbox, sshCfg, h.Sandboxes.ResolveSSHEntry(sandbox.ImageID)), nil
+	return h.sandboxResponseFor(sandbox), nil
 }
 
 func (h SandboxHandler) Delete(c fuego.ContextNoBody) (any, error) {
@@ -224,7 +223,6 @@ func (h SandboxHandler) Snapshot(c fuego.ContextWithBody[dto.CreateSnapshotReque
 	auth := mw.MustAuth(r)
 	slog.Debug("sandbox snapshot requested", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id, "name", body.Name, "tag", body.Tag)
 
-	metadataJSON, _ := json.Marshal(body.Metadata)
 	image, err := h.Sandboxes.CreateSnapshot(r.Context(), services.CreateSnapshotInput{
 		SandboxID:   id,
 		Name:        body.Name,
@@ -234,7 +232,7 @@ func (h SandboxHandler) Snapshot(c fuego.ContextWithBody[dto.CreateSnapshotReque
 		IsPublic:    body.IsPublic,
 		ClientIP:    extractIP(r),
 		UserID:      &auth.UserID,
-		Metadata:    metadataJSON,
+		Metadata:    body.Metadata,
 		AuditActor:  newAuditActor(r, &auth.UserID),
 	})
 	if err != nil {
@@ -242,7 +240,7 @@ func (h SandboxHandler) Snapshot(c fuego.ContextWithBody[dto.CreateSnapshotReque
 	}
 
 	slog.Info("sandbox snapshot created", "component", "sandbox", "user_id", auth.UserID, "sandbox_id", id, "image_id", image.ID, "image", image.FullName())
-	return imageToResponse(image), nil
+	return imageResponseFor(h.Images, image), nil
 }
 
 func (h SandboxHandler) HealthSSE(w http.ResponseWriter, r *http.Request) {
@@ -371,14 +369,19 @@ func mapSandboxError(err error) error {
 	}
 }
 
-func sandboxToResponse(sb *models.Sandbox, sshCfg config.SSHConfig, sshEntry *registry.SSHEntry) dto.SandboxResponse {
+func (h SandboxHandler) sandboxResponseFor(sb *models.Sandbox) dto.SandboxResponse {
+	enrichment := h.Sandboxes.EnrichMetadata([]models.Sandbox{*sb})
+	return sandboxToResponse(sb, h.Sandboxes.SSHConfig(), enrichment[sb.ID])
+}
+
+func sandboxToResponse(sb *models.Sandbox, sshCfg config.SSHConfig, enrichment services.SandboxEnrichment) dto.SandboxResponse {
 	var owner *dto.UserSummary
 	if sb.Owner != nil {
 		owner = &dto.UserSummary{ID: sb.Owner.ID, Email: sb.Owner.Email, AvatarURL: dto.GravatarURL(sb.Owner.Email, 80)}
 	}
 	var ssh *dto.SSHConnectionInfo
 	if sshCfg.Enabled {
-		ssh = buildSSHInfo(sb, sshCfg, sshEntry)
+		ssh = buildSSHInfo(sb, sshCfg, enrichment.SSH)
 	}
 	return dto.SandboxResponse{
 		ID: sb.ID, ImageID: sb.ImageID, Owner: owner,
@@ -386,7 +389,7 @@ func sandboxToResponse(sb *models.Sandbox, sshCfg config.SSHConfig, sshEntry *re
 		Status: sb.Status, StateReason: sb.StateReason,
 		ContainerID: sb.ContainerID, ContainerName: sb.ContainerName,
 		URL: sb.GetURL(), Port: sb.Port, SSH: ssh, ClientIP: sb.ClientIP,
-		Metadata:  sb.Metadata,
+		Metadata:  enrichment.Metadata,
 		ExpiresAt: sb.ExpiresAt, LastSeenAt: sb.LastSeenAt,
 		CreatedAt: sb.CreatedAt, UpdatedAt: sb.UpdatedAt,
 	}

@@ -22,7 +22,7 @@ type Image struct {
 	IsPublic     bool           `gorm:"not null;default:false" json:"isPublic" example:"true"`
 	Status       string         `gorm:"size:32;not null;default:ready" json:"status" example:"ready"`
 	Error        *string        `gorm:"type:text" json:"error,omitempty" example:"pull access denied"`
-	Metadata     datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"metadata,omitempty" swaggertype:"string"`
+	Metadata     datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"-" swaggerignore:"true"`
 	RegistryRef  *string        `gorm:"size:255" json:"registryRef,omitempty" example:"dockware/dev"`
 	OwnerID      *uuid.UUID     `gorm:"column:owner_id;type:uuid" json:"ownerId,omitempty" format:"uuid" example:"5cc66f6f-5c71-4be4-9f2d-639dc4b8c8c2"`
 	Owner        *User          `gorm:"foreignKey:OwnerID;references:ID" json:"-" swaggerignore:"true"`

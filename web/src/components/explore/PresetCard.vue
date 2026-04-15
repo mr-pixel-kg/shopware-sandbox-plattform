@@ -2,6 +2,8 @@
 import { Package } from 'lucide-vue-next'
 import { computed } from 'vue'
 
+import MetadataActionRenderer from '@/components/metadata/MetadataActionRenderer.vue'
+import MetadataSection from '@/components/metadata/MetadataSection.vue'
 import {
   Card,
   CardContent,
@@ -11,24 +13,32 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { resolveAssetUrl } from '@/utils/formatters'
-import { resolveIcon } from '@/utils/icons'
+import { extractFieldValues, itemsForContext } from '@/utils/metadata'
 
 import ActionButton from './ActionButton.vue'
 
 import type { CardAction } from './ActionButton.vue'
-import type { MetadataGroup } from './SandboxCard.vue'
-import type { Image } from '@/types'
+import type { ActionItem, Image } from '@/types'
 
 const props = defineProps<{
   image: Image
-  actions: CardAction[]
-  metadata?: MetadataGroup[]
+  extraActions?: CardAction[]
 }>()
 
 const thumbnailSrc = computed(() => resolveAssetUrl(props.image.thumbnailUrl))
+const values = computed(() => extractFieldValues(props.image.metadata))
+const schemaActions = computed(() =>
+  itemsForContext(props.image.metadata, 'image.card').filter(
+    (i): i is ActionItem => i.type === 'action',
+  ),
+)
 
-const primaryActions = computed(() => props.actions.filter((a) => a.variant !== 'destructive'))
-const destructiveActions = computed(() => props.actions.filter((a) => a.variant === 'destructive'))
+const primaryExtras = computed(() =>
+  (props.extraActions ?? []).filter((a) => a.variant !== 'destructive'),
+)
+const destructiveExtras = computed(() =>
+  (props.extraActions ?? []).filter((a) => a.variant === 'destructive'),
+)
 </script>
 
 <template>
@@ -53,39 +63,27 @@ const destructiveActions = computed(() => props.actions.filter((a) => a.variant 
         {{ image.description }}
       </CardDescription>
     </CardHeader>
-    <CardContent v-if="metadata?.length" class="space-y-3 pt-0">
-      <div
-        v-for="group in metadata"
-        :key="group.title"
-        class="bg-muted/50 space-y-1.5 rounded-md border px-3 py-2"
-      >
-        <p class="text-muted-foreground/70 text-[11px] font-medium tracking-wider uppercase">
-          {{ group.title }}
-        </p>
-        <div
-          v-for="field in group.fields"
-          :key="field.label"
-          class="flex items-center justify-between gap-2 text-xs"
-        >
-          <span class="text-muted-foreground flex items-center gap-1">
-            <component :is="resolveIcon(field.icon)" v-if="field.icon" class="h-3 w-3" />
-            {{ field.label }}
-          </span>
-          <span class="font-mono text-[11px]">{{ field.value }}</span>
-        </div>
-      </div>
+    <CardContent class="space-y-3 pt-0">
+      <MetadataSection
+        :metadata="image.metadata"
+        context="image.card"
+        :model-value="values"
+        view="card"
+        hide-actions
+      />
     </CardContent>
     <CardFooter class="mt-auto flex items-center gap-2">
       <div class="flex min-w-0 flex-1 gap-2 [&>*]:flex-1">
+        <MetadataActionRenderer v-for="item in schemaActions" :key="item.key" :item="item" />
         <ActionButton
-          v-for="action in primaryActions"
+          v-for="action in primaryExtras"
           :key="action.label"
           :action="action"
           full-width
         />
       </div>
       <ActionButton
-        v-for="action in destructiveActions"
+        v-for="action in destructiveExtras"
         :key="action.label"
         :action="action"
         class="shrink-0"

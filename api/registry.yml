@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./internal/registry/schema/registry.schema.json
 images:
   - match: "dockware/*"
     ssh:
@@ -6,43 +7,75 @@ images:
       password: "dockware"
     internal_port: 80
     metadata:
-      - key: "admin_user"
-        label: "Admin Username"
-        type: "field"
-        value: "admin"
-        input: "text"
-        required: true
-        condition: "ready"
-        icon: "user"
-      - key: "admin_password"
-        label: "Admin Password"
-        type: "field"
-        value: "shopware"
-        input: "password"
-        required: true
-        condition: "ready"
-        icon: "lock"
-      - key: "app_env"
-        label: "App Env"
-        type: "field"
-        value: "prod"
-        input: "text"
-        required: true
-        icon: "file-box"
-      - key: "open_admin"
-        label: "Admin"
-        type: "action"
-        value: "{{.URL}}/admin"
-        variant: "default"
-        condition: "ready"
-        icon: "shield"
-      - key: "open_storefront"
-        label: "Storefront"
-        type: "action"
-        value: "{{.URL}}"
-        variant: "outline"
-        condition: "ready"
-        icon: "store"
+      groups:
+        - key: credentials
+          label: Zugangsdaten
+          description: Login für das Shopware-Admin-Panel
+        - key: config
+          label: Konfiguration
+      items:
+        - key: admin_user
+          label: Admin Username
+          type: field
+          icon: user
+          group: credentials
+          visibility:
+            contexts: [image.create, image.edit, sandbox.create, sandbox.card, sandbox.details]
+          field:
+            input: text
+            default: admin
+            required: true
+
+        - key: admin_password
+          label: Admin Password
+          type: field
+          icon: lock
+          group: credentials
+          visibility:
+            contexts: [image.create, image.edit, sandbox.create, sandbox.card, sandbox.details]
+          field:
+            input: password
+            default: shopware
+            required: true
+            help_text: Wird für den Login ins Shopware-Admin-Panel verwendet.
+
+        - key: app_env
+          label: App Environment
+          type: field
+          icon: file-box
+          group: config
+          visibility:
+            contexts: [image.create, image.edit, sandbox.create, sandbox.details]
+          field:
+            input: select
+            default: prod
+            required: true
+            help_text: Steuert Symfony-Environment und Fehler-Verbosity.
+            options:
+              - { value: prod, label: Production }
+              - { value: dev,  label: Development }
+
+        - key: open_admin
+          label: Admin
+          type: action
+          icon: shield
+          visibility:
+            contexts: [sandbox.card, sandbox.details]
+          action:
+            url: "{{.URL}}/admin"
+            variant: default
+            target: _blank
+
+        - key: open_storefront
+          label: Storefront
+          type: action
+          icon: store
+          visibility:
+            contexts: [sandbox.card, sandbox.details]
+          action:
+            url: "{{.URL}}"
+            variant: outline
+            target: _blank
     env:
       TRUSTED_PROXIES: "{{.TrustedProxies}}"
       SHOP_DOMAIN: "{{.Hostname}}"

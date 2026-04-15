@@ -221,13 +221,13 @@ Images without an `ssh` block will not have ssh access. The `ssh.host` config su
 
 Copied from `.env.example`. Controls Docker and database settings:
 
-| Variable             | Description                                    | Default                 |
-|----------------------|------------------------------------------------|-------------------------|
-| `DOCKER_SOCKET_PATH` | Path to Docker socket (differs macOS vs Linux) | `/var/run/docker.sock`  |
-| `POSTGRES_USER`      | PostgreSQL username                            | `shopshredder`          |
-| `POSTGRES_PASSWORD`  | PostgreSQL password                            | /                       |
-| `POSTGRES_DB`        | PostgreSQL database name                       | `shopshredder`          |
-| `WEB_API_URL`        | API URL for web frontend                       | `http://localhost:8080` |
+| Variable            | Description                                                                 | Default                 |
+|---------------------|-----------------------------------------------------------------------------|-------------------------|
+| `DOCKER_SOCK`       | Host path of the Docker daemon socket (bind mounted into the api container) | `/var/run/docker.sock`  |
+| `POSTGRES_USER`     | PostgreSQL username                                                         | `shopshredder`          |
+| `POSTGRES_PASSWORD` | PostgreSQL password                                                         | /                       |
+| `POSTGRES_DB`       | PostgreSQL database name                                                    | `shopshredder`          |
+| `WEB_API_URL`       | API URL for web frontend                                                    | `http://localhost:8080` |
 
 ## Development
 
@@ -274,18 +274,6 @@ cd api
 go run ./cmd/migrate up
 go run ./cmd/migrate status
 go run ./cmd/migrate create add_user_index
-```
-
-#### Docker Host (macOS)
-
-If using Docker Desktop on macOS, set your socket path in `.env`:
-
-```
-DOCKER_SOCKET_PATH=/Users/<username>/.docker/run/docker.sock
-```
-
-```
-DOCKER_HOST=/Users/<username>/.docker/run/docker.sock
 ```
 
 ### Web Frontend (`/web/`)

@@ -118,7 +118,7 @@ func registerRoutes(s *fuego.Server, cfg config.Config, runtime *runtimeServices
 
 	auth := handlers.AuthHandler{Auth: runtime.auth, Audit: runtime.audit}
 	image := handlers.ImageHandler{Images: runtime.image, Audit: runtime.audit, Resolver: runtime.resolver}
-	sandbox := handlers.SandboxHandler{Sandboxes: runtime.sandbox, Health: runtime.sandboxHealth, Auth: runtime.auth}
+	sandbox := handlers.SandboxHandler{Sandboxes: runtime.sandbox, Images: runtime.image, Health: runtime.sandboxHealth, Auth: runtime.auth}
 	audit := handlers.AuditHandler{Audit: runtime.audit}
 	user := handlers.UserHandler{Users: runtime.user, Audit: runtime.audit}
 	whitelist := handlers.WhitelistHandler{Users: runtime.user, Audit: runtime.audit}

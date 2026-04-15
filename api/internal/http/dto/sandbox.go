@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/models"
-	"gorm.io/datatypes"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
 )
 
 type CreateSandboxRequest struct {
@@ -30,24 +30,24 @@ type SandboxListResponse struct {
 }
 
 type SandboxResponse struct {
-	ID            uuid.UUID            `json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
-	ImageID       uuid.UUID            `json:"imageId" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
-	Owner         *UserSummary         `json:"owner,omitempty"`
-	ClientID      *uuid.UUID           `json:"clientId,omitempty" format:"uuid" example:"db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"`
-	DisplayName   string               `json:"displayName" example:"My Test Shop"`
-	Status        models.SandboxStatus `json:"status" enums:"starting,running,paused,stopping,stopped,expired,deleted,failed" example:"running"`
-	StateReason   *string              `json:"stateReason,omitempty" example:"Snapshot wird erstellt"`
-	ContainerID   string               `json:"containerId" example:"1a2b3c4d5e6f7g8h9i0j"`
-	ContainerName string               `json:"containerName" example:"sandbox-0b443c82"`
-	URL           string               `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
-	Port          *int                 `json:"port,omitempty" example:"8080"`
-	SSH           *SSHConnectionInfo   `json:"ssh,omitempty"`
-	ClientIP      string               `json:"clientIp" example:"203.0.113.25"`
-	Metadata      datatypes.JSON       `json:"metadata,omitempty" swaggertype:"string"`
-	ExpiresAt     *time.Time           `json:"expiresAt,omitempty" example:"2026-03-20T12:00:00Z"`
-	LastSeenAt    *time.Time           `json:"lastSeenAt,omitempty" example:"2026-03-20T10:45:00Z"`
-	CreatedAt     time.Time            `json:"createdAt" example:"2026-03-20T10:15:00Z"`
-	UpdatedAt     time.Time            `json:"updatedAt" example:"2026-03-20T10:20:00Z"`
+	ID            uuid.UUID               `json:"id" format:"uuid" example:"0b443c82-d8a3-49a7-b59a-26ce327c7341"`
+	ImageID       uuid.UUID               `json:"imageId" format:"uuid" example:"8ae13ed9-cfb1-4941-a248-bc74b9fb6a24"`
+	Owner         *UserSummary            `json:"owner,omitempty"`
+	ClientID      *uuid.UUID              `json:"clientId,omitempty" format:"uuid" example:"db7fcb92-c2ff-4c20-9ac2-5a2504ab6326"`
+	DisplayName   string                  `json:"displayName" example:"My Test Shop"`
+	Status        models.SandboxStatus    `json:"status" enums:"starting,running,paused,stopping,stopped,expired,deleted,failed" example:"running"`
+	StateReason   *string                 `json:"stateReason,omitempty" example:"Snapshot wird erstellt"`
+	ContainerID   string                  `json:"containerId" example:"1a2b3c4d5e6f7g8h9i0j"`
+	ContainerName string                  `json:"containerName" example:"sandbox-0b443c82"`
+	URL           string                  `json:"url" example:"https://sandbox-0b443c82.demo.shopshredder.de"`
+	Port          *int                    `json:"port,omitempty" example:"8080"`
+	SSH           *SSHConnectionInfo      `json:"ssh,omitempty"`
+	ClientIP      string                  `json:"clientIp" example:"203.0.113.25"`
+	Metadata      []registry.MetadataItem `json:"metadata"`
+	ExpiresAt     *time.Time              `json:"expiresAt,omitempty" example:"2026-03-20T12:00:00Z"`
+	LastSeenAt    *time.Time              `json:"lastSeenAt,omitempty" example:"2026-03-20T10:45:00Z"`
+	CreatedAt     time.Time               `json:"createdAt" example:"2026-03-20T10:15:00Z"`
+	UpdatedAt     time.Time               `json:"updatedAt" example:"2026-03-20T10:20:00Z"`
 }
 
 type SSHConnectionInfo struct {

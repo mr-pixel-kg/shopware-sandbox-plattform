@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mr-pixel-kg/shopshredder/api/internal/apperror"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/docker"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/models"
 	"github.com/mr-pixel-kg/shopshredder/api/internal/registry"
@@ -119,7 +120,6 @@ func (s *ImageService) ListAllPaginated(input ImageListInput) (*ImageListResult,
 		return nil, err
 	}
 	images = s.attachThumbnailURLs(images)
-	s.enrichMetadata(images)
 	return &ImageListResult{
 		Images: images,
 		Total:  total,
@@ -134,7 +134,6 @@ func (s *ImageService) ListPublicPaginated(input ImageListInput) (*ImageListResu
 		return nil, err
 	}
 	images = s.attachThumbnailURLs(images)
-	s.enrichMetadata(images)
 	return &ImageListResult{
 		Images: images,
 		Total:  total,
@@ -148,9 +147,7 @@ func (s *ImageService) ListPublic() ([]models.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	images = s.attachThumbnailURLs(images)
-	s.enrichMetadata(images)
-	return images, nil
+	return s.attachThumbnailURLs(images), nil
 }
 
 func (s *ImageService) ListAll() ([]models.Image, error) {
@@ -158,9 +155,7 @@ func (s *ImageService) ListAll() ([]models.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	images = s.attachThumbnailURLs(images)
-	s.enrichMetadata(images)
-	return images, nil
+	return s.attachThumbnailURLs(images), nil
 }
 
 func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
@@ -168,18 +163,14 @@ func (s *ImageService) FindByID(id uuid.UUID) (*models.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	image = s.attachThumbnailURL(image)
-	images := []models.Image{*image}
-	s.enrichMetadata(images)
-	*image = images[0]
-	return image, nil
+	return s.attachThumbnailURL(image), nil
 }
 
 func (s *ImageService) FindByIDs(ids []uuid.UUID) ([]models.Image, error) {
 	return s.repo.FindByIDs(ids)
 }
 
-func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, description *string, isPublic bool, metadata json.RawMessage, registryRef *string, status string) (*models.Image, error) {
+func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, description *string, isPublic bool, metadata []registry.MetadataItem, registryRef *string, status string) (*models.Image, error) {
 	img := &models.Image{
 		ID:          uuid.New(),
 		Name:        name,
@@ -189,9 +180,13 @@ func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, d
 		IsPublic:    isPublic,
 		Status:      status,
 		OwnerID:     userID,
-		Metadata:    guardJSON(metadata, []byte("[]")),
 		RegistryRef: registryRef,
 	}
+	encoded, err := s.encodeMetadata(img, metadata)
+	if err != nil {
+		return nil, err
+	}
+	img.Metadata = encoded
 
 	if err := s.repo.Create(img); err != nil {
 		return nil, err
@@ -200,13 +195,27 @@ func (s *ImageService) createImage(userID *uuid.UUID, name, tag string, title, d
 	return s.attachThumbnailURL(img), nil
 }
 
+func (s *ImageService) encodeMetadata(img *models.Image, metadata []registry.MetadataItem) (datatypes.JSON, error) {
+	schema := s.resolver.SchemaFor(img.RegistryName())
+	if err := registry.ValidateMetadata(registry.MergeWithRegistry(schema, metadata), schema); err != nil {
+		return nil, apperror.BadRequest("INVALID_METADATA", err.Error())
+	}
+	return json.Marshal(registry.StripRegistryDuplicates(metadata, schema))
+}
+
+func decodeMetadata(raw datatypes.JSON) []registry.MetadataItem {
+	var metadata []registry.MetadataItem
+	_ = json.Unmarshal(raw, &metadata)
+	return metadata
+}
+
 func (s *ImageService) CreateForUser(
 	ctx context.Context,
 	userID *uuid.UUID,
 	name, tag string,
 	title, description *string,
 	isPublic bool,
-	metadata json.RawMessage,
+	metadata []registry.MetadataItem,
 	registryRef *string,
 ) (*models.Image, error) {
 	img, err := s.createImage(userID, name, tag, title, description, isPublic, metadata, registryRef, models.ImageStatusPulling)
@@ -220,12 +229,10 @@ func (s *ImageService) CreateForUser(
 		if err := s.repo.UpdateStatus(img.ID, models.ImageStatusReady, nil); err != nil {
 			slog.Error("failed to mark image as ready", "component", "image", "image_id", img.ID.String(), "error", err.Error())
 		}
-		s.enrichMetadata([]models.Image{*img})
 		return img, nil
 	}
 
 	s.startPull(img.ID, fullName)
-	s.enrichMetadata([]models.Image{*img})
 	return img, nil
 }
 
@@ -292,7 +299,7 @@ func (s *ImageService) WatchPullProgress(imageID string) (<-chan docker.PullProg
 	return s.tracker.Watch(imageID)
 }
 
-func (s *ImageService) Update(id uuid.UUID, title, description *string, isPublic bool, metadata json.RawMessage) (*models.Image, error) {
+func (s *ImageService) Update(id uuid.UUID, title, description *string, isPublic bool, metadata []registry.MetadataItem) (*models.Image, error) {
 	image, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, err
@@ -302,17 +309,17 @@ func (s *ImageService) Update(id uuid.UUID, title, description *string, isPublic
 	image.Description = description
 	image.IsPublic = isPublic
 	if metadata != nil {
-		image.Metadata = datatypes.JSON(metadata)
+		encoded, err := s.encodeMetadata(image, metadata)
+		if err != nil {
+			return nil, err
+		}
+		image.Metadata = encoded
 	}
 	if err := s.repo.Update(image); err != nil {
 		return nil, err
 	}
 
-	image = s.attachThumbnailURL(image)
-	images := []models.Image{*image}
-	s.enrichMetadata(images)
-	*image = images[0]
-	return image, nil
+	return s.attachThumbnailURL(image), nil
 }
 
 func (s *ImageService) SaveThumbnail(id uuid.UUID, file multipart.File, originalFilename, contentType string) (*models.Image, error) {
@@ -348,9 +355,7 @@ func (s *ImageService) SaveThumbnail(id uuid.UUID, file multipart.File, original
 		return nil, err
 	}
 
-	image = s.attachThumbnailURL(image)
-	s.enrichMetadata([]models.Image{*image})
-	return image, nil
+	return s.attachThumbnailURL(image), nil
 }
 
 func (s *ImageService) DeleteThumbnail(id uuid.UUID) (*models.Image, error) {
@@ -396,7 +401,7 @@ func (s *ImageService) CreateForCommit(
 	name, tag string,
 	title, description *string,
 	isPublic bool,
-	metadata json.RawMessage,
+	metadata []registry.MetadataItem,
 	registryRef *string,
 ) (*models.Image, error) {
 	return s.createImage(userID, name, tag, title, description, isPublic, metadata, registryRef, models.ImageStatusCommitting)
@@ -458,13 +463,6 @@ func (s *ImageService) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return s.repo.Delete(id)
-}
-
-func guardJSON(data []byte, fallback []byte) datatypes.JSON {
-	if data == nil || string(data) == "null" {
-		return datatypes.JSON(fallback)
-	}
-	return datatypes.JSON(data)
 }
 
 func (s *ImageService) attachThumbnailURLs(images []models.Image) []models.Image {
@@ -561,19 +559,11 @@ func extensionForContentType(contentType string) string {
 	}
 }
 
-func (s *ImageService) enrichMetadata(images []models.Image) {
-	if s.resolver == nil {
-		return
-	}
+func (s *ImageService) EnrichMetadata(images []models.Image) map[uuid.UUID][]registry.MetadataItem {
+	out := make(map[uuid.UUID][]registry.MetadataItem, len(images))
 	for i := range images {
-		entry := s.resolver.ResolveEntry(images[i].RegistryName())
-		if entry == nil {
-			continue
-		}
-		reg := make([]registry.MetadataItem, len(entry.Metadata))
-		copy(reg, entry.Metadata)
-		merged := mergeRegistryAndDB(reg, images[i].Metadata)
-		data, _ := json.Marshal(merged)
-		images[i].Metadata = datatypes.JSON(data)
+		img := &images[i]
+		out[img.ID] = s.resolver.MergeMetadata(img.RegistryName(), decodeMetadata(img.Metadata))
 	}
+	return out
 }

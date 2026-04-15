@@ -1,0 +1,567 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mr-pixel-kg/shopware-sandbox-plattform/master/api/internal/registry/schema/registry.schema.json",
+  "title": "Image Registry",
+  "description": "Catalogue of container images the API can launch as sandboxes. Used by editors for autocomplete and inline diagnostics; the Go loader in api/internal/registry performs the authoritative validation at runtime.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["images"],
+  "properties": {
+    "images": {
+      "title": "Images",
+      "description": "Image entries evaluated top-to-bottom; the first entry whose match glob matches an image reference wins.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/ImageEntry" }
+    }
+  },
+  "$defs": {
+    "Key": {
+      "title": "Identifier",
+      "description": "Lowercase identifier starting with a letter, followed by letters, digits, or underscores. Max 63 characters.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "examples": ["admin_user", "app_env", "open_admin"]
+    },
+    "Duration": {
+      "title": "Duration",
+      "description": "Duration string parsed by Go's time.ParseDuration. Units: ns, us, µs, ms, s, m, h.",
+      "type": "string",
+      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+      "examples": ["500ms", "30s", "5m", "1h"]
+    },
+    "Context": {
+      "title": "UI Surface",
+      "description": "Named UI surface an item can render on. image.create = add-image dialog; image.edit = edit-image drawer; image.card = image tile in the explore/template list; sandbox.create = new-sandbox form; sandbox.card = sandbox tile in the user's sandbox list; sandbox.details = sandbox details and config tab.",
+      "type": "string",
+      "enum": [
+        "image.create",
+        "image.edit",
+        "image.card",
+        "sandbox.create",
+        "sandbox.card",
+        "sandbox.details"
+      ]
+    },
+    "ImageEntry": {
+      "title": "Image Entry",
+      "description": "Definition for one or more container images that share a match glob, runtime configuration, and metadata schema.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match"],
+      "properties": {
+        "match": {
+          "title": "Match Glob",
+          "description": "Glob matched against image references (repo and optional tag). First matching entry in images wins.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["dockware/*", "dockware/dev:*", "ghcr.io/acme/shop-*"]
+        },
+        "internal_port": {
+          "title": "Container Port",
+          "description": "TCP port the container's primary HTTP service listens on. Used to wire the public URL and the health check.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "examples": [80, 8080]
+        },
+        "ssh": { "$ref": "#/$defs/SSHEntry" },
+        "env": {
+          "title": "Environment Variables",
+          "description": "Environment variables injected into the container. Each value is a Go template rendered against the sandbox TemplateContext (e.g. {{.URL}}, {{.Hostname}}, {{.Meta.<key>}}).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "title": "Docker Labels",
+          "description": "Docker labels applied to the container. Each value is a Go template rendered against the sandbox TemplateContext.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "post_start": {
+          "title": "Post-Start Commands",
+          "description": "Commands executed inside the container after it starts, in declaration order. Later commands may rely on effects of earlier ones.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/ExecCommand" }
+        },
+        "pre_stop": {
+          "title": "Pre-Stop Commands",
+          "description": "Commands executed inside the container before it stops, in declaration order.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/ExecCommand" }
+        },
+        "health_check": { "$ref": "#/$defs/HealthCheck" },
+        "logs": {
+          "title": "Log Sources",
+          "description": "Log streams the UI can tail for sandboxes built from this image.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/LogSource" }
+        },
+        "metadata": { "$ref": "#/$defs/MetadataSchema" }
+      }
+    },
+    "SSHEntry": {
+      "title": "SSH Defaults",
+      "description": "Default SSH credentials surfaced to users. Informational only; the platform does not configure or verify the SSH server.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "username", "password"],
+      "properties": {
+        "port": {
+          "title": "Port",
+          "description": "Internal TCP port the SSH server listens on.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "examples": [22]
+        },
+        "username": {
+          "title": "Username",
+          "description": "Default SSH username baked into the image.",
+          "type": "string",
+          "minLength": 1
+        },
+        "password": {
+          "title": "Password",
+          "description": "Default SSH password baked into the image.",
+          "type": "string"
+        }
+      }
+    },
+    "ExecCommand": {
+      "title": "Exec Command",
+      "description": "One command invocation with timing and retry behaviour. Shown as a step in the lifecycle log.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "title": "Command",
+          "description": "Argv array. Each element is a Go template rendered against the sandbox TemplateContext.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "examples": [["bash", "-c", "echo {{.Hostname}}"]]
+        },
+        "label": {
+          "title": "Label",
+          "description": "Human-readable step label shown in lifecycle log output.",
+          "type": "string"
+        },
+        "delay": {
+          "$ref": "#/$defs/Duration",
+          "title": "Initial Delay",
+          "description": "Wait before the first attempt."
+        },
+        "timeout": {
+          "$ref": "#/$defs/Duration",
+          "title": "Attempt Timeout",
+          "description": "Maximum duration of a single attempt before it is aborted."
+        },
+        "retries": {
+          "title": "Retries",
+          "description": "Additional attempts after the first failure. 0 means no retries.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_delay": {
+          "$ref": "#/$defs/Duration",
+          "title": "Retry Delay",
+          "description": "Wait between attempts."
+        }
+      }
+    },
+    "HealthCheck": {
+      "title": "Health Check",
+      "description": "HTTP GET probe against the container's internal_port. A sandbox is considered ready once the probe returns 2xx.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "timeout", "interval"],
+      "properties": {
+        "path": {
+          "title": "Path",
+          "description": "HTTP path to probe.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["/api/_info/health-check"]
+        },
+        "timeout": {
+          "$ref": "#/$defs/Duration",
+          "title": "Request Timeout",
+          "description": "Maximum duration of a single probe request."
+        },
+        "interval": {
+          "$ref": "#/$defs/Duration",
+          "title": "Probe Interval",
+          "description": "Wait between probe attempts."
+        }
+      }
+    },
+    "LogSource": {
+      "title": "Log Source",
+      "description": "One tailable log stream exposed to the UI.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type"],
+      "properties": {
+        "key": { "$ref": "#/$defs/Key" },
+        "label": {
+          "title": "Label",
+          "description": "Human-readable label shown in the log selector.",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "description": "Log source kind. docker = container stdout/stderr; file = file inside the container (requires path); lifecycle = platform-emitted post_start and pre_stop output.",
+          "type": "string",
+          "enum": ["docker", "file", "lifecycle"]
+        },
+        "path": {
+          "title": "File Path",
+          "description": "Absolute path inside the container. Required when type=file; must be omitted for docker and lifecycle.",
+          "type": "string"
+        }
+      }
+    },
+    "MetadataSchema": {
+      "title": "Metadata Schema",
+      "description": "Declares the fields, actions, and display values this image exposes to the UI.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "groups": {
+          "title": "Groups",
+          "description": "Named sections used to group items in forms and detail views. Rendered in declaration order; referenced by an item's group key.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetadataGroup" }
+        },
+        "items": {
+          "title": "Items",
+          "description": "Metadata entries. Each item is one of three variants discriminated by type: field (user-editable), action (link or button), or display (read-only value).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetadataItem" }
+        }
+      }
+    },
+    "MetadataGroup": {
+      "title": "Metadata Group",
+      "description": "Labelled section of metadata items.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label"],
+      "properties": {
+        "key": { "$ref": "#/$defs/Key" },
+        "label": {
+          "title": "Label",
+          "description": "Section heading shown in the UI.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "title": "Description",
+          "description": "Helper text shown beneath the section heading.",
+          "type": "string"
+        }
+      }
+    },
+    "FieldDependency": {
+      "title": "Field Dependency",
+      "description": "Shows the dependent item only when another field item's stored value equals value (exact string match).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "value"],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/Key",
+          "title": "Field Key",
+          "description": "Key of another field item in the same metadata schema."
+        },
+        "value": {
+          "title": "Value",
+          "description": "Required value of the referenced field for this item to render.",
+          "type": "string"
+        }
+      }
+    },
+    "Visibility": {
+      "title": "Visibility",
+      "description": "Controls where and when a metadata item renders.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contexts": {
+          "title": "Contexts",
+          "description": "UI surfaces this item appears on. Omit or leave empty to render on every surface.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Context" }
+        },
+        "condition": {
+          "title": "Runtime Condition",
+          "description": "Runtime gate evaluated by the frontend. Only \"ready\" is recognized today (disables the item until the sandbox reports ready); any other value is ignored.",
+          "type": "string",
+          "examples": ["ready"]
+        },
+        "depends_on": { "$ref": "#/$defs/FieldDependency" }
+      }
+    },
+    "SelectOption": {
+      "title": "Select Option",
+      "description": "One choice in a select or multiselect field.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "title": "Value",
+          "description": "Stored value written to sandbox metadata.",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "description": "Label shown in the UI for this option.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "FieldSpec": {
+      "title": "Field",
+      "description": "User-editable input. Values are always stored as strings; booleans, numbers, and multiselect values use a string encoding on the wire.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input"],
+      "properties": {
+        "input": {
+          "title": "Input Kind",
+          "description": "Rendered control and string-encoding convention. text = single-line text; password = masked single-line text; number = decimal string; email = email-validated text; url = url-validated text; select = one value from options; multiselect = comma-joined subset of options; toggle = \"true\" or \"false\"; textarea = multi-line text.",
+          "type": "string",
+          "enum": [
+            "text",
+            "password",
+            "number",
+            "email",
+            "url",
+            "select",
+            "multiselect",
+            "toggle",
+            "textarea"
+          ]
+        },
+        "default": {
+          "title": "Default",
+          "description": "Default value used when no sandbox value is set. Also feeds {{.Meta.<key>}} during template rendering.",
+          "type": "string"
+        },
+        "placeholder": {
+          "title": "Placeholder",
+          "description": "Placeholder text shown in empty inputs.",
+          "type": "string"
+        },
+        "help_text": {
+          "title": "Help Text",
+          "description": "Guidance rendered alongside the control and wired to aria-describedby.",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "description": "If true, the form cannot be submitted without a value.",
+          "type": "boolean"
+        },
+        "read_only": {
+          "title": "Read-Only",
+          "description": "If true, the value is displayed but not editable. Use for platform-assigned values.",
+          "type": "boolean"
+        },
+        "options": {
+          "title": "Options",
+          "description": "Available choices. Required and non-empty when input is select or multiselect; must be omitted for other input kinds.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/SelectOption" }
+        }
+      }
+    },
+    "ActionSpec": {
+      "title": "Action",
+      "description": "Clickable link or button.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "title": "URL",
+          "description": "Go template producing an absolute URL, rendered server-side against the sandbox TemplateContext. Wrap user-controlled interpolations with urlquery, e.g. {{.URL}}/admin?u={{ urlquery .Meta.admin_user }}.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["{{.URL}}/admin"]
+        },
+        "variant": {
+          "title": "Variant",
+          "description": "Button visual style. default = primary; outline = secondary; destructive = danger (requires confirm).",
+          "type": "string",
+          "enum": ["default", "outline", "destructive"]
+        },
+        "size": {
+          "title": "Size",
+          "description": "Button size. default = standard; icon = compact icon-only.",
+          "type": "string",
+          "enum": ["default", "icon"]
+        },
+        "target": {
+          "title": "Target",
+          "description": "Anchor target. Defaults to _blank when omitted.",
+          "type": "string",
+          "enum": ["_blank", "_self"]
+        },
+        "confirm": {
+          "title": "Confirm Prompt",
+          "description": "Confirmation prompt shown before the action runs. Required when variant=destructive; ignored otherwise.",
+          "type": "string",
+          "examples": ["Dies löscht alle Shop-Daten. Fortfahren?"]
+        }
+      }
+    },
+    "DisplaySpec": {
+      "title": "Display",
+      "description": "Read-only value shown in the UI.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "title": "Value",
+          "description": "Go template rendered to a plain string server-side against the sandbox TemplateContext.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["{{.URL}}", "{{.Meta.admin_user}}"]
+        },
+        "format": {
+          "title": "Format",
+          "description": "Render style. text = plain text; code = monospace block; badge = status pill; link = clickable URL; password = masked with reveal toggle and treated as secret end-to-end.",
+          "type": "string",
+          "enum": ["text", "code", "badge", "link", "password"]
+        },
+        "copyable": {
+          "title": "Copyable",
+          "description": "Adds a copy-to-clipboard button next to the value.",
+          "type": "boolean"
+        }
+      }
+    },
+    "MetadataItem": {
+      "title": "Metadata Item",
+      "description": "One entry in metadata.items. Discriminated by type into a field, action, or display variant; exactly one of the matching sub-objects must be present.",
+      "oneOf": [
+        { "$ref": "#/$defs/FieldItem" },
+        { "$ref": "#/$defs/ActionItem" },
+        { "$ref": "#/$defs/DisplayItem" }
+      ]
+    },
+    "FieldItem": {
+      "title": "Field Item",
+      "description": "User-editable metadata item (type=field).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "field"],
+      "properties": {
+        "key": { "$ref": "#/$defs/Key" },
+        "label": {
+          "title": "Label",
+          "description": "Label shown next to the control.",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "description": "Discriminator. Must be \"field\".",
+          "type": "string",
+          "const": "field"
+        },
+        "icon": {
+          "title": "Icon",
+          "description": "Lucide icon name (e.g. user, lock, mail).",
+          "type": "string"
+        },
+        "group": {
+          "$ref": "#/$defs/Key",
+          "title": "Group",
+          "description": "Key of a metadata group declared in metadata.groups."
+        },
+        "visibility": { "$ref": "#/$defs/Visibility" },
+        "field": { "$ref": "#/$defs/FieldSpec" }
+      }
+    },
+    "ActionItem": {
+      "title": "Action Item",
+      "description": "Clickable link or button metadata item (type=action).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "action"],
+      "properties": {
+        "key": { "$ref": "#/$defs/Key" },
+        "label": {
+          "title": "Label",
+          "description": "Button or link text.",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "description": "Discriminator. Must be \"action\".",
+          "type": "string",
+          "const": "action"
+        },
+        "icon": {
+          "title": "Icon",
+          "description": "Lucide icon name (e.g. user, lock, mail).",
+          "type": "string"
+        },
+        "group": {
+          "$ref": "#/$defs/Key",
+          "title": "Group",
+          "description": "Key of a metadata group declared in metadata.groups."
+        },
+        "visibility": { "$ref": "#/$defs/Visibility" },
+        "action": { "$ref": "#/$defs/ActionSpec" }
+      }
+    },
+    "DisplayItem": {
+      "title": "Display Item",
+      "description": "Read-only metadata item (type=display).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "display"],
+      "properties": {
+        "key": { "$ref": "#/$defs/Key" },
+        "label": {
+          "title": "Label",
+          "description": "Label shown above or beside the value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "description": "Discriminator. Must be \"display\".",
+          "type": "string",
+          "const": "display"
+        },
+        "icon": {
+          "title": "Icon",
+          "description": "Lucide icon name (e.g. user, lock, mail).",
+          "type": "string"
+        },
+        "group": {
+          "$ref": "#/$defs/Key",
+          "title": "Group",
+          "description": "Key of a metadata group declared in metadata.groups."
+        },
+        "visibility": { "$ref": "#/$defs/Visibility" },
+        "display": { "$ref": "#/$defs/DisplaySpec" }
+      }
+    }
+  }
+}

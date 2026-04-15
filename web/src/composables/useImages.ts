@@ -183,22 +183,20 @@ export function useImages(mode: FetchMode = 'public') {
 
   async function updateImage(id: string, req: UpdateImageRequest): Promise<Image> {
     const updated = await imagesApi.update(id, req)
-    const idx = images.value.findIndex((i) => i.id === id)
-    if (idx !== -1) images.value[idx] = updated
+    store.upsertImage(updated)
     return updated
   }
 
   async function uploadThumbnail(id: string, file: File): Promise<Image> {
     const updated = await imagesApi.uploadThumbnail(id, file)
-    const idx = images.value.findIndex((i) => i.id === id)
-    if (idx !== -1) images.value[idx] = updated
+    store.upsertImage(updated)
     return updated
   }
 
   async function deleteThumbnail(id: string): Promise<void> {
     await imagesApi.deleteThumbnail(id)
-    const idx = images.value.findIndex((i) => i.id === id)
-    if (idx !== -1) images.value[idx] = { ...images.value[idx], thumbnailUrl: undefined }
+    const current = images.value.find((i) => i.id === id)
+    if (current) store.upsertImage({ ...current, thumbnailUrl: undefined })
   }
 
   async function deleteImage(id: string) {

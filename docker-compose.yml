@@ -8,7 +8,6 @@ services:
       - "${SSH_PORT:-2222}:${SSH_PORT:-2222}"
     environment:
       CONFIG_PATH: /app/config.yml
-      DOCKER_HOST: unix:///var/run/docker.sock
       DATABASE_HOST: ${DATABASE_HOST:-database}
       SERVER_ALLOWED_ORIGINS: ${SERVER_ALLOWED_ORIGINS}
       DATABASE_PORT: ${DATABASE_PORT:-5432}
@@ -23,7 +22,7 @@ services:
       SSH_ENABLED: ${SSH_ENABLED:-true}
       SSH_PORT: ${SSH_PORT:-2222}
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - api_storage:/app/storage
     networks:
       - sandbox-network

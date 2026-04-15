@@ -51,7 +51,7 @@ func (r *SandboxRepository) FindByID(id uuid.UUID) (*models.Sandbox, error) {
 
 func (r *SandboxRepository) FindByContainerID(containerID string) (*models.Sandbox, error) {
 	var sandbox models.Sandbox
-	if err := r.db.First(&sandbox, "container_id = ?", containerID).Error; err != nil {
+	if err := r.db.Where("deleted_at IS NULL").First(&sandbox, "container_id = ?", containerID).Error; err != nil {
 		return nil, err
 	}
 	return &sandbox, nil
