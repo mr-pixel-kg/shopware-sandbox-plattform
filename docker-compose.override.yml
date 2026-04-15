@@ -12,7 +12,7 @@ services:
       - "80:80"
       - "9000:8080"
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
     networks:
       - sandbox-network
       - internal
@@ -40,7 +40,7 @@ services:
       SSH_ENABLED: "true"
       SSH_PORT: "2222"
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - ./api/storage:/app/storage
 
   web:
