@@ -82,44 +82,24 @@ images:
       APP_URL: "{{.URL}}"
       APP_ENV: "{{.Meta.app_env}}"
     post_start:
-      - label: "Wait for Shopware readiness"
-        command: ["bash", "-c", "for i in $(seq 1 60); do test -x /var/www/html/bin/console && mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e 'SELECT 1' >/dev/null 2>&1 && cd /var/www/html && bin/console about >/dev/null 2>&1 && exit 0; sleep 2; done; exit 1"]
-        delay: 3s
+      - label: "Wait for Shopware"
+        command: ["sh", "-c", "until curl -fsS http://127.0.0.1/api/_info/health-check >/dev/null 2>&1; do sleep 2; done"]
         timeout: 180s
-      - label: "Configure trusted proxies"
-        command: ["bash", "-c", "mkdir -p /var/www/html/config/packages && printf 'framework:\\n    trusted_proxies: \"127.0.0.1,REMOTE_ADDR\"\\n' > /var/www/html/config/packages/framework.yaml"]
-        delay: 1s
-        timeout: 30s
-        retries: 2
-        retry_delay: 3s
-      - label: "Write .env.local"
-        command: ["bash", "-c", "printf 'APP_ENV={{.Meta.app_env}}\\nAPP_URL={{.URL}}\\n' > /var/www/html/.env.local"]
+      - label: "Write config"
+        command: ["sh", "-c", "cd /var/www/html && mkdir -p config/packages && echo 'framework: { trusted_proxies: \"127.0.0.1,REMOTE_ADDR\" }' > config/packages/framework.yaml && printf 'APP_ENV=%s\\nAPP_URL=%s\\n' '{{.Meta.app_env}}' '{{.URL}}' > .env.local"]
         timeout: 10s
-        retries: 2
-        retry_delay: 3s
-      - label: "Update sales channel domains"
-        command: ["bash", "-c", "mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"UPDATE IGNORE sales_channel_domain SET url='{{.URL}}' WHERE url <> '{{.URL}}';\" && mysql -u root -proot -h 127.0.0.1 -P 3306 shopware -e \"DELETE FROM sales_channel_domain WHERE url <> '{{.URL}}';\""]
+      - label: "Update sales channel URL"
+        command: ["mysql", "-h127.0.0.1", "-uroot", "-proot", "shopware", "-e", "UPDATE IGNORE sales_channel_domain SET url='{{.URL}}'; DELETE FROM sales_channel_domain WHERE url<>'{{.URL}}';"]
+        timeout: 30s
+      - label: "Ensure admin user"
+        command: ["sh", "-c", "cd /var/www/html && bin/console user:change-password '{{.Meta.admin_user}}' --password='{{.Meta.admin_password}}' 2>/dev/null || bin/console user:create --admin --no-interaction --email='{{.Meta.admin_user}}@example.com' --firstName=Admin --lastName=Admin --password='{{.Meta.admin_password}}' '{{.Meta.admin_user}}'"]
+        timeout: 30s
+      - label: "Resolve URL change"
+        command: ["sh", "-c", "cd /var/www/html && (bin/console app:shop-id:change move-shop-permanently 2>/dev/null || bin/console app:url-change:resolve move-shop-permanently 2>/dev/null || true)"]
         timeout: 60s
-        retries: 3
-        retry_delay: 5s
-      - label: "Configure admin user"
-        command: ["bash", "-c", "cd /var/www/html && if bin/console user:change-password '{{.Meta.admin_user}}' --password='{{.Meta.admin_password}}' 2>/dev/null; then true; else bin/console user:create --admin --no-interaction --email=admin@example.com --firstName=Admin --lastName=Admin --password='{{.Meta.admin_password}}' '{{.Meta.admin_user}}'; fi"]
-        delay: 2s
-        timeout: 60s
-        retries: 3
-        retry_delay: 5s
-      - label: "Resolve app URL change"
-        command: ["bash", "-c", "cd /var/www/html && if bin/console list --raw 2>/dev/null | grep -q '^app:shop-id:change'; then bin/console app:shop-id:change move-shop-permanently; elif bin/console list --raw 2>/dev/null | grep -q '^app:url-change:resolve'; then bin/console app:url-change:resolve move-shop-permanently; fi"]
-        delay: 2s
-        timeout: 120s
-        retries: 3
-        retry_delay: 10s
       - label: "Clear cache"
-        command: ["bash", "-c", "cd /var/www/html && bin/console cache:clear"]
-        delay: 1s
+        command: ["sh", "-c", "cd /var/www/html && bin/console cache:clear"]
         timeout: 60s
-        retries: 3
-        retry_delay: 5s
     logs:
       - key: "container"
         label: "Container Output"
