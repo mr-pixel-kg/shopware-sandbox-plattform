@@ -83,8 +83,10 @@ images:
       APP_ENV: "{{.Meta.app_env}}"
     post_start:
       - label: "Wait for Shopware"
-        command: ["sh", "-c", "until curl -fsS http://127.0.0.1/api/_info/health-check >/dev/null 2>&1; do sleep 2; done"]
-        timeout: 180s
+        command: ["curl", "-fsS", "http://127.0.0.1/api/_info/health-check"]
+        timeout: 10s
+        retries: 20
+        retry_delay: 2s
       - label: "Write config"
         command: ["sh", "-c", "cd /var/www/html && mkdir -p config/packages && echo 'framework: { trusted_proxies: \"127.0.0.1,REMOTE_ADDR\" }' > config/packages/framework.yaml && printf 'APP_ENV=%s\\nAPP_URL=%s\\n' '{{.Meta.app_env}}' '{{.URL}}' > .env.local"]
         timeout: 10s
@@ -96,9 +98,6 @@ images:
         timeout: 30s
       - label: "Resolve URL change"
         command: ["sh", "-c", "cd /var/www/html && (bin/console app:shop-id:change move-shop-permanently 2>/dev/null || bin/console app:url-change:resolve move-shop-permanently 2>/dev/null || true)"]
-        timeout: 60s
-      - label: "Clear cache"
-        command: ["sh", "-c", "cd /var/www/html && bin/console cache:clear"]
         timeout: 60s
     logs:
       - key: "container"
