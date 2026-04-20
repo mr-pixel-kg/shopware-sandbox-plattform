@@ -91,7 +91,7 @@ images:
         command: ["sh", "-c", "cd /var/www/html && mkdir -p config/packages && echo 'framework: { trusted_proxies: \"127.0.0.1,REMOTE_ADDR\" }' > config/packages/framework.yaml && printf 'APP_ENV=%s\\nAPP_URL=%s\\n' '{{.Meta.app_env}}' '{{.URL}}' > .env.local"]
         timeout: 10s
       - label: "Update sales channel URL"
-        command: ["mysql", "-h127.0.0.1", "-uroot", "-proot", "shopware", "-e", "UPDATE sales_channel_domain SET url='{{.URL}}';"]
+        command: ["mysql", "-h127.0.0.1", "-uroot", "-proot", "shopware", "-e", "UPDATE sales_channel_domain SET url='{{.URL}}' ORDER BY id LIMIT 1;"]
         timeout: 30s
       - label: "Ensure admin user"
         command: ["sh", "-c", "cd /var/www/html && bin/console user:change-password '{{.Meta.admin_user}}' --password='{{.Meta.admin_password}}' 2>/dev/null || bin/console user:create --admin --no-interaction --email='{{.Meta.admin_user}}@example.com' --firstName=Admin --lastName=Admin --password='{{.Meta.admin_password}}' '{{.Meta.admin_user}}'"]
