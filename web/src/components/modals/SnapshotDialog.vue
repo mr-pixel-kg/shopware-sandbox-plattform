@@ -18,7 +18,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { isFieldItem } from '@/utils/metadata'
 
 import type { Image, MetadataItem, MetadataSchema, Sandbox } from '@/types'
 
@@ -64,15 +63,6 @@ function revokeBlobPreview() {
   }
 }
 
-function stripSecretValues(items: MetadataItem[]): MetadataItem[] {
-  return items.map((it) => {
-    if (isFieldItem(it) && it.field.input === 'password') {
-      return { ...it, field: { ...it.field, default: '' } }
-    }
-    return it
-  })
-}
-
 async function initFromSource() {
   revokeBlobPreview()
   thumbnailFile.value = null
@@ -88,7 +78,7 @@ async function initFromSource() {
   description.value = img?.description ?? ''
   isPublic.value = img?.isPublic ?? false
 
-  metadata.value = stripSecretValues(img?.metadata ?? [])
+  metadata.value = [...(img?.metadata ?? [])]
   registrySchema.value = img ? await imagesApi.lookupRegistry(img.registryRef ?? img.name) : null
 }
 
@@ -142,7 +132,7 @@ function handleSubmit() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-160">
       <DialogHeader>
         <DialogTitle>Snapshot erstellen</DialogTitle>
         <DialogDescription>
@@ -156,7 +146,7 @@ function handleSubmit() {
             <TabsTrigger value="metadata" class="flex-1">Metadaten</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" class="mt-4 grid min-h-[380px] gap-4">
+          <TabsContent value="general" class="mt-4 grid min-h-95 gap-4">
             <div class="grid gap-2">
               <Label for="snapshot-name">Image Name</Label>
               <Input
@@ -232,7 +222,7 @@ function handleSubmit() {
             </div>
           </TabsContent>
 
-          <TabsContent value="metadata" class="mt-4 min-h-[380px]">
+          <TabsContent value="metadata" class="mt-4 min-h-95">
             <MetadataEditor v-model="metadata" :registry-schema="registrySchema" :disabled="busy" />
           </TabsContent>
         </Tabs>
